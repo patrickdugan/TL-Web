@@ -1,0 +1,42 @@
+.sign-tab-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+
+    .options {
+        .content {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            .detailed {
+                margin-bottom: 1rem;
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                border-bottom: 1px solid var(--hardGrey);
+                .tx {
+                    width: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    .inputs {
+                        display: flex;
+                        justify-content: space-between;
+                        mat-form-field {
+                            width: 30%;
+                        }
+                    }
+                }
+            }
+            .priv-key-field {
+                width: 100%;
+                display: flex;
+                padding-top: 2rem;
+                justify-content: space-between;
+                mat-form-field {
+                    width: 48%;
+                }
+            }
+        }
+    }
+}

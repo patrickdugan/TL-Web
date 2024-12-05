@@ -1,0 +1,34 @@
+:host {
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1001;
+    top: 0;
+    pointer-events: none;
+    background-color: rgba(0, 0, 0, 0.75);
+    .disconnected-line {
+        pointer-events: all;
+        display: flex;
+        position: relative;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        box-shadow: 0 0 0.5rem 0.1rem black;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem;
+        color: whitesmoke;
+        z-index: 999;
+        font-size: 1.25rem;
+        span {
+            padding: 0 0.25rem;
+            color: yellow;
+            cursor: pointer;
+            transition: color 0.25s;
+            &:hover { 
+                color: gray;
+            }
+        }
+    }
+}

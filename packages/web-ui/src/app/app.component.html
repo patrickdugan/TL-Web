@@ -1,0 +1,12 @@
+<tl-side-nav *ngIf="isNetworkSelected" (keydown.shift.t)="openHiddenTerminal()">
+    <tl-layout>
+        <router-outlet></router-outlet>
+    </tl-layout>
+    <ng-container>
+        <ng-template *ngFor='let w of windows' [ngComponentOutlet]="w.component"></ng-template>
+        <tl-info-line></tl-info-line>
+    </ng-container>
+</tl-side-nav>
+
+<tl-disconnected-line *ngIf="!allConnected"></tl-disconnected-line>
+<overlay-loading *ngIf='isLoading || socketsLoading'></overlay-loading>

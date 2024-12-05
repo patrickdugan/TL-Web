@@ -1,0 +1,77 @@
+:host {
+    height: 2rem;
+    width: 100%;
+    background-color: var(--darkBlue2);
+    box-shadow: 0 0 0.1rem 0 black;
+    padding: 0.25rem;
+    z-index: 20;
+    color: var(--white);
+    position: absolute;
+    bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    .tabs {
+        flex-shrink: 1;
+        display: flex;
+        .tab {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.1rem 0.5rem;
+            border: 1px solid black;
+            cursor: pointer;
+            color: var(--white);
+            background-color: var(--darkBlue);
+            white-space: nowrap;
+        }
+    }
+    .info-line {
+        display: flex;
+        .info {
+            border-left: 1px solid white;
+            padding: 0 1rem;
+            white-space: nowrap;
+            .block-container {
+                position: relative;
+                .newBlock {
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    color: var(--greenSuccess);
+                    opacity: 0;
+                }
+                .active-animation {
+                    animation: newBlock 4s ease-in 1;
+                }
+            }
+            &:first-child {
+                border-left: unset;
+            }
+            .blinking {
+                animation: blinker 2s ease-in infinite; 
+            }
+        }
+    }
+}
+
+@keyframes blinker {
+    50% {
+      opacity: 0;
+    }
+}
+
+@keyframes newBlock {
+    10% {
+        opacity: 1;
+        top: -1rem;
+    }
+    60% {
+        opacity: 1;
+        top: -1rem;
+    }
+    80% {
+        opacity: 0;
+        top: 0;
+    }
+}

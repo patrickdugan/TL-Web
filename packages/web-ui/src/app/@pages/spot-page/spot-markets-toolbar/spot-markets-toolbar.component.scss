@@ -1,0 +1,72 @@
+:host {
+    width: 100%;
+}
+
+.markets-toolbar {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    .market-types-container {
+        display: flex;
+        width: 100%;
+        justify-content: center;
+        mat-tab-group {
+            width: 100%;
+        }
+    }
+
+    .markets-container {
+        margin-top: 1.5rem;
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        mat-tab-group {
+            width: 100%;
+        }
+    }
+}
+
+.market-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.5rem;
+    overflow: hidden;
+}
+
+.market-pair-span {
+    color: whitesmoke;
+}
+
+::ng-deep .main-market-nav {
+    .mat-tab-label {
+        background-color: #1B1E34;
+        min-width: 100px;
+        opacity: 1;
+    }
+
+    .mat-tab-disabled {
+        opacity: 0.8;
+    }
+
+    .mat-tab-label-active {
+        background-color: #272A3E;
+    }
+
+    .sub-market-nav {
+        .mat-tab-label {
+            background-color: #1B1E34;
+            min-width: 100px;
+            border-radius: 3px;
+            height: 38px;
+            min-width: 120px;
+        }
+
+        .mat-tab-label-active {
+            background-color: var(--lightBlue);
+        }
+    }
+
+    .mat-ink-bar {
+        display: none;
+    }
+}

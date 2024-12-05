@@ -1,0 +1,99 @@
+:host {
+    width: 100%;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+}
+
+.portfolio-page-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    padding: 5rem 2rem 0rem 2rem;
+    mat-table {
+        width: 100%;
+        background-color: unset;
+        .mat-header-cell {
+            color: white;
+            background-color: rgb(46, 46, 46);
+            height: 1rem;
+        }
+        .mat-cell {
+            color: wheat;
+        }
+    }
+    mat-card {
+        width: 100%;
+        background-color: rgba(128, 128, 128, 0.3);
+        color: wheat;
+        margin-bottom: 2rem;
+        padding-top: 3rem;
+        mat-card-header {
+            margin-bottom: 1rem;
+            span {
+                color: whitesmoke;
+                padding: 0 0.5rem;
+            }
+        }
+        mat-card-content {
+            color: whitesmoke;
+            overflow: auto;
+            .no-tokens {
+                text-align: center;
+            }
+        }
+        .new-address-buttton {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+        }
+    }
+}
+
+.mat-cell {
+    overflow: hidden;
+    .copy-icon {
+        margin-left: 0.5rem;
+        font-size: 0.9rem;
+        cursor: pointer;
+        &:hover {
+            filter: invert(1);
+        }
+    }
+}
+
+.mat-column-actions {
+    .span-button {
+        white-space: nowrap;
+        color: whitesmoke;
+        cursor: pointer;
+        margin: 0 0.5rem;
+        &:hover {
+            color: gray;
+        }
+    }
+}
+
+  .mat-column-address {
+    min-width: 12rem;
+  }
+
+  .mat-column-propertyid,
+  .mat-column-name,
+  .mat-column-confirmed,
+  .mat-column-unconfirmed,
+  .mat-column-balance,
+  .mat-column-attestation {
+    min-width: 6rem;
+  }
+
+  .mat-column-attestation {
+    max-width: 3rem;
+    mat-icon {
+        cursor: pointer;
+        margin-left: 1rem;
+    }
+  }
+  .mat-column-actions {
+    min-width: 16rem;
+  }

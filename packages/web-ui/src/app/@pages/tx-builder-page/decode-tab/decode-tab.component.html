@@ -1,0 +1,34 @@
+<div class="decode-tab-wrapper">
+    <div class="io-area input">
+        <div class="header">
+            <div class="text">Input</div>
+            <mat-icon (click)="pasteClipboard()">content_paste</mat-icon>
+        </div>
+        <div class="content">
+            <textarea
+                [(ngModel)]="input"
+                placeholder="Place your Raw Transction here ..."
+            ></textarea>
+        </div>
+    </div>
+    <div class="buttons">
+        <button
+            class="blueButton"
+            (click)="decode()"
+        >Decode</button>
+    </div>
+    <div class="io-area output">
+        <div class="header">
+            <div class="text">Tradelayer Output</div>
+            <mat-icon (click)="copyOutput(1)">content_copy</mat-icon>
+        </div>
+        <div class="content"> {{ output_tl || "// No Output"}} </div>
+    </div>
+    <div class="io-area output">
+        <div class="header">
+            <div class="text">Litecoin Output</div>
+            <mat-icon (click)="copyOutput(2)">content_copy</mat-icon>
+        </div>
+        <div class="content"> {{ output_main || "// No Output"}} </div>
+    </div>
+</div>

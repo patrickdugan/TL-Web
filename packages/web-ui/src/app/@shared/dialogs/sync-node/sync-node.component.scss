@@ -1,0 +1,66 @@
+.dialog-container {
+    color: black;
+    mat-dialog-content {
+        .content-container {
+            display: flex;
+            flex-direction: column;
+            padding-top: 1rem;
+            min-width: 25rem;
+            align-items: center;
+            .information {
+                margin-bottom: 1rem;
+            }
+            .synced {
+                color: green;
+                margin-bottom: 1rem;
+
+            }
+            .blocks-span {
+                text-align: center;
+                margin: 0.5rem 0;
+            }
+            button {
+                margin-top: 1rem
+            }
+            .message {
+                text-align: center;
+                color: red;
+                min-height: 1.25rem;
+            }
+        }
+        .content-container-not-started {
+            display: flex !important;
+            flex-direction: column !important;
+            padding-top: 1rem;
+            .advanced {
+                display: flex;
+                align-items: center;
+                padding: 0 0.75rem;
+                margin-top: 1rem;
+                span {
+                    font-size: 0.75rem;
+                    cursor: pointer;
+                }
+                mat-icon {
+                    margin-right: 0.5rem;
+                    transform: scale(0.75);
+                    cursor: pointer;
+                }
+            }
+            .advaned-options {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 0 2rem;
+            }
+            button {
+                background-color: var(--mossGreen);
+            }
+        }
+    }
+
+}
+
+::ng-deep mat-progress-bar {
+    height: 24px !important
+}

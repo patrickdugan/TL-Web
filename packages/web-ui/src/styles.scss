@@ -1,0 +1,89 @@
+@use '~@angular/material' as mat;
+@use './app/@theme/style.scss';
+@include mat.core();
+
+$tradelayer-wallet-primary: mat.define-palette(mat.$indigo-palette);
+$tradelayer-wallet-accent: mat.define-palette(mat.$pink-palette, A200, A100, A400);
+
+$tradelayer-wallet-warn: mat.define-palette(mat.$red-palette);
+
+$tradelayer-wallet-theme: mat.define-light-theme((
+  color: (
+    primary: $tradelayer-wallet-primary,
+    accent: $tradelayer-wallet-accent,
+    warn: $tradelayer-wallet-warn,
+  )
+));
+
+@include mat.all-component-themes($tradelayer-wallet-theme);
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+body {
+  background-color: var(--background);
+  min-width: 45rem;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+}
+
+.drawer-container {
+  background-color: var(--background);
+  height: 100%;
+}
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Let's get this party started */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3); 
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+  background: rgba(100, 100, 100, 0.8); 
+  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5); 
+}
+
+::-webkit-scrollbar-thumb:window-inactive {
+  background: rgba(100,100,100,0.4); 
+}
+
+.custom-toastr {
+  top: 0%;
+  right: 0%;
+  width: 100%;
+  .ngx-toastr {
+    width: 100% !important;
+    padding: 0.75rem !important;
+    padding-left: 4rem !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+}

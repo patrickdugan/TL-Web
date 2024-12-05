@@ -1,0 +1,75 @@
+<div class="tab-container">
+    <mat-form-field>
+        <mat-label>Raw Transaction Hex</mat-label>
+        <input matInput type='text' [(ngModel)]='rawTx'>
+    </mat-form-field>
+
+    <mat-checkbox [(ngModel)]='detailed' [disabled]='!vins.length'>Detailed</mat-checkbox>
+
+    <div class="detailed" *ngIf='vins.length && detailed'>
+        <div class="tx" *ngFor='let tx of vins; let i = index'>
+            <mat-form-field style="width: 100%; cursor: pointer;" (click)='copy(tx.txid)'>
+                <mat-label>Input {{ i }}: Transaction ID</mat-label>
+                <input matInput type='text' [value]='tx.txid' disabled>
+            </mat-form-field>
+            <div class="options">
+                <mat-form-field>
+                    <mat-label>amount</mat-label>
+                    <input matInput type='number' [(ngModel)]='tx.amount'>
+                </mat-form-field>
+                <mat-form-field>
+                    <mat-label>Script PubKey</mat-label>
+                    <input matInput type='text' [(ngModel)]='tx.scriptPubKey'>
+                </mat-form-field>
+                <mat-form-field>
+                    <mat-label>Redeem Script</mat-label>
+                    <input matInput type='text' [(ngModel)]='tx.redeemScript'>
+                </mat-form-field>
+            </div>
+            <mat-form-field class='priv-key-field'>
+                <mat-label>Private Key</mat-label>
+                <input matInput type='text' [value]='privKeys?.[i] || ""' (keyup)='updatePrivKeyValue($event, i)'>
+            </mat-form-field>
+        </div>
+    </div>
+
+    <div class="pubkey-wrapper">
+        <mat-checkbox [(ngModel)]='addMultisig' [disabled]='!vins.length'>Add Multisig Address First</mat-checkbox>
+        <div class='keys' *ngIf='addMultisig'>
+            <div class='field'>
+                <span>Required Keys: </span>
+                <span class='value'> {{ nRequired }} </span>
+                <div class="icons">
+                    <mat-icon (click)="nKeysChange('required', 'add')">add</mat-icon>
+                    <mat-icon (click)="nKeysChange('required', 'remove')">remove</mat-icon>
+                </div>
+            </div>
+            <div class='field'>
+                <span>All Keys: </span>
+                <span class='value'> {{ pubkeysArray.length }} </span>
+                <div class="icons">
+                    <mat-icon (click)="nKeysChange('all', 'add')">add</mat-icon>
+                    <mat-icon (click)="nKeysChange('all', 'remove')">remove</mat-icon>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <div class="add-multisig" *ngIf='addMultisig'>
+        <mat-form-field style="width: 100%" *ngFor='pubkey of pubkeysArray; let i = index'>
+            <mat-label>Public Key</mat-label>
+            <input
+            matInput
+            type='text'
+            [value]='pubkeysArray[i]'
+            (keyup)='changePubKey($event, i)'>
+        </mat-form-field>
+    </div>
+
+    <button mat-button [disabled]='buttonDisabled' (click)='sign()'> Sign </button>
+    <textarea [(ngModel)]='hexOutput'> {{ hexOutput }} </textarea>
+    <span class='ready-to-send' *ngIf='hexOutput'> {{ complete ? 'Completed (ready to be sent)' : 'Not Completed'}}</span>
+    <span class='errors-string' *ngIf='hexOutput && !complete && errorsObj'> {{ errorsString }}</span>
+
+</div>

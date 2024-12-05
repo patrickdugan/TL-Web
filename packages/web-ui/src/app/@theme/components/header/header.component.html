@@ -1,0 +1,38 @@
+<mat-toolbar>
+    <mat-toolbar-row>
+        <div class="left-side">
+            <button mat-icon-button (click)='toggleSideBar()'>
+                <mat-icon>menu</mat-icon>
+                <img src='./assets/tl-logo.svg'>
+            </button>
+        </div>
+        <span class="spacer"></span>
+        <div class="right-side" *ngIf="isLoggedIn">
+            <div class="balance" (click)='updateBalance()'>
+                <span>Balance: </span>
+                <span class="balance-span" *ngIf="!balanceLoading">
+                    {{ availableBalance }} LTC
+                </span>
+                <span class="balance-span" *ngIf="balanceLoading">
+                    <mat-spinner diameter="25"></mat-spinner>
+                </span>
+            </div>
+        </div>
+
+        <!-- <button mat-icon-button (click)='isLoggedIn ? logOut() : navigateToLoginRoute()'>
+            <mat-icon>{{ isLoggedIn ? 'logout' : 'login' }}</mat-icon>
+        </button> -->
+    </mat-toolbar-row>
+</mat-toolbar>
+
+<div class="nav-container">
+    <nav mat-tab-nav-bar mat-align-tabs="center">
+        <a
+            *ngFor='let route of mainRoutes'
+            mat-tab-link
+            (click)='navigateTo(route)'
+            [active]='selectedRoute === route'
+            [disabled]='route.disabled'
+        >{{ route.name }}</a>
+      </nav>
+</div>

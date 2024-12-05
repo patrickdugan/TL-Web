@@ -1,0 +1,73 @@
+::ng-deep {
+    .mat-tab-header-pagination-chevron {
+        border-color: var(--white);
+    }
+
+    .mat-tab-label {
+        color: var(--white);
+    }
+
+    .blueButton {
+        background: var(--blue);
+        color: var(--white);
+        &:hover {
+            background: var(--lightBlue);
+            color: var(--white);
+        }
+    }
+
+    .blueButton:disabled {
+        background: var(--darkBlue);
+        color: var(--greyBlue);
+        &:hover {
+            background: var(--darkBlue);
+            color: var(--greyBlue);
+        }
+    }
+}
+
+::ng-deep .mat-dialog-container {
+    background-color: var(--violet2);
+    color: var(--softGrey);
+
+    .redButton {
+        background: var(--red2);
+        color: var(--white);
+        &:hover {
+            background: var(--redError);
+            color: var(--white);
+        }
+    }
+
+    .greenButton {
+        background: var(--mossGreen);
+        color: var(--white);
+        &:hover {
+            background: var(--mossGreen);
+            color: var(--white);
+        }
+    }
+
+    button:disabled {
+        background: var(--darkBlue);
+        color: var(--greyBlue);
+    }
+
+    .mat-form-field-label,
+    .mat-form-field-outline,
+    .mat-hint,
+    .mat-input-element:disabled,
+    .mat-select-value-text {
+        color: white !important;
+    }
+}
+
+overlay-loading {
+    position: fixed;
+    z-index: 9999;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
