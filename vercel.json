@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "packages/serverinterface/src/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "packages/wallet-server/src/**/*.ts",
+          "packages/wallet-server/src/**/*.js"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "packages/wallet-server/dist/server/index.js"
+    }
+  ]
+}

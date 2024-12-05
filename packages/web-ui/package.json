@@ -1,10 +1,10 @@
 {
   "name": "wallet-fe",
   "version": "0.0.11",
-  "scripts": {
-    "build": "ng build --configuration production",
-    "build:watch": "ng build --watch --configuration production"
-  },
+ "scripts": {
+  "build": "ng build --configuration production --output-path=dist",
+  "build:watch": "ng build --watch --configuration production"
+},
   "private": true,
   "dependencies": {
     "@angular/animations": "~12.1.0-",
