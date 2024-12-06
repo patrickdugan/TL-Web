@@ -101,11 +101,6 @@ export class FuturesMarketService {
     }
 
     private changeOrderbookMarketFilter() {
-      const message = {
-        event: 'update-orderbook',
-        data: this.marketFilter,
-      };
-      this.socket.send(JSON.stringify(message));
-}
-
+        this.socket.emit('update-orderbook', this.marketFilter);
+    }
 }

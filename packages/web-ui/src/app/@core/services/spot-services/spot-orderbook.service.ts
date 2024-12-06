@@ -1,5 +1,5 @@
 import { Injectable } from "@angular/core";
-import { Subject, Subscription } from "rxjs";
+import { Subject } from "rxjs";
 import { SpotMarketsService } from "./spot-markets.service";
 import { obEventPrefix, SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
@@ -7,8 +7,6 @@ import { LoadingService } from "../loading.service";
 import { AuthService } from "../auth.service";
 import { ITradeInfo } from "src/app/utils/swapper";
 import { ISpotTradeProps } from "src/app/utils/swapper/common";
-import WebSocket, { MessageEvent } from 'ws';
-
 
 interface ISpotOrderbookData {
     orders: ISpotOrder[],
@@ -29,7 +27,7 @@ export interface ISpotOrder {
     lock: boolean;
     props: {
         amount: number;
-        id_desired: number;
+        id_desired: number,
         id_for_sale: number;
         price: number;
     };
@@ -37,7 +35,7 @@ export interface ISpotOrder {
     timestamp: number;
     type: "SPOT";
     uuid: string;
-    state?: "CANCELLED" | "FILLED"
+    state?: "CANCALED" | "FILLED"
 }
 
 @Injectable({
@@ -45,7 +43,6 @@ export interface ISpotOrder {
 })
 
 export class SpotOrderbookService {
-    private subscription: Subscription;
     private _rawOrderbookData: ISpotOrder[] = [];
     outsidePriceHandler: Subject<number> = new Subject();
     buyOrderbooks: { amount: number, price: number }[] = [];
@@ -56,7 +53,7 @@ export class SpotOrderbookService {
 
     constructor(
         private socketService: SocketService,
-        private spotMarketService: SpotMarketsService,
+        private spotMarkertService: SpotMarketsService,
         private toastrService: ToastrService,
         private loadingService: LoadingService,
         private authService: AuthService,
@@ -71,7 +68,7 @@ export class SpotOrderbookService {
     }
 
     get selectedMarket() {
-        return this.spotMarketService.selectedMarket;
+        return this.spotMarkertService.selectedMarket;
     }
 
     get rawOrderbookData() {
@@ -82,85 +79,56 @@ export class SpotOrderbookService {
         if (!this.activeSpotAddress) return [];
         return this.tradeHistory
             .filter(e => e.seller.keypair.address === this.activeSpotAddress || e.buyer.keypair.address === this.activeSpotAddress)
-            .map(t => ({ ...t, side: t.buyer.keypair.address === this.activeSpotAddress ? 'BUY' : 'SELL' })) as ISpotHistoryTrade[];
+            .map(t => ({...t, side: t.buyer.keypair.address === this.activeSpotAddress ? 'BUY' : 'SELL'})) as ISpotHistoryTrade[];
     }
 
     set rawOrderbookData(value: ISpotOrder[]) {
         this._rawOrderbookData = value;
         this.structureOrderBook();
-    }
+    } 
 
     private get socket() {
         return this.socketService.socket;
     }
 
     get marketFilter() {
-        return this.spotMarketService.marketFilter;
-    }
+        return this.spotMarkertService.marketFilter;
+    };
 
     subscribeForOrderbook() {
-        this.endOrderbookSubscription();
+        this.endOrderbookSbuscription();
+        this.socket.on(`${obEventPrefix}::order:error`, (message: string) => {
+            this.toastrService.error(message || `Undefined Error`, 'Orderbook Error');
+            this.loadingService.tradesLoading = false;
+        });
 
-    this.subscription = this.socketService.events$.subscribe(async (data) => {
-       
-      if (!data || !data.event) return;
+        this.socket.on(`${obEventPrefix}::order:saved`, (data: any) => {
+            this.loadingService.tradesLoading = false;
+            this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
+        });
 
-      switch (data.event) {
-        case `${obEventPrefix}::order:error`:
-          this.toastrService.error(data.message || 'Undefined Error', 'Orderbook Error');
-          this.loadingService.tradesLoading = false;
-          break;
+        this.socket.on(`${obEventPrefix}::update-orders-request`, () => {
+            this.socket.emit('update-orderbook', this.marketFilter)
+        });
 
-        case `${obEventPrefix}::order:saved`:
-          this.toastrService.success('The Order is Saved in Orderbook', 'Success');
-          this.loadingService.tradesLoading = false;
-          break;
-
-        case `${obEventPrefix}::update-orders-request`:
-          this.socket.send(
-            JSON.stringify({
-              event: 'update-orderbook',
-              data: this.marketFilter,
-            })
-          );
-          break;
-
-        case `${obEventPrefix}::orderbook-data`:
-          try {
-            const orderbookData: ISpotOrderbookData = data.data;
+        this.socket.on(`${obEventPrefix}::orderbook-data`, (orderbookData: ISpotOrderbookData) => {
             this.rawOrderbookData = orderbookData.orders;
             this.tradeHistory = orderbookData.history;
             const lastTrade = this.tradeHistory[0];
-            if (!lastTrade) {
-              this.currentPrice = 1;
-              return;
-            }
-            const { amountForSale, amountDesired } = lastTrade.props;
+            if (!lastTrade) return this.currentPrice = 1;
+            const { amountForSale , amountDesired } = lastTrade.props;
             const price = parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
             this.currentPrice = price;
-          } catch (error) {
-            console.error('Error processing message', error);
-          }
-          break;
+            return;
+        });
 
-        default:
-          this.socket.send(
-              JSON.stringify({
-                event: 'update-orderbook',
-                data: this.marketFilter,
-              })
-            );
-          break;
-      }
-     });
+        this.socket.emit('update-orderbook', this.marketFilter);
     }
 
-    endOrderbookSubscription(){
-        if(this.subscription) {
-          this.subscription.unsubscribe();
-          //this.subscription = null;
-        }
-      }
+    endOrderbookSbuscription() {
+        ['update-orders-request', 'orderbook-data', 'order:error', 'order:saved']
+            .forEach(m => this.socket.off(`${obEventPrefix}::${m}`));
+    }
 
     private structureOrderBook() {
         this.buyOrderbooks = this._structureOrderbook(true);
@@ -172,16 +140,16 @@ export class SpotOrderbookService {
         const propIdForSale = isBuy ? this.selectedMarket.second_token.propertyId : this.selectedMarket.first_token.propertyId;
         const filteredOrderbook = this.rawOrderbookData.filter(o => o.props.id_desired === propIdDesired && o.props.id_for_sale === propIdForSale);
         const range = 1000;
-        const result: { price: number, amount: number }[] = [];
+        const result: {price: number, amount: number}[] = [];
         filteredOrderbook.forEach(o => {
-            const _price = Math.trunc(o.props.price * range);
-            const existing = result.find(_o => Math.trunc(_o.price * range) === _price);
-            existing
-                ? existing.amount += o.props.amount
-                : result.push({
-                    price: parseFloat(o.props.price.toFixed(4)),
-                    amount: o.props.amount,
-                });
+          const _price = Math.trunc(o.props.price*range)
+          const existing = result.find(_o =>  Math.trunc(_o.price*range) === _price);
+          existing
+            ? existing.amount += o.props.amount
+            : result.push({
+                price: parseFloat(o.props.price.toFixed(4)),
+                amount: o.props.amount,
+            });
         });
         if (!isBuy) this.lastPrice = result.sort((a, b) => b.price - a.price)?.[result.length - 1]?.price || this.currentPrice || 1;
 

@@ -84,7 +84,7 @@ export class SpotOrderbookCardComponent implements OnInit, OnDestroy {
     }
 
     ngOnDestroy() {
-      this.spotOrderbookService.endOrderbookSubscription()
+      this.spotOrderbookService.endOrderbookSbuscription()
     }
 
     fillBuySellPrice(price: number) {

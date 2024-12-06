@@ -1,21 +1,19 @@
-// Import WebSocket directly
-//import WebSocket from 'ws';
+import { Socket as SocketClient } from 'socket.io-client';
 import { IBuildTxConfig, IUTXO, TxsService } from "src/app/@core/services/txs.service";
 import { IMSChannelData, SwapEvent, IBuyerSellerInfo, TClient, IFuturesTradeProps, ISpotTradeProps, ETradeType } from "./common";
 import { Swap } from "./swap";
 import { ENCODER } from '../payloads/encoder';
 import { ToastrService } from "ngx-toastr";
 
-// Replace SocketClient with WebSocket in the constructor
 export class SellSwapper extends Swap {
-    private tradeStartTime: number; // Add this declaration for tradeStartTime
+        private tradeStartTime: number; // Add this declaration for tradeStartTime
     constructor(
         typeTrade: ETradeType,
         tradeInfo: ISpotTradeProps, // IFuturesTradeProps can be added if needed for futures
         sellerInfo: IBuyerSellerInfo,
         buyerInfo: IBuyerSellerInfo,
         client: TClient,
-        socket: WebSocket, // Use WebSocket here
+        socket: SocketClient,
         txsService: TxsService,
         private toastrService: ToastrService
     ) {
@@ -26,7 +24,6 @@ export class SellSwapper extends Swap {
         this.initTrade();
     }
 
-
     
     private logTime(stage: string) {
         const currentTime = Date.now();
@@ -36,33 +33,29 @@ export class SellSwapper extends Swap {
     private handleOnEvents() {
         this.removePreviuesListeners();
         const _eventName = `${this.cpInfo.socketId}::swap`;
-
-        this.socket.addEventListener('message', (eventData: MessageEvent) => {
-            const swapEventData: SwapEvent = JSON.parse(eventData.data);
-            this.eventSubs$.next(swapEventData);
-            
-            const { socketId, data } = swapEventData;
-            
-            // Ensure you are passing the correct types expected by the methods
-            switch (swapEventData.eventName) {
+        console.log(_eventName)
+        this.socket.on(_eventName, (eventData: SwapEvent) => {
+            this.eventSubs$.next(eventData);
+            const { socketId, data } = eventData;
+            console.log('event data '+JSON.stringify(eventData))
+            switch (eventData.eventName){
                 case 'TERMINATE_TRADE':
-                    this.onTerminateTrade(socketId, swapEventData.eventName);  // or extract message if needed
+                    this.onTerminateTrade.bind(this)(socketId, data);
                     break;
                 case 'BUYER:STEP2':
-                    this.onStep2(socketId);
+                    this.onStep2.bind(this)(socketId);
                     break;
                 case 'BUYER:STEP4':
-                    this.onStep4(socketId, data); 
+                    this.onStep4.bind(this)(socketId, data);
                     break;
                 case 'BUYER:STEP6':
-                    this.onStep6(socketId, data);  // Or cast to appropriate type
+                    this.onStep6.bind(this)(socketId, data);
                     break;
                 default:
                     break;
             }
         });
     }
-
 
     private async initTrade() {
         try {
@@ -78,10 +71,7 @@ export class SellSwapper extends Swap {
             this.multySigChannelData.scriptPubKey = validateMS.data.scriptPubKey;
 
             const swapEvent = new SwapEvent(`SELLER:STEP1`, this.myInfo.socketId, this.multySigChannelData);
-            this.socket.send(JSON.stringify({
-                event: `${this.myInfo.socketId}::swap`,
-                data: JSON.stringify(swapEvent) // Ensure swapEvent is a valid object to stringify
-            }));
+            this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (error: any) {
             const errorMessage = error.message || 'Undefined Error';
             this.terminateTrade(`InitTrade: ${errorMessage}`);
@@ -169,10 +159,7 @@ export class SellSwapper extends Swap {
             } as IUTXO;
 
             const swapEvent = new SwapEvent(`SELLER:STEP3`, this.myInfo.socketId, utxoData);
-            this.socket.send(JSON.stringify({
-                event: `${this.myInfo.socketId}::swap`,
-                data: JSON.stringify(swapEvent) // Ensure swapEvent is a valid object to stringify
-            }));
+            this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (error: any) {
             const errorMessage = error.message || 'Undefined Error';
             this.terminateTrade(`Step 2: ${errorMessage}`);
@@ -193,10 +180,7 @@ export class SellSwapper extends Swap {
             if (signRes.error || !signRes.data?.psbtHex) return console.log(`Sign Tx: ${signRes.error}`);
             console.log('sign res '+JSON.stringify(signRes))
             const swapEvent = new SwapEvent(`SELLER:STEP5`, this.myInfo.socketId, signRes.data.psbtHex);
-            this.socket.send(JSON.stringify({
-                event: `${this.myInfo.socketId}::swap`,
-                data: JSON.stringify(swapEvent) // Ensure swapEvent is a valid object to stringify
-            })); 
+            this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent); 
         } catch (error: any) {
             const errorMessage = error.message || 'Undefined Error';
             this.terminateTrade(`Step 4: ${errorMessage}`);

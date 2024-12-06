@@ -13,7 +13,7 @@ import { IFuturesOrder } from 'src/app/@core/services/futures-services/futures-o
 
 export class FuturesOrdersComponent implements OnInit, OnDestroy {
     private subsArray: Subscription[] = [];
-    private subscription: Subscription;
+
     displayedColumns: string[] = ['date', 'market', 'amount', 'price', 'isBuy', 'close'];
 
     constructor(
@@ -39,36 +39,24 @@ export class FuturesOrdersComponent implements OnInit, OnDestroy {
     }
 
      private subscribe() {
+       this.socket.on(`${obEventPrefix}::placed-orders`, (orders: { openedOrders: IFuturesOrder[], orderHistory: IFuturesOrder[] }) => {
+         const { openedOrders, orderHistory } = orders;
 
-     this.subscription = this.socketService.events$.subscribe((data) => {
-        console.log('checking data in subscribe futures orders '+JSON.stringify(data))
-       
-      if (!data || !data.event) return;
-
-      switch (data.event) {
-        case `${obEventPrefix}::placed-orders`:
-          const { openedOrders, orderHistory } = data.data;
-           this.futuresOrdersService.orderHistory = orderHistory
-             .filter((q: IFuturesOrder) => q.type === "FUTURES" && q.keypair.pubkey === this.authService.activeFuturesKey?.pubkey && q.state);
-           this.futuresOrdersService.openedOrders = openedOrders.filter((q: IFuturesOrder)=> q.type === "FUTURES");
-          break;
-
-        case `${obEventPrefix}::disconnect`:
-          this.futuresOrdersService.openedOrders = [];
-          break;
-
-        default:
-          
-          break;
-      }
+         this.futuresOrdersService.orderHistory = orderHistory
+           .filter(q => q.type === "FUTURES" && q.keypair.pubkey === this.authService.activeFuturesKey?.pubkey && q.state);
+         this.futuresOrdersService.openedOrders = openedOrders.filter(q => q.type === "FUTURES");
+       });
+       this.futuresOrdersService.closeOpenedOrder('test-for-update');
+       this.socket.on(`${obEventPrefix}::disconnect`, () => {
+         this.futuresOrdersService.openedOrders = [];
+       });
 
        const subs = this.authService.updateAddressesSubs$
-         .subscribe(kp => {1
+         .subscribe(kp => {
            if (!this.authService.activeFuturesKey || !kp.length) this.futuresOrdersService.closeAllOrders();
          });
        this.subsArray.push(subs);
-     })
-    }
+     }
 
     ngOnDestroy(): void {
       this.subsArray.forEach(s => s.unsubscribe());

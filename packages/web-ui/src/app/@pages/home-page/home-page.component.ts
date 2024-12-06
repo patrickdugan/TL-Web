@@ -6,8 +6,5 @@ import { Component } from '@angular/core';
   styleUrls: ['./home-page.component.scss']
 })
 export class HomePageComponent {
-    connectWallet() {
-    window.postMessage({ type: 'CONNECT_WALLET' }, '*');
-	}
-
+    
 }

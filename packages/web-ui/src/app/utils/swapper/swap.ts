@@ -1,21 +1,19 @@
 import { TxsService } from "src/app/@core/services/txs.service";
 import { ETradeType, IBuyerSellerInfo, IFuturesTradeProps, IMSChannelData, ISpotTradeProps, SwapEvent, TClient } from "./common";
-//import WebSocket from 'ws';
+import { Socket as SocketClient } from 'socket.io-client';
 import { Subject } from "rxjs";
 
 export abstract class Swap {
     readyRes: (value: { data?: any, error?: any }) => void = () => {};
     eventSubs$: Subject<SwapEvent> = new Subject();
     multySigChannelData: IMSChannelData | null = null;
-    listeners: { eventName: string, callback: (event: MessageEvent) => void }[] = [];
-
     constructor(
         public typeTrade: ETradeType,
         public tradeInfo: ISpotTradeProps|IFuturesTradeProps, 
         public myInfo: IBuyerSellerInfo,
         public cpInfo: IBuyerSellerInfo,
         public client: TClient,
-        public socket: WebSocket,  // Changed to WebSocket
+        public socket: SocketClient,
         public txsService: TxsService,
     ) { }
 
@@ -28,11 +26,7 @@ export abstract class Swap {
 
     terminateTrade(reason: string = 'No info'): void {
         const eventData = new SwapEvent('TERMINATE_TRADE', this.myInfo.socketId, reason);
-        // Sending data through WebSocket, assuming it's serialized as a string
-        this.socket.send(JSON.stringify({
-            event: 'swap',
-            data: eventData
-        }));
+        this.socket.emit(`${this.myInfo.socketId}::swap`, eventData);
         this.onTerminateTrade('', reason);
     }
 
@@ -42,13 +36,6 @@ export abstract class Swap {
     }
 
     removePreviuesListeners() {
-        if (this.listeners && this.listeners.length) {
-            this.listeners.forEach(listener => {
-                // Remove each event listener for WebSocket
-                this.socket.removeEventListener(listener.eventName, listener.callback as () => void);
-            });
-        }
+        this.socket.off(`${this.cpInfo.socketId}::swap`);
     }
-
-
 }

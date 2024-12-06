@@ -1,5 +1,5 @@
 import { Injectable } from "@angular/core";
-import { Subject, Subscription } from "rxjs";
+import { Subject } from "rxjs";
 import { obEventPrefix, SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
 import { LoadingService } from "../loading.service";
@@ -7,7 +7,6 @@ import { AuthService } from "../auth.service";
 import { FuturesMarketService } from "./futures-markets.service";
 import { ITradeInfo } from "src/app/utils/swapper";
 import { IFuturesTradeProps } from "src/app/utils/swapper/common";
-//import WebSocket, { MessageEvent } from 'ws';
 
 interface IFuturesOrderbookData {
     orders: IFuturesOrder[],
@@ -37,7 +36,7 @@ export interface IFuturesOrder {
     timestamp: number;
     type: "FUTURES";
     uuid: string;
-    state?: "CANCALLED" | "FILLED";
+    state?: "CANCALED" | "FILLED";
 }
 
 @Injectable({
@@ -47,8 +46,6 @@ export interface IFuturesOrder {
 export class FuturesOrderbookService {
     private _rawOrderbookData: IFuturesOrder[] = [];
     outsidePriceHandler: Subject<number> = new Subject();
-    private subscription: Subscription;
-    private subsArray: Subscription[] = [];
     buyOrderbooks: { amount: number, price: number }[] = [];
     sellOrderbooks: { amount: number, price: number }[] = [];
     tradeHistory: IFuturesHistoryTrade[] = [];
@@ -89,7 +86,7 @@ export class FuturesOrderbookService {
     set rawOrderbookData(value: IFuturesOrder[]) {
         this._rawOrderbookData = value;
         this.structureOrderBook();
-    }
+    } 
 
     private get socket() {
         return this.socketService.socket;
@@ -99,55 +96,38 @@ export class FuturesOrderbookService {
         return this.futuresMarketService.marketFilter;
     };
 
-subscribeForOrderbook() {
-    this.endOrderbookSubscription();  // Unsubscribe from previous subscriptions
+    subscribeForOrderbook() {
+        this.endOrderbookSbuscription();
+        this.socket.on(`${obEventPrefix}::order:error`, (message: string) => {
+            this.toastrService.error(message || `Undefined Error`, 'Orderbook Error');
+            this.loadingService.tradesLoading = false;
+        });
 
-    // Subscribe to the socket events
-    this.subscription = this.socketService.events$.subscribe(async (data) => {
-      if (!data || !data.event) return;
+        this.socket.on(`${obEventPrefix}::order:saved`, (data: any) => {
+            this.loadingService.tradesLoading = false;
+            this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
+        });
 
-      switch (data.event) {
-        case `${obEventPrefix}::order:error`:
-          this.toastrService.error('Orderbook Error', data.message || '');
-          this.loadingService.tradesLoading = false;
-          break;
+        this.socket.on(`${obEventPrefix}::update-orders-request`, () => {
+            this.socket.emit('update-orderbook', this.marketFilter)
+        });
 
-        case `${obEventPrefix}::order:saved`:
-          this.loadingService.tradesLoading = false;
-          this.toastrService.success('The Order is Saved in Orderbook', 'Success');
-          break;
-
-        case `${obEventPrefix}::update-orders-request`:
-          this.socket.send(JSON.stringify({ type: 'update-orderbook', contract_id: this.selectedMarket.contract_id }));
-          break;
-
-        case `${obEventPrefix}::orderbook-data`:
-          try {
-            const orderbookData: IFuturesOrderbookData = data.data;
+        this.socket.on(`${obEventPrefix}::orderbook-data`, (orderbookData: IFuturesOrderbookData) => {
             this.rawOrderbookData = orderbookData.orders;
             this.tradeHistory = orderbookData.history;
             const lastTrade = this.tradeHistory[0];
+            if (!lastTrade) return this.currentPrice = 1;
             this.currentPrice = lastTrade?.props?.price || 1;
-          } catch (error) {
-            console.error('Error processing message', error);
-          }
-          break;
+            return;
+        });
 
-        default:
-          // Handle other events if necessary
-          break;
-      }
-    });
-    // Request initial orderbook data
-    this.socket.send(JSON.stringify({ type: 'update-orderbook', contract_id: this.selectedMarket.contract_id }));
-  }
-
-  endOrderbookSubscription(){
-    if(this.subscription){
-      this.subscription.unsubscribe();
-      //this.subscription = null;
+        this.socket.emit('update-orderbook', this.marketFilter);
     }
-  }
+
+    endOrderbookSbuscription() {
+        ['update-orders-request', 'orderbook-data', 'order:error', 'order:saved']
+            .forEach(m => this.socket.off(`${obEventPrefix}::${m}`));
+    }
 
     private structureOrderBook() {
         this.buyOrderbooks = this._structureOrderbook(true);
@@ -158,16 +138,16 @@ subscribeForOrderbook() {
         const contract_id = this.selectedMarket.contract_id;
         const filteredOrderbook = this.rawOrderbookData.filter(o => o.props.contract_id === contract_id && o.action === (isBuy ? "BUY" : "SELL"));
         const range = 1000;
-        const result: { price: number, amount: number }[] = [];
+        const result: {price: number, amount: number}[] = [];
         filteredOrderbook.forEach(o => {
-            const _price = Math.trunc(o.props.price * range);
-            const existing = result.find(_o => Math.trunc(_o.price * range) === _price);
-            existing
-                ? existing.amount += o.props.amount
-                : result.push({
-                    price: parseFloat(o.props.price.toFixed(4)),
-                    amount: o.props.amount,
-                });
+          const _price = Math.trunc(o.props.price*range)
+          const existing = result.find(_o =>  Math.trunc(_o.price*range) === _price);
+          existing
+            ? existing.amount += o.props.amount
+            : result.push({
+                price: parseFloat(o.props.price.toFixed(4)),
+                amount: o.props.amount,
+            });
         });
         if (!isBuy) this.lastPrice = result.sort((a, b) => b.price - a.price)?.[result.length - 1]?.price || this.currentPrice || 1;
 

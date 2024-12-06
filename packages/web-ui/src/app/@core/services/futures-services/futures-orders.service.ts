@@ -61,15 +61,15 @@ export class FuturesOrdersService {
 
     newOrder(orderConf: IFuturesTradeConf) {
         this.loadingService.tradesLoading = true;
-        this.socket.send(JSON.stringify({ event: 'new-order', data: orderConf }));
+        this.socket.emit('new-order', orderConf);
     }
 
     addLiquidity(orders: IFuturesTradeConf[]) {
-        this.socket.send(JSON.stringify({ event: 'many-orders', data: orders }));
+        this.socket.emit('many-orders', orders);
     }
 
     closeOpenedOrder(uuid: string) {
-        this.socket.send(JSON.stringify({ event: 'close-order', data: uuid }));
+        this.socket.emit('close-order', uuid);
     }
 
     closeAllOrders() {

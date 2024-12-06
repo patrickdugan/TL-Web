@@ -95,9 +95,6 @@ export class SpotMarketsService {
     }
 
     private changeOrderbookMarketFilter() {
-        this.socket.send(JSON.stringify({
-          event: 'update-orderbook',
-          data: this.marketFilter,
-        }));
+        this.socket.emit('update-orderbook', this.marketFilter);
     }
 }
