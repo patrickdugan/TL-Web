@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "packages/web-ui/src/index.html",
+      "src": "packages/web-ui/dist/index.html",
       "use": "@vercel/static",
       "config": {
         "distDir": "packages/web-ui/dist"
