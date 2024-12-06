@@ -109,7 +109,7 @@ export class SellSwapper extends Swap {
             const isColumnA = column === 'A';
 
             let payload;
-            if (transfer) {
+            /*if (transfer) {
                 console.log('Using channel balance for transfer');
 
                 payload = ENCODER.encodeTransfer({
@@ -118,7 +118,7 @@ export class SellSwapper extends Swap {
                     isColumnA: isColumnA,
                     destinationAddr: this.multySigChannelData.address,
                 });
-            } else {
+            } else {*/
                 console.log('Using available balance for trade');
 
                 payload = ENCODER.encodeCommit({
@@ -126,7 +126,7 @@ export class SellSwapper extends Swap {
                     propertyId: propIdDesired,
                     channelAddress: this.multySigChannelData.address,
                 });
-            }
+            //}
 
             commitTxConfig.payload = payload;
 

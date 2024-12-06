@@ -2,20 +2,31 @@
   "version": 2,
   "builds": [
     {
-      "src": "packages/serverinterface/src/index.ts",
+      "src": "packages/web-ui/src/index.html",
+      "use": "@vercel/static",
+      "config": {
+        "distDir": "packages/web-ui/dist"
+      }
+    },
+    {
+      "src": "packages/server-interface/src/index.ts",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
-          "packages/wallet-server/src/**/*.ts",
-          "packages/wallet-server/src/**/*.js"
+          "packages/server-interface/src/**/*.ts",
+          "packages/server-interface/src/**/*.js"
         ]
       }
     }
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "packages/server-interface/src/index.ts"
+    },
+    {
       "src": "/(.*)",
-      "dest": "packages/wallet-server/dist/server/index.js"
+      "dest": "packages/web-ui/dist/$1"
     }
   ]
 }

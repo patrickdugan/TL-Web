@@ -131,20 +131,20 @@ export class BuySwapper extends Swap {
                 this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
             } else {
                 let payload;
-                if (transfer) {
+                /*if (transfer) {
                     payload = ENCODER.encodeTransfer({
                         propertyId: propIdForSale,
                         amount: amountForSale,
-                        isColumnA: isA,  // Assume Column A, adjust based on context
+                        columnA: isA? 1:0,  // Assume Column A, adjust based on context
                         destinationAddr: this.multySigChannelData.address,
                     });
-                } else{
+                } else{*/
                     payload = ENCODER.encodeCommit({
                         amount: amountForSale,
                         propertyId: propIdForSale,
                         channelAddress: this.multySigChannelData.address,
                     });
-                }
+                //}
 
                 const commitTxConfig: IBuildTxConfig = {
                     fromKeyPair: { address: this.myInfo.keypair.address },
