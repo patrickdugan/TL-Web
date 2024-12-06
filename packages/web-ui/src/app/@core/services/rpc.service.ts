@@ -75,7 +75,7 @@ export class RpcService {
     }
 
     get isSynced() {
-      return this.headerBlock && this.lastBlock + 1 >= this.headerBlock /*&& this.latestTlBlock + 1 >= this.headerBlock;*/
+      return true //this.headerBlock && this.lastBlock + 1 >= this.headerBlock /*&& this.latestTlBlock + 1 >= this.headerBlock;*/
     }
 
     get NETWORK() {

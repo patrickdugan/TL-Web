@@ -31,7 +31,7 @@ type TradeTokensChannelParams = {
     propertyId2: number;
     amountOffered1: number;
     amountDesired2: number;
-    columnAIsOfferer: boolean;
+    columnAIsOfferer: number;
     expiryBlock: number;
 };
 
