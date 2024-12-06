@@ -2,31 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "packages/web-ui/dist/index.html",
-      "use": "@vercel/static",
-      "config": {
-        "distDir": "packages/web-ui/dist"
-      }
-    },
-    {
-      "src": "packages/server-interface/src/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "packages/server-interface/src/**/*.ts",
-          "packages/server-interface/src/**/*.js"
-        ]
-      }
+      "src": "packages/web-ui/dist/**/*",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "packages/server-interface/src/index.ts"
-    },
-    {
       "src": "/(.*)",
-      "dest": "packages/web-ui/dist/$1"
+      "dest": "/index.html"
     }
   ]
 }
