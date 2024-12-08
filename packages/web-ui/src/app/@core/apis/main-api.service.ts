@@ -4,136 +4,72 @@ import { Observable } from "rxjs";
 import { environment } from "src/environments/environment";
 import { ENetwork, TNETWORK } from "../services/rpc.service";
 import { IBuildLTCITTxConfig, IBuildTxConfig, ISignPsbtConfig, ISignTxConfig } from "../services/txs.service";
-
+import { smartRpc, buildTx, buildLTCInstatTx, signTx, buildPsbt, jsTlApi } from "../tx-builder-service";
 
 @Injectable({
     providedIn: 'root',
 })
-
 export class MainApiService {
+    constructor(private http: HttpClient) {}
 
-    constructor(
-        private http: HttpClient,
-    ) {}
-
-    private get apiUrl() {
-        return environment.homeApiUrl + '/api/'
+    rpcCall(method: string, params?: any[]): Observable<any> {
+        return new Observable(observer => {
+            smartRpc(method, params)
+                .then(res => observer.next(res))
+                .catch(err => observer.error(err))
+                .finally(() => observer.complete());
+        });
     }
 
-    setApiUrl(apiUrl: string | null) {
-        return this.http.post(this.apiUrl + 'set-api-url', { apiUrl });
-    }
-    
-    startWalletNode(
-            path: string,
-            network: ENetwork,
-            flags: { reindex: boolean; startclean: boolean },
-        ): Observable<any> {
-        const { reindex, startclean } = flags;
-        const body = {
-            network,
-            startclean,
-            reindex,
-            path,
-        };
-        return this.http.post(this.apiUrl + 'start-wallet-node', body);
+    buildTx(buildTxConfig: IBuildTxConfig, isApiMode: boolean): Observable<any> {
+        return new Observable(observer => {
+            buildTx(buildTxConfig, isApiMode)
+                .then(res => observer.next(res))
+                .catch(err => observer.error(err))
+                .finally(() => observer.complete());
+        });
     }
 
-    stopWalletNode() {
-        const body = {};
-        return this.http.post(this.apiUrl + 'stop-wallet-node', body);
+    buildLTCITTx(buildTxConfig: IBuildLTCITTxConfig, isApiMode: boolean): Observable<any> {
+        return new Observable(observer => {
+            buildLTCInstatTx(buildTxConfig, isApiMode)
+                .then(res => observer.next(res))
+                .catch(err => observer.error(err))
+                .finally(() => observer.complete());
+        });
     }
 
-    createNewConfFile(
-        body: {
-            username: string;
-            password: string;
-            port: number;
-            path: string;
-        }
-    ): Observable<any> {
-        return this.http.post(this.apiUrl + 'new-config', body);
-    };
-
-    rpcCall(method: string, params?: any[]): Observable<{
-        data?: any;
-        error?: string;
-        statusCode: number;
-        IECode: number;
-        EECode: number;
-    }> {
-        const body = { method, params };
-        return this.http.post<{
-            data?: any;
-            error?: string;
-            statusCode: number;
-            IECode: number;
-            EECode: number;
-        }>(this.apiUrl + 'rpc-call', body)
+    signTx(buildTxConfig: ISignTxConfig, network: string): Observable<any> {
+        return new Observable(observer => {
+            signTx(buildTxConfig)
+                .then(res => observer.next(res))
+                .catch(err => observer.error(err))
+                .finally(() => observer.complete());
+        });
     }
 
-    buildTx(buildTxConfig: IBuildTxConfig, isApiMode: boolean): Observable<{
-        data?: { rawtx: string; inputs: any[]};
-        error?: string;
-    }>{
-        return this.http.post<{
-            data?: { rawtx: string; inputs: any[]};
-            error?: string;  
-        }>(this.apiUrl + 'build-tx', { ...buildTxConfig, isApiMode })
+    signPsbt(buildPsbtConfig: ISignPsbtConfig, network: string): Observable<any> {
+        return new Observable(observer => {
+            const result = buildPsbt({
+                rawtx: buildPsbtConfig.psbtHex,
+                inputs: buildPsbtConfig.inputs,
+                network: buildPsbtConfig.network,
+            });
+            if (result.error) {
+                observer.error(result.error);
+            } else {
+                observer.next(result);
+            }
+            observer.complete();
+        });
     }
 
-    buildLTCITTx(buildTxConfig: IBuildLTCITTxConfig, isApiMode: boolean): Observable<{
-        data?: { rawtx: string; inputs: any[]};
-        error?: string;
-    }>{
-        return this.http.post<{
-            data?: { rawtx: string; inputs: any[]};
-            error?: string;  
-        }>(this.apiUrl + 'build-ltcit-tx', { ...buildTxConfig, isApiMode })
-    }
-
-
-    signTx(buildTxConfig: ISignTxConfig, network: TNETWORK): Observable<{
-        data?: {
-            isValid: boolean;
-            signedHex?: string;
-            psbtHex?: string,
-        };
-        error?: string;
-    }>{
-        return this.http.post<{
-            data?: {
-                isValid: boolean;
-                signedHex?: string;
-                psbtHex?: string,
-            };
-            error?: string;  
-        }>(this.apiUrl + 'sign-tx', { ...buildTxConfig, network })
-    }
-
-    signPsbt(buildPsbtConfig: ISignPsbtConfig, network: TNETWORK): Observable<{
-        data?: {
-            psbtHex: string;
-            isValid: boolean;
-            isFinished: boolean;
-            finalHex?: string;
-        };
-        error?: string;
-    }>{
-        return this.http.post<{
-            data?: {
-            psbtHex: string;
-            isValid: boolean;
-            isFinished: boolean;
-            finalHex?: string;
-        };
-            error?: string;  
-        }>(this.apiUrl + 'sign-psbt', { ...buildPsbtConfig, network })
-    }
-
-     // New Function to initialize TradeLayer
     initTradeLayer(): Observable<any> {
-        console.log('about to call init TL ' + this.apiUrl + 'init-tradelayer');
-        return this.http.post(this.apiUrl + 'init-tradelayer', {});
+        return new Observable(observer => {
+            jsTlApi('init-tradelayer', [])
+                .then(res => observer.next(res))
+                .catch(err => observer.error(err))
+                .finally(() => observer.complete());
+        });
     }
 }

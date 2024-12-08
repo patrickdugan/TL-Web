@@ -2,30 +2,31 @@ import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
-import { environment } from "src/environments/environment";
 
 @Injectable({
     providedIn: 'root',
 })
-
 export class NewTradeLayerApiService {
-    constructor(
-        private http: HttpClient,
-    ) {}
+    constructor(private http: HttpClient) {}
 
+    // Replace this with your actual API URL
     private get apiUrl() {
-        return 'http://localhost:1986' + '/tl/'
+        return 'http://172.81.181.19:3000/';
     }
 
-    rpc(method: string, params?: any[] | any): Observable<{
-        data?: any;
-        error?: any;
-    }> {
-        if (!this.apiUrl) throw new Error("Api Url not found");
-        const body = { params };
-        return this.http.post<any>(this.apiUrl + method, body)
-        .pipe(map((res: any) => {
-            return { data: res };
-        }))
+    // Generalized RPC call
+    rpc(method: string, params: any[] = []): Observable<{ data?: any; error?: any }> {
+        const endpoint = `${this.apiUrl}tl_${method}`; // Prefix with "tl_"
+        const body = { params }; // Wrap params in the expected format
+
+        return this.http.post<any>(endpoint, body).pipe(
+            map((response: any) => {
+                // Standardize response format to match expected structure
+                return {
+                    data: response.data || response,
+                    error: response.error || null,
+                };
+            })
+        );
     }
 }
