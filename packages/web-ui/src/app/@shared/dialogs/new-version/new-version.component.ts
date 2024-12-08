@@ -2,7 +2,7 @@ import { AfterViewInit, Component, NgZone, OnInit } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { ConnectionService } from 'src/app/@core/services/connections.service';
 import { DialogService, DialogTypes } from 'src/app/@core/services/dialogs.service';
-import { ElectronService } from 'src/app/@core/services/electron.service';
+//import { ElectronService } from 'src/app/@core/services/electron.service';
 
 @Component({
   selector: 'rpc-connect-dialog',
@@ -12,35 +12,39 @@ import { ElectronService } from 'src/app/@core/services/electron.service';
 
 export class NewVersionDialog implements OnInit {
   public message: string = 'Checking for updates...';
-  public loading: boolean = true;
+  public loading: boolean = false;
   public downloadButton: boolean = false;
   constructor(
     public dialogRef: MatDialogRef<NewVersionDialog>,
-    private electronService: ElectronService,
+    //private electronService: ElectronService,
     private dialogService: DialogService,
     private connectionService: ConnectionService,
     private ngZone: NgZone,
   ) {}
 
   ngOnInit() {
-    this.handleUpdateEvents();
-    this.connectionService.isOnline
+    this.close()
+
+    //this.handleUpdateEvents();
+    //this.handleOffline()
+    /*this.connectionService.isOnline
       ? this.electronService.emitEvent('check-version')
-      : this.handleOffline();
-    
+      : ;*/
+  
   }
 
   private handleOffline() {
-    this.message = 'No internet Connection';
+    return
+    /*this.message = 'No internet Connection';
     const sub = this.connectionService.isOnline$.subscribe(isOnline => {
       if (!isOnline) return;
-      this.electronService.emitEvent('check-version');
+      //this.electronService.emitEvent('check-version');
       sub.unsubscribe();
-    });
+    });*/
   }
 
   private handleUpdateEvents() {
-    this.electronService.ipcRenderer.on('angular-electron-message', (channel: any, _data: any) => {
+    /*this.electronService.ipcRenderer.on('angular-electron-message', (channel: any, _data: any) => {
           if (_data.event !== 'update-app') return;
           this.loading = true;
           this.downloadButton = false;
@@ -72,11 +76,11 @@ export class NewVersionDialog implements OnInit {
                 break;
             }
           });
-      });
+      });*/
   }
 
   download() {
-      this.electronService.emitEvent('download-new-version');
+      //this.electronService.emitEvent('download-new-version');
   }
 
   close() {

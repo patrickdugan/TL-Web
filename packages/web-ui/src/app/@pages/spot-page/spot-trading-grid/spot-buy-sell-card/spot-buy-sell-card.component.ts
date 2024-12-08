@@ -48,7 +48,7 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
     ) {}
 
     get spotKeyPair() {
-      return this.authService.walletAddresses[0];
+      return "asdfasdfasdfsadf"//this.authService.walletAddresses[0];
     }
 
     get spotAddress() {

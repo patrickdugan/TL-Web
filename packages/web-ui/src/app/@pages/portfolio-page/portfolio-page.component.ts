@@ -53,7 +53,7 @@ export class PortfolioPageComponent implements OnInit {
   }
 
   ngOnInit(): void {
-      this.authService.getAddressesFromWallet();
+      this.authService.listOfallAddresses //getAddressesFromWallet();
   }
 
   shouldShowVesting(propertyId: number): boolean {
@@ -94,7 +94,8 @@ export class PortfolioPageComponent implements OnInit {
     //     .toPromise();
 
     // if (!password) return;
-    await this.authService.addKeyPair();
+    //await this.authService.addKeyPair();
+    return
   }
 
   showTokens(address: string) {

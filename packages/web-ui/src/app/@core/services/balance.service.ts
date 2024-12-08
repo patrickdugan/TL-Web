@@ -94,7 +94,7 @@ export class BalanceService {
     async updateBalances(notiffy: boolean = true) {
         // this.balanceLoading = true;
         try {
-            const addressesArray = this.authService.walletAddresses;
+            const addressesArray = ['asdfasd','asdfasdfasdfssda']//this.authService.walletAddresses;
             for (let i = 0; i < addressesArray?.length; i++) {
                 const address = addressesArray[i];
                 await this.updateCoinBalanceForAddressFromUnspents(address);

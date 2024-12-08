@@ -1,6 +1,6 @@
 import { Injectable } from "@angular/core";
 import { MatDialog, MatDialogConfig } from "@angular/material/dialog";
-import { NewVersionDialog } from "src/app/@shared/dialogs/new-version/new-version.component";
+//import { NewVersionDialog } from "src/app/@shared/dialogs/new-version/new-version.component";
 import { NewNodeDialog } from "src/app/@shared/dialogs/new-node/new-node.component";
 import { SelectNetworkDialog } from "src/app/@shared/dialogs/select-network/select-network.component";
 import { EncKeyDialog } from "src/app/@shared/dialogs/enc-key/enc-key.component";
@@ -11,7 +11,7 @@ import { TransferDialog } from 'src/app/@shared/dialogs/transfer/transfer.compon
 
 export enum DialogTypes {
     SELECT_NETOWRK = "SELECT_NETOWRK",
-    NEW_VERSION = 'NEW_VERSION',
+    //NEW_VERSION = 'NEW_VERSION',
     ENC_KEY = "ENC_KEY",
     COMMING_SOON = 'COMMING_SOON',
     NEW_NODE = 'NEW_NODE',
@@ -22,7 +22,7 @@ export enum DialogTypes {
 
 const dialogs: { [key: string]: any; } = {
     'SELECT_NETOWRK': SelectNetworkDialog,
-    'NEW_VERSION': NewVersionDialog,
+    //'NEW_VERSION': NewVersionDialog,
     'NEW_NODE': NewNodeDialog,
     'ENC_KEY': EncKeyDialog,
     'COMMING_SOON': CommingSoonDialog,

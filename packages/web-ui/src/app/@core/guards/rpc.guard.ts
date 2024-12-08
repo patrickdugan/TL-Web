@@ -15,7 +15,7 @@ export class RPCGuard implements CanActivate {
 
     async canActivate(): Promise<boolean> {
         const isNetworkSelected = this.rpcService.isNetworkSelected;
-        if (!isNetworkSelected) this.dialogService.openDialog(DialogTypes.NEW_VERSION);
+        if (!isNetworkSelected) this.dialogService.openDialog(DialogTypes.SELECT_NETOWRK);
         return isNetworkSelected;
    }
 }

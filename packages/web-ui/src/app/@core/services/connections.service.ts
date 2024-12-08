@@ -15,12 +15,12 @@ export class ConnectionService {
     ) { }
 
     get isOnline() {
-        return this._isOnline;
+        return true;
     }
 
     get isMainSocketConnected() {
-        return this.socketService.socket.connected;
-    }
+        return true
+        }
 
     get isOBSocketConnected() {
         return this.socketService.obSocketConnected;

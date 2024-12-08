@@ -4,7 +4,7 @@ import { ToastrService } from 'ngx-toastr';
 import { ApiService } from 'src/app/@core/services/api.service';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { DialogService, DialogTypes } from 'src/app/@core/services/dialogs.service';
-import { ElectronService } from 'src/app/@core/services/electron.service';
+//import { ElectronService } from 'src/app/@core/services/electron.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
 import { ENetwork, RpcService } from 'src/app/@core/services/rpc.service';
 
@@ -40,7 +40,7 @@ export class SyncNodeDialog implements OnInit, OnDestroy {
         private rpcService: RpcService,
         private apiService: ApiService,
         private loadingService: LoadingService,
-        private electronService: ElectronService,
+        //private electronService: ElectronService,
         private zone: NgZone,
         private dialogService: DialogService,
         private router: Router,
@@ -243,12 +243,12 @@ export class SyncNodeDialog implements OnInit, OnDestroy {
     }
 
     openDirSelectDialog() {
-        this.electronService.emitEvent('open-dir-dialog');
-        this.electronService.ipcRenderer.once('angular-electron-message', (_: any, message: any) => {
+        //this.electronService.emitEvent('open-dir-dialog');
+        /*this.electronService.ipcRenderer.once('angular-electron-message', (_: any, message: any) => {
             const { event, data } = message;
             if (event !== 'selected-dir' || !data ) return;
             this.zone.run(() => this.directory = data || '');
-        });
+        });*/
     }
 
     toggleAdvanced() {

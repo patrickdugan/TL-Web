@@ -2,7 +2,7 @@ import { Component, NgZone } from '@angular/core';
 import { AttestationService } from './@core/services/attestation.service';
 import { BalanceService } from './@core/services/balance.service';
 import { ConnectionService } from './@core/services/connections.service';
-import { ElectronService } from './@core/services/electron.service';
+//import { ElectronService } from './@core/services/electron.service';
 import { LoadingService } from './@core/services/loading.service';
 import { NodeRewardService } from './@core/services/node-reward.service';
 import { RpcService } from './@core/services/rpc.service';
@@ -22,7 +22,7 @@ export class AppComponent {
     private connectionService: ConnectionService,
     private ngZone: NgZone,
     private loadingService: LoadingService,
-    private electronService: ElectronService,
+    //private electronService: ElectronService,
     private windowsService: WindowsService,
     private attestationService: AttestationService,
     private balanceService: BalanceService,
@@ -32,7 +32,7 @@ export class AppComponent {
   ) {
     this.handleInits();
     this.handleConnections();
-    this.handleElectronEvents();
+    //this.handleElectronEvents();
   }
 
   get windows() {
@@ -79,7 +79,7 @@ export class AppComponent {
       })
   }
 
-  handleElectronEvents() {
+  /*handleElectronEvents() {
     this.electronService.ipcRenderer
       .on('angular-electron-message', (_: any, message: any) => {
         const { event, data } = message;
@@ -87,7 +87,7 @@ export class AppComponent {
           this.ngZone.run(() => this.isLoading = true);
         }
       });
-  }
+  }*/
 
   openHiddenTerminal() {
     this.windowsService.openTerminal();

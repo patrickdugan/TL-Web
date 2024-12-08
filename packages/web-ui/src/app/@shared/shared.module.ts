@@ -25,7 +25,7 @@ import { DisconnectedLineComponent } from './components/disconnected-line/discon
 import { OverlayLoadingComponent } from './components/overlay-loading/overlay-loading.component';
 
 import { SelectNetworkDialog } from './dialogs/select-network/select-network.component';
-import { NewVersionDialog } from './dialogs/new-version/new-version.component';
+//import { NewVersionDialog } from './dialogs/new-version/new-version.component';
 import { SyncNodeDialog } from './dialogs/sync-node/sync-node.component';
 import { NewNodeDialog } from './dialogs/new-node/new-node.component';
 import { TerminalDialog } from './dialogs/terminal/terminal.component';
@@ -63,7 +63,7 @@ const MAT_MODULES = [
 
 const DIALOGS = [
     SelectNetworkDialog,
-    NewVersionDialog,
+    //NewVersionDialog,
     SyncNodeDialog,
     NewNodeDialog,
     TerminalDialog,
