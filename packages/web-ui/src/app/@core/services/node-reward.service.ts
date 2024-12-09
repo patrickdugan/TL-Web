@@ -62,7 +62,7 @@ export class NodeRewardService {
         }
         const payload = "007900";
         const address = keyPair.address;
-        const res = await this.txsService.buildSingSendTx({
+        const res = await this.txsService.buildSignSendTx({
             fromKeyPair: { address },
             toKeyPair: { address },
             payload,
@@ -104,7 +104,7 @@ export class NodeRewardService {
                 } else {
                     if (iawRes.data?.result === 'true') {
                         const payload = "007A00";
-                        const cnrREs = await this.txsService.buildSingSendTx({
+                        const cnrREs = await this.txsService.buildSignSendTx({
                             fromKeyPair: { address },
                             toKeyPair: { address },
                             payload,

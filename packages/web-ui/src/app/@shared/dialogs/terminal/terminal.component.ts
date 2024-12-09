@@ -37,14 +37,14 @@ export class TerminalDialog  {
       : [];
     this.textArea += `\n${this.input}\n`;
     if (this.typeRpc === "LOCAL") {
-      this.mainApi.rpcCall(method, params).toPromise()
+      /*this.mainApi.rpcCall(method, params).toPromise()
         .then(res => {
           if (!res.data || res.error) throw new Error(res.error || `${method}: Undefined Error`);
           this.textArea += `\n${JSON.stringify(res.data, null, 2)}\n=======================================\n`;
         })
         .catch(error => {
           this.textArea += `\n${method} ERROR: ${error.message}\n=======================================\n`
-        });
+        });*/
     }
 
     if (this.typeRpc === "API") {

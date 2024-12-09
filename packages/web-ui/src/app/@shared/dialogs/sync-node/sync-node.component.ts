@@ -128,7 +128,7 @@ export class SyncNodeDialog implements OnInit, OnDestroy {
     }
 
     private async checkTradelayerSync() {
-        console.log('checking tl flag this sync '+this.rpcService.isTLStarted)
+        /*console.log('checking tl flag this sync '+this.rpcService.isTLStarted)
         console.log(Boolean(!this.rpcService.isTLStarted&&this.rpcService.isAbleToRpc == true))
         try {
             if (!this.isAbleToRpc || !this.nodeBlock) return;
@@ -163,7 +163,8 @@ export class SyncNodeDialog implements OnInit, OnDestroy {
            console.log('error calling init '+JSON.stringify(error))
             const errorMessage = error?.message || error || "Undefined Error";
             //this.tlMessage = errorMessage;
-        }
+        }*/
+        return null
     }
 
     private async checkIsAbleToRpcLoop() {
@@ -195,7 +196,7 @@ export class SyncNodeDialog implements OnInit, OnDestroy {
     }
 
     private async checkIsAbleToRpc() {
-        try {
+        /*try {
             if (this.isAbleToRpc || !this.coreStarted) return;
             const res = await this.apiService.mainApi.rpcCall('getblockchaininfo').toPromise();
             if (res.error) this.message = res.error;
@@ -206,7 +207,9 @@ export class SyncNodeDialog implements OnInit, OnDestroy {
         } catch (error: any) {
             const errrorMessage = error?.message || error || "Undefined Error";
             this.message = errrorMessage;
-        }
+        }*/
+
+        return null
     }
 
     async terminate() {
@@ -260,7 +263,8 @@ export class SyncNodeDialog implements OnInit, OnDestroy {
     }
 
     async startWalletNode() {
-        const network = this.network;
+        return null
+        /*const network = this.network;
         if (!network) return;
         const path = this.defaultDirectoryCheckbox ? '' : this.directory;
         const { reindex, startclean } = this;
@@ -289,5 +293,6 @@ export class SyncNodeDialog implements OnInit, OnDestroy {
             this.loadingService.isLoading = false;
             this.eta = 'Calculating Remaining Time ...';
         });
+        */
     }
 }

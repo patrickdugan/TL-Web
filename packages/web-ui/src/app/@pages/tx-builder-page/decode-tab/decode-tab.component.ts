@@ -38,7 +38,7 @@ export class DecodeTxTabComponent implements OnInit {
   }
 
   decode() {
-    this.rpcService.rpc('decoderawtransaction', [this.input])
+   /*this.rpcService.rpc('decoderawtransaction', [this.input])
       .then(res => this.output_main = JSON.stringify(res, null, 4))
       .catch(error => {
         this.output_main = `Error: ${error.message || error || 'Undefined'}`;
@@ -49,5 +49,5 @@ export class DecodeTxTabComponent implements OnInit {
       .catch(error => {
         this.output_tl = `Error: ${error.message || error || 'Undefined'}`;
       });
-  }
+  */}
 }

@@ -1,15 +1,10 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "packages/web-ui/dist/**/*",
-      "use": "@vercel/static"
-    }
-  ],
+  "builds": [],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/packages/web-ui/dist/index.html"
     }
   ]
 }

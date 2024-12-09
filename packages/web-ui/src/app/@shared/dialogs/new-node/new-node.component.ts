@@ -35,7 +35,8 @@ export class NewNodeDialog {
   }
 
   async create() {
-    this.loadingService.isLoading = true;
+    return null
+    /*this.loadingService.isLoading = true;
     const { port, username, password, path } = this;
     const params = { port, username, password, path };
     await this.rpcService.createNewNode(params)
@@ -53,7 +54,7 @@ export class NewNodeDialog {
       })
       .finally(() => {
         this.loadingService.isLoading = false;
-      });
+      });*/
 
   }
 

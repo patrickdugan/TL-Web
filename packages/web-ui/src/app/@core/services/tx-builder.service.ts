@@ -84,7 +84,7 @@ export const smartRpc: TClient = async (method: string, params: any[] = [], api:
 };
 
 export const jsTlApi: TClient = async (method: string, params: any[] = []) => {
-    const url = `http://localhost:3000/tl_${method}`;
+    const url = `http://localhost:3000/${method}`;
     return await axios.post(url, { params })
         .then(res => res.data);
 };

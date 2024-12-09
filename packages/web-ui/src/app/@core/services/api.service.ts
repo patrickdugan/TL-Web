@@ -12,8 +12,8 @@ import { NewTradeLayerApiService } from "../apis/tl-api.service";
 })
 
 export class ApiService {
-    private _network: TNETWORK = null;
-    private _apiUrl: string | null = http://172.81.181.19:3000 //null;
+    private _network: TNETWORK = 'LTCTEST'// null;
+    private _apiUrl: string | null = 'http://172.81.181.19:3000'; // Fixed
     private _orderbookUrl: string | null = null;
 
     constructor(

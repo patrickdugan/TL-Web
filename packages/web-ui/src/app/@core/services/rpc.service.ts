@@ -113,7 +113,8 @@ export class RpcService {
       network: ENetwork,
       flags: { reindex: boolean, startclean: boolean },
     ) {
-      this.NETWORK = network;
+      return
+      /*this.NETWORK = network;
       if (this.NETWORK !== network) throw new Error("Please first Change the Network");
       return await this.mainApi
         .startWalletNode(path, network, flags)
@@ -124,11 +125,11 @@ export class RpcService {
             this.dialogService.closeAllDialogs();
           }
           return res;
-        });
+        });*/
     }
 
     async createNewNode(params: { username: string, password: string, port: number, path: string }) {
-      return await this.mainApi.createNewConfFile(params).toPromise();
+      return//await this.mainApi.createNewConfFile(params).toPromise();
     }
 
     async checkNetworkInfo() {
@@ -151,7 +152,7 @@ export class RpcService {
     }
 
     async terminateNode() {
-      return await this.mainApi.stopWalletNode().toPromise()
+      return /*await this.mainApi.stopWalletNode().toPromise()
         .then(res => {
           this.clearRpcConnection();
           this._stoppedByTerminated = true;
@@ -159,7 +160,7 @@ export class RpcService {
         })
         .catch(err => {
           this.toastrService.error('Error with stopping Node', err?.message || err);
-        });
+        });*/
     }
 
     private clearRpcConnection() {
@@ -170,8 +171,8 @@ export class RpcService {
 
     rpc(method: string, params?: any[]) {
       //return this.mainApi.rpcCall(method, params).toPromise();;
-       return this.isApiMode
-         ? this.tlApi.rpc(method, params).toPromise()
-         : this.mainApi.rpcCall(method, params).toPromise();
+       return this.tlApi.rpc(method, params).toPromise()//this.isApiMode
+         //? 
+         //: this.mainApi.rpcCall(method, params).toPromise();
     }
   }

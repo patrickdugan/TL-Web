@@ -45,7 +45,7 @@ export class FuturesChannelsComponent implements OnInit, OnDestroy {
           },
           payload: payloadRes.data,
         };
-        const res = await this.txsService.buildSingSendTx(config);
+        const res = await this.txsService.buildSignSendTx(config);
         if (res.error || !res.data) throw new Error(res.error);
         this.toastrService.success(`Withdraw TX: ${res.data}`, 'Success');
       } catch (err: any) {

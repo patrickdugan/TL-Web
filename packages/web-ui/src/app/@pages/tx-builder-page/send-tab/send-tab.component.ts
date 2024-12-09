@@ -30,10 +30,12 @@ export class SendTxTabComponent implements OnInit {
   }
 
   send() {
-    this.rpcService.rpc('sendrawtransaction', [this.input])
+    /*this.rpcService.rpc('sendrawtransaction', [this.input])
       .then(res => this.output = JSON.stringify(res, null, 4))
       .catch(error => {
         this.output = `Error: ${error.message || error || 'Undefined'}`;
       });
+      */
+      return
   }
 }

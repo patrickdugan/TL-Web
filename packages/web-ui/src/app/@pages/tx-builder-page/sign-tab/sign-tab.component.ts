@@ -63,7 +63,7 @@ export class SignTxTabComponent implements OnInit {
   }
 
   sign() {
-    this.output = '';
+    /*this.output = '';
     const wif = this.privKey
     const inputs = this.vins;
     const rawtx = this.input;
@@ -72,7 +72,8 @@ export class SignTxTabComponent implements OnInit {
       .then(res => this.output = JSON.stringify(res, null, 4))
       .catch(error => {
         this.output = `Error: ${error.message || error || 'Undefined'}`;
-      });
+      });*/
+      return ''
   }
 
   private async updateInputs() {

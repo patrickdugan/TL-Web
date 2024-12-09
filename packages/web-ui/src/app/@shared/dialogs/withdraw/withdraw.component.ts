@@ -146,7 +146,7 @@ export class WithdrawDialog {
                 return;
             }
             
-            const res = await this.txsService.buildSingSendTx(txOptionsRes.data);
+            const res = await this.txsService.buildSignSendTx(txOptionsRes.data);
             if (res.error || !res.data) {
                 this.toastrService.error(res.error, 'Transaction Error');
                 return;
