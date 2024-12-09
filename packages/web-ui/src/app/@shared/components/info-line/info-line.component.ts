@@ -2,7 +2,7 @@ import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 // import { SocketService } from 'src/app/@core/services/socket.service';
 import { IWindow, WindowsService } from 'src/app/@core/services/windows.service';
-const mainPackageJson = require('../../../../../../../package.json');
+import mainPackageJson from '../../../../../../../package.json';
 
 @Component({
   selector: 'tl-info-line',

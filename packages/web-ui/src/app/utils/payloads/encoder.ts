@@ -1,4 +1,4 @@
-const BigNumber = require('bignumber.js'); // Make sure BigNumber is imported
+import BigNumber from 'bignumber.js'; // Make sure BigNumber is imported
 
 const marker = 'tl';
 

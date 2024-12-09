@@ -1,10 +1,8 @@
 import { Injectable } from "@angular/core";
-import { Router } from "@angular/router";
 import { ToastrService } from "ngx-toastr";
-import { Socket } from "socket.io-client";
-import { io } from 'socket.io-client'
+import { io, Socket } from "socket.io-client";
 import { environment } from '../../../environments/environment';
-import { ApiService } from "./api.service";
+import { Subject } from "rxjs";
 
 export enum SocketEmits {
     LTC_INSTANT_TRADE = 'LTC_INSTANT_TRADE',
@@ -15,20 +13,18 @@ export const obEventPrefix = 'OB_SOCKET';
 @Injectable({
     providedIn: 'root',
 })
-
 export class SocketService {
     private _socket: Socket | null = null;
     private _obSocketConnected: boolean = false;
-
     private mainSocketWaiting: boolean = false;
     private obServerWaiting: boolean = false;
 
-    constructor(
-        private toasterService: ToastrService,
-        private router: Router,
-        private apiService: ApiService,
-    ) {}
+    // Event Subject to emit and subscribe to WebSocket events
+    private eventSubject = new Subject<{ event: string; data: any }>();
 
+    constructor(private toasterService: ToastrService) {}
+
+    // Expose combined socket loading states
     get socketsLoading() {
         return this.mainSocketWaiting || this.obServerWaiting;
     }
@@ -37,46 +33,62 @@ export class SocketService {
         return environment.homeApiUrl;
     }
 
+    // Get the connection status of the orderbook socket
     get obSocketConnected() {
         return this._obSocketConnected;
     }
 
+    // Getter for the main socket, initializing if necessary
     get socket() {
         if (!this._socket) return this.mainSocketConnect();
         return this._socket;
     }
 
-    get marketApi() {
-        return this.apiService.marketApi;
-    }
-
+    // Initialize the main socket connection
     mainSocketConnect() {
         this.mainSocketWaiting = true;
         this._socket = io(this.mainSocketUrl, { reconnection: false });
-        this.handleMainSocketEvents();
+
+        // Handle connection lifecycle events
+        this.socket.on('connect', () => {
+            this.mainSocketWaiting = false;
+            console.log('Main socket connected');
+        });
+
+        this.socket.on('disconnect', () => {
+            this.mainSocketWaiting = false;
+            console.error('Main socket disconnected');
+        });
+
+        this.socket.on('connect_error', () => {
+            this.mainSocketWaiting = false;
+            console.error('Main socket connection error');
+        });
+
+        // Integrate OB socket events into the same service
         this.handleMainOBSocketEvents();
+        this.handleOBSocketData();
+
         return this._socket;
     }
 
-   obSocketConnect(url: string) {
+    // Initiate a connection to the orderbook service (OB socket)
+    obSocketConnect(url: string) {
         this.obServerWaiting = true;
         this.socket.emit('ob-sockets-connect', url);
     }
 
+    // Disconnect from the orderbook service
     obSocketDisconnect() {
         this.socket.emit('ob-sockets-disconnect');
     }
 
-    private handleMainSocketEvents() {
-            this.socket.on('connect', () => this.mainSocketWaiting = false);
-            this.socket.on('connect_error', () => this.mainSocketWaiting = false);
-            this.socket.on('disconnect', () => this.mainSocketWaiting = false);
-    }
-
+    // Handle main OB socket connection lifecycle
     private handleMainOBSocketEvents() {
         this.socket.on(`${obEventPrefix}::connect`, () => {
             this._obSocketConnected = true;
             this.obServerWaiting = false;
+            console.log('Orderbook socket connected');
         });
 
         this.socket.on(`${obEventPrefix}::connect_error`, () => {
@@ -88,8 +100,63 @@ export class SocketService {
         this.socket.on(`${obEventPrefix}::disconnect`, () => {
             this._obSocketConnected = false;
             this.obServerWaiting = false;
-            this.router.navigateByUrl('/');
             this.toasterService.error('Orderbook Disconnected', 'Error');
         });
+    }
+
+    // Handle OB socket-specific events and data flow
+    private handleOBSocketData() {
+        const orderEvents = [
+            'order:error',
+            'order:saved',
+            'placed-orders',
+            'orderbook-data',
+            'update-orders-request',
+            'new-channel',
+        ];
+
+        // Forward OB server events to the wallet
+        orderEvents.forEach((eventName) => {
+            this.socket.on(eventName, (data: any) => {
+                const fullEventName = `${obEventPrefix}::${eventName}`;
+                this.emitEvent(fullEventName, data);
+            });
+        });
+
+        // Forward wallet events to the OB server
+        ["update-orderbook", "new-order", "close-order", 'many-orders'].forEach((eventName) => {
+            this.socket.on(eventName, (data: any) => {
+                this.socket.emit(eventName, data);
+            });
+        });
+
+        // Handle swap events dynamically based on socket ID
+        const swapEventName = 'swap';
+        this.socket.on('new-channel', (d: any) => {
+            const cpSocketId = d.isBuyer ? d.tradeInfo.seller.socketId : d.tradeInfo.buyer.socketId;
+            this.socket.removeAllListeners(`${cpSocketId}::${swapEventName}`);
+            this.socket.on(`${cpSocketId}::${swapEventName}`, (data: any) => {
+                this.emitEvent(`${cpSocketId}::${swapEventName}`, data);
+            });
+        });
+    }
+
+    // Emit custom events to components via RxJS Subject
+    private emitEvent(event: string, data: any): void {
+        this.eventSubject.next({ event, data });
+    }
+
+    // Expose WebSocket events as an observable
+    get events$() {
+        return this.eventSubject.asObservable();
+    }
+
+    // Send a message to the WebSocket server
+    send(event: string, data: any): void {
+        if (!this.socket) {
+            console.error("WebSocket is not connected");
+            return;
+        }
+        this.socket.emit(event, data);
     }
 }
