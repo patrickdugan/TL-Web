@@ -38,10 +38,6 @@ export class FuturesOrdersService {
         private loadingService: LoadingService,
     ) { }
 
-    get socket() {
-        return this.socketService.socket;
-    }
-
     get openedOrders(): IFuturesOrder[] {
         return this._openedOrders;
     }
@@ -61,15 +57,15 @@ export class FuturesOrdersService {
 
     newOrder(orderConf: IFuturesTradeConf) {
         this.loadingService.tradesLoading = true;
-        this.socket.emit('new-order', orderConf);
+        this.socketService.obSocket?.emit('new-order', orderConf);
     }
 
     addLiquidity(orders: IFuturesTradeConf[]) {
-        this.socket.emit('many-orders', orders);
+        this.socketService.obSocket?.emit('many-orders', orders);
     }
 
     closeOpenedOrder(uuid: string) {
-        this.socket.emit('close-order', uuid);
+        this.socketService.obSocket?.emit('close-order', uuid);
     }
 
     closeAllOrders() {

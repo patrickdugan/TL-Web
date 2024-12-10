@@ -32,12 +32,8 @@ export class SwapService {
         private soundsService: SoundsService,
     ) {}
 
-    private get socket() {
-        return this.socketService.socket;
-    }
-
     onInit() {
-        this.socket.on(`${obEventPrefix}::new-channel`, async (swapConfig: IChannelSwapData) => {
+        this.socketService.obSocket?.on(`${obEventPrefix}::new-channel`, async (swapConfig: IChannelSwapData) => {
             this.loadingService.tradesLoading = false;
             const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer);
             
@@ -51,14 +47,15 @@ export class SwapService {
     }
 
     private async channelSwap(tradeInfo: ITradeInfo<any>, isBuyer: boolean) {
+        if (!this.socketService.obSocket) return;
         const { buyer, seller, props, type } = tradeInfo;
 
         if (type === "SPOT") {
             const { transfer } = props as ISpotTradeProps;
 
             const swapper = isBuyer
-                ? new BuySwapper(type, props, buyer, seller, this.rpcService.rpc.bind(this.rpcService), this.socket, this.txsService, this.toastrService)
-                : new SellSwapper(type, props, seller, buyer, this.rpcService.rpc.bind(this.rpcService), this.socket, this.txsService, this.toastrService);
+                ? new BuySwapper(type, props, buyer, seller, this.rpcService.rpc.bind(this.rpcService), this.socketService.obSocket, this.txsService, this.toastrService)
+                : new SellSwapper(type, props, seller, buyer, this.rpcService.rpc.bind(this.rpcService), this.socketService.obSocket, this.txsService, this.toastrService);
 
             swapper.eventSubs$.subscribe(eventData => {
                 this.toastrService.info(eventData.eventName, 'Trade Info', { timeOut: 3000 });
@@ -70,8 +67,8 @@ export class SwapService {
             const { transfer } = props as IFuturesTradeProps;
 
             const swapper = isBuyer
-                ? new BuySwapper(type, props, buyer, seller, this.rpcService.rpc.bind(this.rpcService), this.socket, this.txsService, this.toastrService)
-                : new SellSwapper(type, props, seller, buyer, this.rpcService.rpc.bind(this.rpcService), this.socket, this.txsService, this.toastrService);
+                ? new BuySwapper(type, props, buyer, seller, this.rpcService.rpc.bind(this.rpcService), this.socketService.obSocket, this.txsService, this.toastrService)
+                : new SellSwapper(type, props, seller, buyer, this.rpcService.rpc.bind(this.rpcService), this.socketService.obSocket, this.txsService, this.toastrService);
 
             swapper.eventSubs$.subscribe(eventData => {
                 this.toastrService.info(eventData.eventName, 'Trade Info', { timeOut: 3000 });

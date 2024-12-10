@@ -22,10 +22,6 @@ export class SpotOrdersComponent implements OnInit, OnDestroy {
       private authService: AuthService,
     ) {}
 
-    get socket() {
-      return this.socketService.socket;
-    }
-
     get openedOrders() {
       return this.spotOrdersService.openedOrders;
     }
@@ -39,7 +35,7 @@ export class SpotOrdersComponent implements OnInit, OnDestroy {
     }
 
     private subsribe() {
-       this.socket.on(`${obEventPrefix}::placed-orders`, (orders: { openedOrders: ISpotOrder[], orderHistory: ISpotOrder[] }) => {
+       this.socketService.obSocket?.on(`${obEventPrefix}::placed-orders`, (orders: { openedOrders: ISpotOrder[], orderHistory: ISpotOrder[] }) => {
           const { openedOrders, orderHistory } = orders;
           console.log('orders '+JSON.stringify(openedOrders)+' '+JSON.stringify(orderHistory))
           this.spotOrdersService.orderHistory = orderHistory
@@ -48,7 +44,7 @@ export class SpotOrdersComponent implements OnInit, OnDestroy {
         });
 
         //this.spotOrdersService.closeOpenedOrder('test-for-update');
-        this.socket.on(`${obEventPrefix}::disconnect`, () => {
+        this.socketService.obSocket?.on(`${obEventPrefix}::disconnect`, () => {
           this.spotOrdersService.openedOrders = [];
         });
 

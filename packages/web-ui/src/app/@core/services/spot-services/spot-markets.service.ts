@@ -95,6 +95,6 @@ export class SpotMarketsService {
     }
 
     private changeOrderbookMarketFilter() {
-        this.socket.emit('update-orderbook', this.marketFilter);
+        this.socketService.obSocket?.emit('update-orderbook', this.marketFilter);
     }
 }

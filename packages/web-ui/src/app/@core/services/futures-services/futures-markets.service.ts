@@ -80,10 +80,6 @@ export class FuturesMarketService {
     get selectedMarketIndex() {
         return this.marketsFromSelectedMarketType.indexOf(this.selectedMarket);
     }
-
-    get socket() {
-        return this.socketService.socket;
-    }
     
     get marketFilter() {
         return {
@@ -101,6 +97,6 @@ export class FuturesMarketService {
     }
 
     private changeOrderbookMarketFilter() {
-        this.socket.emit('update-orderbook', this.marketFilter);
+        this.socketService.obSocket?.emit('update-orderbook', this.marketFilter);
     }
 }

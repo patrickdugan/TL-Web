@@ -52,7 +52,7 @@ export class RpcService {
     ) {}
 
     onInit() {
-      //return
+      return
       this.socket.on('core-error', error => {
         this.clearRpcConnection();
         if (!this._stoppedByTerminated) {

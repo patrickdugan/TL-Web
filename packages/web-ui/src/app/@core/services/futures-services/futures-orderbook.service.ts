@@ -88,31 +88,27 @@ export class FuturesOrderbookService {
         this.structureOrderBook();
     } 
 
-    private get socket() {
-        return this.socketService.socket;
-    }
-
     get marketFilter() {
         return this.futuresMarketService.marketFilter;
     };
 
     subscribeForOrderbook() {
         this.endOrderbookSbuscription();
-        this.socket.on(`${obEventPrefix}::order:error`, (message: string) => {
+        this.socketService.obSocket?.on(`${obEventPrefix}::order:error`, (message: string) => {
             this.toastrService.error(message || `Undefined Error`, 'Orderbook Error');
             this.loadingService.tradesLoading = false;
         });
 
-        this.socket.on(`${obEventPrefix}::order:saved`, (data: any) => {
+        this.socketService.obSocket?.on(`${obEventPrefix}::order:saved`, (data: any) => {
             this.loadingService.tradesLoading = false;
             this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
         });
 
-        this.socket.on(`${obEventPrefix}::update-orders-request`, () => {
-            this.socket.emit('update-orderbook', this.marketFilter)
+        this.socketService.obSocket?.on(`${obEventPrefix}::update-orders-request`, () => {
+            this.socketService.obSocket?.emit('update-orderbook', this.marketFilter)
         });
 
-        this.socket.on(`${obEventPrefix}::orderbook-data`, (orderbookData: IFuturesOrderbookData) => {
+        this.socketService.obSocket?.on(`${obEventPrefix}::orderbook-data`, (orderbookData: IFuturesOrderbookData) => {
             this.rawOrderbookData = orderbookData.orders;
             this.tradeHistory = orderbookData.history;
             const lastTrade = this.tradeHistory[0];
@@ -121,12 +117,12 @@ export class FuturesOrderbookService {
             return;
         });
 
-        this.socket.emit('update-orderbook', this.marketFilter);
+        this.socketService.obSocket?.emit('update-orderbook', this.marketFilter);
     }
 
     endOrderbookSbuscription() {
         ['update-orders-request', 'orderbook-data', 'order:error', 'order:saved']
-            .forEach(m => this.socket.off(`${obEventPrefix}::${m}`));
+            .forEach(m => this.socketService.obSocket?.off(`${obEventPrefix}::${m}`));
     }
 
     private structureOrderBook() {

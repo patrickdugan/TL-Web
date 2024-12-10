@@ -15,6 +15,8 @@ export const obEventPrefix = 'OB_SOCKET';
 })
 export class SocketService {
     private _socket: Socket | null = null;
+    private _obServerSocket: Socket | null = null;
+
     private _obSocketConnected: boolean = false;
     private mainSocketWaiting: boolean = false;
     private obServerWaiting: boolean = false;
@@ -36,6 +38,10 @@ export class SocketService {
     // Get the connection status of the orderbook socket
     get obSocketConnected() {
         return this._obSocketConnected;
+    }
+
+    get obSocket(): Socket | null {
+        return this._obServerSocket;
     }
 
     // Getter for the main socket, initializing if necessary
@@ -65,9 +71,9 @@ export class SocketService {
             console.error('Main socket connection error');
         });
 
-        // Integrate OB socket events into the same service
-        this.handleMainOBSocketEvents();
-        this.handleOBSocketData();
+        // // Integrate OB socket events into the same service
+        // this.handleMainOBSocketEvents();
+        // this.handleOBSocketData();
 
         return this._socket;
     }
@@ -75,34 +81,55 @@ export class SocketService {
     // Initiate a connection to the orderbook service (OB socket)
     obSocketConnect(url: string) {
         this.obServerWaiting = true;
-        this.socket.emit('ob-sockets-connect', url);
+        this._obServerSocket = io(url, { reconnection: false });
+
+        this.obSocket?.on('connect', () => {
+            this.obServerWaiting = false;
+            this._obSocketConnected = true;
+            console.log('OB socket connected');
+            this.handleOBSocketData();
+        });
+
+        this.obSocket?.on('disconnect', () => {
+            this.obServerWaiting = false;
+            console.error('OB socket disconnected');
+        });
+
+        this.obSocket?.on('connect_error', () => {
+            this.obServerWaiting = false;
+            console.error('OB socket connection error');
+        });
+
     }
 
     // Disconnect from the orderbook service
     obSocketDisconnect() {
-        this.socket.emit('ob-sockets-disconnect');
+        if (!this.obSocket) return;
+        this.obSocket.disconnect();
+        this._obSocketConnected = false;
+        this._obServerSocket = null;
     }
 
     // Handle main OB socket connection lifecycle
-    private handleMainOBSocketEvents() {
-        this.socket.on(`${obEventPrefix}::connect`, () => {
-            this._obSocketConnected = true;
-            this.obServerWaiting = false;
-            console.log('Orderbook socket connected');
-        });
+    // private handleMainOBSocketEvents() {
+    //     this.socket.on(`${obEventPrefix}::connect`, () => {
+    //         this._obSocketConnected = true;
+    //         this.obServerWaiting = false;
+    //         console.log('Orderbook socket connected');
+    //     });
 
-        this.socket.on(`${obEventPrefix}::connect_error`, () => {
-            this._obSocketConnected = false;
-            this.obServerWaiting = false;
-            this.toasterService.error('Orderbook Connection Error, Host is probably down', 'Error');
-        });
+    //     this.socket.on(`${obEventPrefix}::connect_error`, () => {
+    //         this._obSocketConnected = false;
+    //         this.obServerWaiting = false;
+    //         this.toasterService.error('Orderbook Connection Error, Host is probably down', 'Error');
+    //     });
 
-        this.socket.on(`${obEventPrefix}::disconnect`, () => {
-            this._obSocketConnected = false;
-            this.obServerWaiting = false;
-            this.toasterService.error('Orderbook Disconnected', 'Error');
-        });
-    }
+    //     this.socket.on(`${obEventPrefix}::disconnect`, () => {
+    //         this._obSocketConnected = false;
+    //         this.obServerWaiting = false;
+    //         this.toasterService.error('Orderbook Disconnected', 'Error');
+    //     });
+    // }
 
     // Handle OB socket-specific events and data flow
     private handleOBSocketData() {
@@ -116,8 +143,9 @@ export class SocketService {
         ];
 
         // Forward OB server events to the wallet
+        
         orderEvents.forEach((eventName) => {
-            this.socket.on(eventName, (data: any) => {
+            this.obSocket?.on(eventName, (data: any) => {
                 const fullEventName = `${obEventPrefix}::${eventName}`;
                 this.emitEvent(fullEventName, data);
             });
@@ -125,17 +153,17 @@ export class SocketService {
 
         // Forward wallet events to the OB server
         ["update-orderbook", "new-order", "close-order", 'many-orders'].forEach((eventName) => {
-            this.socket.on(eventName, (data: any) => {
-                this.socket.emit(eventName, data);
+            this.obSocket?.on(eventName, (data: any) => {
+                this.obSocket?.emit(eventName, data);
             });
         });
 
         // Handle swap events dynamically based on socket ID
         const swapEventName = 'swap';
-        this.socket.on('new-channel', (d: any) => {
+        this.obSocket?.on('new-channel', (d: any) => {
             const cpSocketId = d.isBuyer ? d.tradeInfo.seller.socketId : d.tradeInfo.buyer.socketId;
-            this.socket.removeAllListeners(`${cpSocketId}::${swapEventName}`);
-            this.socket.on(`${cpSocketId}::${swapEventName}`, (data: any) => {
+            this.obSocket?.removeAllListeners(`${cpSocketId}::${swapEventName}`);
+            this.obSocket?.on(`${cpSocketId}::${swapEventName}`, (data: any) => {
                 this.emitEvent(`${cpSocketId}::${swapEventName}`, data);
             });
         });

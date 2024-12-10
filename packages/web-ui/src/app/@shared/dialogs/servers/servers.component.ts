@@ -44,14 +44,14 @@ export class ServersDialog implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.socketService.socket.on(`${obEventPrefix}::connect`, () => {
+    this.socketService.obSocket?.on(`${obEventPrefix}::connect`, () => {
       const orderbookUrl = this.selectedOrderbookServer === "@custom"
         ? this.customOrderbookUrl
         : this.selectedOrderbookServer;
       this.apiService.orderbookUrl = orderbookUrl;
     });
 
-    this.socketService.socket.on(`${obEventPrefix}::disconnect`, () => {
+    this.socketService.obSocket?.on(`${obEventPrefix}::disconnect`, () => {
       this.apiService.orderbookUrl = null;
     });
   }

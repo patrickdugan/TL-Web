@@ -37,10 +37,6 @@ export class SpotOrdersService {
         private loadingService: LoadingService,
     ) { }
 
-    get socket() {
-        return this.socketService.socket;
-    }
-
     get openedOrders(): ISpotOrder[] {
         return this._openedOrders;
     }
@@ -60,15 +56,15 @@ export class SpotOrdersService {
     newOrder(orderConf: ISpotTradeConf) {
         this.loadingService.tradesLoading = true;
         console.log('inside new order '+JSON.stringify(orderConf))
-        this.socket.emit('new-order', orderConf);
+        this.socketService.obSocket?.emit('new-order', orderConf);
     }
 
     addLiquidity(orders: ISpotTradeConf[]) {
-        this.socket.emit('many-orders', orders);
+        this.socketService.obSocket?.emit('many-orders', orders);
     }
 
     closeOpenedOrder(uuid: string) {
-        this.socket.emit('close-order', uuid);
+        this.socketService.obSocket?.emit('close-order', uuid);
     }
 
     closeAllOrders() {

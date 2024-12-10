@@ -22,10 +22,6 @@ export class FuturesOrdersComponent implements OnInit, OnDestroy {
       private authService: AuthService,
     ) {}
 
-    get socket() {
-      return this.socketService.socket;
-    }
-
     get openedOrders() {
       return this.futuresOrdersService.openedOrders;
     }
@@ -39,7 +35,7 @@ export class FuturesOrdersComponent implements OnInit, OnDestroy {
     }
 
      private subscribe() {
-       this.socket.on(`${obEventPrefix}::placed-orders`, (orders: { openedOrders: IFuturesOrder[], orderHistory: IFuturesOrder[] }) => {
+       this.socketService.obSocket?.on(`${obEventPrefix}::placed-orders`, (orders: { openedOrders: IFuturesOrder[], orderHistory: IFuturesOrder[] }) => {
          const { openedOrders, orderHistory } = orders;
 
          this.futuresOrdersService.orderHistory = orderHistory
@@ -47,7 +43,7 @@ export class FuturesOrdersComponent implements OnInit, OnDestroy {
          this.futuresOrdersService.openedOrders = openedOrders.filter(q => q.type === "FUTURES");
        });
        this.futuresOrdersService.closeOpenedOrder('test-for-update');
-       this.socket.on(`${obEventPrefix}::disconnect`, () => {
+       this.socketService.obSocket?.on(`${obEventPrefix}::disconnect`, () => {
          this.futuresOrdersService.openedOrders = [];
        });
 
