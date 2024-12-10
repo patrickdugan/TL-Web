@@ -113,6 +113,26 @@ const encodeTransfer = (params: EncodeTransferParams): string => {
     return [propertyId, amounts, isColumnA, destinationAddr].join(',');
 };
 
+// Encode Attestation Transaction
+type EncodeAttestationParams = {
+  revoke: number;
+  id: number;
+  targetAddress: string;
+  metaData: string; // Usually a country code or similar metadata
+};
+
+const encodeAttestation = (params: EncodeAttestationParams): string => {
+  const payload = [
+    params.revoke.toString(36),      // Revoke flag (0 or 1)
+    params.id.toString(36),         // ID (usually 0 for whitelist)
+    params.targetAddress,           // Address being attested
+    params.metaData                 // Metadata such as the country code
+  ];
+  const txNumber = 21; // Assuming attestation transaction is type 21
+  const txNumber36 = txNumber.toString(36);
+  const payloadString = payload.join(',');
+  return marker + txNumber36 + payloadString;
+};
 
 
 export const ENCODER = { 
@@ -122,5 +142,6 @@ export const ENCODER = {
     // encodeTradeContractChannel,  
     encodeTradeTokenForUTXO, 
     encodeCommit,
-    encodeTransfer 
+    encodeTransfer,
+    encodeAttestation
 };

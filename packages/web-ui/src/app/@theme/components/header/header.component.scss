@@ -33,6 +33,29 @@ mat-toolbar {
         }
       }
 
+      .connect-button {
+        background: linear-gradient(90deg, #4facfe, #00f2fe); /* Gradient background */
+        color: white; /* Button text color */
+        border: none; /* Remove default border */
+        border-radius: 25px; /* Rounded corners */
+        padding: 10px 20px; /* Spacing inside the button */
+        font-size: 16px; /* Button text size */
+        font-weight: bold; /* Bold text */
+        text-transform: uppercase; /* Make text uppercase */
+        cursor: pointer; /* Pointer cursor on hover */
+        transition: all 0.3s ease; /* Smooth transition for hover effects */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+      }.connect-button:hover {
+        background: linear-gradient(90deg, #00f2fe, #4facfe); /* Reverse gradient */
+        transform: scale(1.05); /* Slightly enlarge on hover */
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3); /* Darker shadow */
+      }.connect-button:active {
+        transform: scale(0.95); /* Slightly shrink when clicked */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Reduce shadow */
+      }
+      
+      
+
 }
 
 .mat-toolbar {

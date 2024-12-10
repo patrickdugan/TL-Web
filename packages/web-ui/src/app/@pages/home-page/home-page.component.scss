@@ -21,14 +21,20 @@
             margin-top: 1.5rem;
         }
     }
-    .login {
-        width: 50%;
-        height: 100%;
-        padding-top: 3rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
+    .connect-button {
+        background-color: transparent;
+        border: none;
+        cursor: pointer;
+  
+        img {
+          width: 40px;
+          height: 40px;
+        }
+  
+        &:hover img {
+          opacity: 0.8;
+        }
+      }
 }
 
 @media only screen and (max-width: 800px) {

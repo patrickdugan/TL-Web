@@ -10,6 +10,7 @@ import { LoadingService } from 'src/app/@core/services/loading.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { TxsService } from 'src/app/@core/services/txs.service';
 import { PasswordDialog } from 'src/app/@shared/dialogs/password/password.component';
+import { ENCODER } from 'src/app/utils/payloads/encoder'
 
 @Component({
   selector: 'tl-portoflio-page',
@@ -115,29 +116,46 @@ export class PortfolioPageComponent implements OnInit {
   //   return this.attestationService.getAttByAddress(address);
   // }
 
-  // async selfAttestate(address: string) {
-  //   try {
-  //     this.loadingService.isLoading = true;
-  //     const isAttestated = await this.attestationService.checkAttAddress(address);
-  //     if (isAttestated) {
-  //       this.loadingService.isLoading = false;
-  //       return
-  //     }
-  //     const payloadRes = await this.rpcService.tlApi.rpc('tl_createpayload_attestation').toPromise();
-  //     if (!payloadRes.data || payloadRes.error) throw new Error(payloadRes.error || "Getting Attestation Payload Error");
-  //     const res = await this.txsService.buildSingSendTx({
-  //       fromKeyPair: { address },
-  //       toKeyPair: { address },
-  //       payload: payloadRes.data,
-  //     });
-  //     if (res.data) {
-  //       this.attestationService.setPendingAtt(address);
-  //       this.toastrService.success(res.data, 'Transaction Sent');
-  //       this.loadingService.isLoading = false;
-  //     }
-  //   } catch (error: any) {
-  //     this.toastrService.error(error.message, `Attestate Error`);
-  //     this.loadingService.isLoading = false;
-  //   }
-  // }
+    async selfAttestate(address: string) {
+      try {
+          this.loadingService.isLoading = true;
+          const ipToCheck = await this.rpcService.rpc('tl_getIpByAddress', [address]);
+          const ipCheckResult = await this.attestationService.checkIP();
+
+          const countryCode = ipCheckResult.attestation.country
+
+          const bannedCountries = ["US", "KP", "SY", "SD", "RU", "IR"];
+          
+          if (bannedCountries.includes(countryCode)) {
+            this.toastrService.error('Cannot attest addresses originating from a sanctioned country.', `Address: ${address}`);
+            return;
+          }
+
+         
+
+          const attestationPayload = ENCODER.encodeAttestation({
+              revoke: 0,
+              id: 0,
+              targetAddress: address,
+              metaData: countryCode,
+          });
+
+          const payloadRes = await this.rpcService.rpc('tl_createpayload_attestation', [attestationPayload]);
+          const res = await this.txsService.buildSignSendTx({
+              fromKeyPair: { address },
+              toKeyPair: { address },
+              payload: payloadRes.data,
+          });
+
+          if (res.data) {
+              this.attestationService.setPendingAtt(address);
+              this.toastrService.success(res.data, 'Transaction Sent');
+          }
+      } catch (error) {
+          this.toastrService.error(error.message, 'Attestation Error');
+      } finally {
+          this.loadingService.isLoading = false;
+      }
+  }
+
 }

@@ -62,6 +62,9 @@ export class HeaderComponent implements OnInit {
     // }
   ];
 
+  public walletAddress: string | null = null;
+  public balanceVisible: boolean = false;
+
   private _selectedRoute: any = this._mainRoutes[0];
   public balanceLoading: boolean = false;
   constructor(
@@ -133,5 +136,28 @@ export class HeaderComponent implements OnInit {
     this.balanceLoading = true;
     await this.balanceService.updateBalances();
     this.balanceLoading = false;
+  }
+
+  async connectWallet() {
+    try {
+      // Check if the browser wallet is available
+      if ((window as any).ethereum) {
+        // Request accounts from the wallet
+        const accounts = await (window as any).ethereum.request({
+          method: 'eth_requestAccounts',
+        });
+
+        // Use the first account as the connected wallet address
+        this.walletAddress = accounts[0];
+        this.balanceVisible = true;
+
+        this.toastrService.success('Wallet connected successfully!');
+      } else {
+        this.toastrService.error('No wallet detected. Please install a browser wallet extension.');
+      }
+    } catch (error) {
+      console.error('Wallet connection error:', error);
+      this.toastrService.error('Failed to connect wallet.');
+    }
   }
 }
