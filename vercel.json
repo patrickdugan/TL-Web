@@ -1,6 +1,11 @@
 {
   "version": 2,
-  "builds": [],
+  "builds": [
+    {
+      "src": "packages/web-ui/dist/**/*",
+      "use": "@vercel/static"
+    }
+  ],
   "routes": [
     {
       "src": "/(.*)",

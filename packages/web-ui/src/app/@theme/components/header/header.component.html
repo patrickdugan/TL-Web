@@ -19,12 +19,21 @@
             </div>
         </div>
         
-        <div class="right-side">
-            <div class="connect">
-                <button class="connect-button" (click)="connectWallet()">
-                    Connect Wallet
-                </button>
+       <div class="right-side">
+          <div class="connect">
+            <div>
+              <button 
+                id="connectWalletButton" 
+                class="connect-button" 
+                *ngIf="!walletAddress" 
+                (click)="connectWallet()">
+                Connect Wallet
+              </button>
+              <div *ngIf="walletAddress">
+                Connected Address: <span id="connectedAddress">{{ walletAddress | slice:0:6 }}...</span>
+              </div>
             </div>
+          </div>
         </div>
 
         <!-- <button mat-icon-button (click)='isLoggedIn ? logOut() : navigateToLoginRoute()'>

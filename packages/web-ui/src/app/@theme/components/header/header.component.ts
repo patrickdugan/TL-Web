@@ -140,18 +140,13 @@ export class HeaderComponent implements OnInit {
 
   async connectWallet() {
     try {
-      // Check if the browser wallet (myWallet) is available
       if ((window as any).myWallet) {
-        // Request accounts from the wallet
         const accounts = await (window as any).myWallet.requestAccounts();
-
-        // Use the first account as the connected wallet address
         if (accounts && accounts.length > 0) {
           this.walletAddress = accounts[0];
           this.balanceVisible = true;
+          console.log('Connected Wallet Address:', this.walletAddress);
           this.toastrService.success('Wallet connected successfully!');
-        } else {
-          throw new Error('No accounts returned by the wallet.');
         }
 
         // Listen for account changes
@@ -167,9 +162,10 @@ export class HeaderComponent implements OnInit {
           this.toastrService.info(`Network changed to ${network}.`);
         });
       } else {
-        this.toastrService.error('No wallet detected. Please install the browser wallet extension.');
+        this.toastrService.error('Wallet extension not detected. Redirecting...');
+        window.open('https://chrome.google.com/webstore/detail/your-wallet-extension-id', '_blank');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Wallet connection error:', error);
       this.toastrService.error('Failed to connect wallet.');
     }
