@@ -1,265 +1,200 @@
-import { fasitfyServer } from "..";
-import axios from 'axios';
-import { buildPsbt, signRawTransction } from "../utils/crypto.util";
-import { safeNumber } from "../utils/common.util";
-
-// let usedUTXOS: string[] = [];
-interface ApiRes {
-    data: any;
-    error: string;
-}
-
-export type TClient = (method: string, ...args: any[]) => Promise<ApiRes>;
+import { WalletService } from './wallet.service'; // Import WalletService
+import { buildPsbt } from '../utils/crypto.util'; // Assuming this uses bitcoinjs-lib
+import { safeNumber } from '../utils/common.util';
 
 export interface IBuildTxConfig {
-    fromKeyPair: {
-        address: string;
-        pubkey?: string;
-    };
-    toKeyPair: {
-        address: string;
-        pubkey?: string;
-    };
-    amount?: number;
-    payload?: string;
-    inputs?: IInput[];
-    addPsbt?: boolean;
-    network?: string;
-};
+  fromKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  toKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  amount: number;
+  payload?: string;
+  network: string; // Example: "bitcoin" or "litecoin"
+}
+
 
 export interface IBuildLTCITTxConfig {
-    buyerKeyPair: {
-        address: string;
-        pubkey?: string;
-    };
-    sellerKeyPair: {
-        address: string;
-        pubkey?: string;
-    };
-    amount: number;
-    payload: string;
-    commitUTXOs: IInput[],
-    network: string;
+  buyerKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  sellerKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  amount: number; // Amount in LTC
+  payload: string; // OP_RETURN data
+  commitUTXOs: IInput[]; // Token UTXOs
+  network: string; // Network: "litecoin" or similar
 }
-
-export interface ISignTxConfig {
-    rawtx: string;
-    wif: string;
-    network: string;
-    inputs: IInput[];
-    psbtHex?: string;
-};
-
-export interface ISignPsbtConfig {
-    wif: string;
-    network: string;
-    psbtHex: string;
-};
 
 export interface IInput {
-    txid: string;
-    amount: number;
-    confirmations: number;
-    scriptPubKey: string;
-    vout: number;
-    redeemScript?: string;
-    pubkey?: string;
-};
-
-const minFeeLtcPerKb = 0.0001;
-
-
-export const smartRpc: TClient = async (method: string, params: any[] = [], api: boolean = false) => {
-    if (fasitfyServer.rpcClient && !api) {
-        return await fasitfyServer.rpcClient.call(method, ...params);;
-    } else {
-        if (fasitfyServer.relayerApiUrl) {
-            const url = `${fasitfyServer.relayerApiUrl}/rpc/${method}`;
-            return await axios.post(url, { params })
-                .then(res => res.data);
-        } else {
-            return { error: `Relayer API url not found` };
-        }
-    }
-};
-
-export const jsTlApi: TClient = async (method: string, params: any[] = []) => {
-    const url = `http://localhost:3000/${method}`;
-    return await axios.post(url, { params })
-        .then(res => res.data);
-};
-
-export const buildLTCInstatTx = async (txConfig: IBuildLTCITTxConfig, isApiMode: boolean) => {
-    try {
-        const { buyerKeyPair, sellerKeyPair, amount, payload, commitUTXOs, network } = txConfig;
-        const buyerAddress = buyerKeyPair.address;
-        const sellerAddress = sellerKeyPair.address;
-        const vaRes1 = await smartRpc('validateaddress', [buyerAddress], isApiMode);
-        if (vaRes1.error || !vaRes1.data?.isvalid) throw new Error(`validateaddress: ${vaRes1.error}`);
-        const vaRes2 = await smartRpc('validateaddress', [sellerAddress], isApiMode);
-        if (vaRes2.error || !vaRes2.data?.isvalid) throw new Error(`validateaddress: ${vaRes2.error}`);
-    
-        const luRes = await smartRpc('listunspent', [0, 999999999, [buyerAddress]], false);
-        if (luRes.error || !luRes.data) return new Error(`listunspent: ${luRes.error}`);
-        const _utxos = (luRes.data as IInput[])
-            .map(i => ({ ...i, pubkey: buyerKeyPair.pubkey }))
-            .sort((a, b) => b.amount - a.amount)
-            // .filter(u => !usedUTXOS.includes(u.txid));
-        const utxos = [...commitUTXOs, ..._utxos];
-        const minAmountRes = await getMinVoutAmount(sellerAddress, isApiMode);
-        if (minAmountRes.error || !minAmountRes.data) return new Error(`getMinVoutAmount: ${minAmountRes.error}`);
-        const minAmount = minAmountRes.data;
-        const buyerLtcAmount = minAmount;
-        const sellerLtcAmount = Math.max(amount, minAmount);
-        const minAmountForAllOuts = safeNumber(buyerLtcAmount + sellerLtcAmount);
-        const inputsRes = getEnoughInputs2(utxos, minAmountForAllOuts);
-        const { finalInputs, fee } = inputsRes;
-        const _inputsSum = finalInputs.map(({amount}) => amount).reduce((a, b) => a + b, 0);
-        const inputsSum = safeNumber(_inputsSum);
-        const changeBuyerLtcAmount = safeNumber(inputsSum - sellerLtcAmount - fee) > buyerLtcAmount
-            ? safeNumber(inputsSum - sellerLtcAmount - fee)
-            : buyerLtcAmount;
-        if (inputsSum < safeNumber(fee + sellerLtcAmount + changeBuyerLtcAmount)) throw new Error("Not Enough coins for paying fees. Code 1");
-        if (!finalInputs.length) throw new Error("Not Enough coins for paying fees. Code 3");
-        const _insForRawTx = finalInputs.map(({txid, vout }) => ({ txid, vout }));
-        const _outsForRawTx = { [buyerAddress]: changeBuyerLtcAmount, [sellerAddress]: sellerLtcAmount };
-
-        const crtRes = await smartRpc('createrawtransaction', [_insForRawTx, _outsForRawTx], isApiMode);
-        if (crtRes.error || !crtRes.data) throw new Error(`createrawtransaction: ${crtRes.error}`);
-        const crtxoprRes = await jsTlApi('tl_createrawtx_opreturn', [crtRes.data, payload]);
-        if (crtxoprRes.error || !crtxoprRes.data) throw new Error(`tl_createrawtx_opreturn: ${crtxoprRes.error}`);
-        const finalTx = crtxoprRes.data;
-        const psbtHexConfig = {
-            rawtx: finalTx,
-            inputs: finalInputs,
-            network: network,
-        };
-        const psbtHexRes = buildPsbt(psbtHexConfig);
-        if (psbtHexRes.error || !psbtHexRes.data) throw new Error(`buildPsbt: ${psbtHexRes.error}`);
-        const data: any = { rawtx: finalTx, inputs: finalInputs, psbtHex: psbtHexRes.data };
-        return { data };
-    } catch (error) {
-        return { error: error.message || 'Undefined build Tx Error' };
-    }
-};
-
-export const buildTx = async (txConfig: IBuildTxConfig, isApiMode: boolean) => {
-    try {
-        const { fromKeyPair, toKeyPair, amount, payload, inputs, addPsbt, network } = txConfig;
-        const fromAddress = fromKeyPair.address;
-        const toAddress = toKeyPair.address;
-        const vaRes1 = await smartRpc('validateaddress', [fromAddress], isApiMode);
-        if (vaRes1.error || !vaRes1.data?.isvalid) throw new Error(`validateaddress: ${vaRes1.error}`);
-        const vaRes2 = await smartRpc('validateaddress', [toAddress], isApiMode);
-        if (vaRes2.error || !vaRes2.data?.isvalid) throw new Error(`validateaddress: ${vaRes2.error}`);
-        //console.log('About to call listunspent in buildTx '+ fromAddress)
-        const luRes = await smartRpc('listunspent', [0, 999999999, [fromAddress]], isApiMode);
-        //console.log(JSON.stringify(luRes))
-        if (luRes.error || !luRes.data) return new Error(`listunspent: ${luRes.error}`);
-        const _utxos = (luRes.data as IInput[])
-            .map(i => ({...i, pubkey: fromKeyPair.pubkey}))
-            .sort((a, b) => b.amount - a.amount);
-        const _inputs = inputs?.length ? inputs : [];
-        const utxos = [..._inputs, ..._utxos];
-        const minAmountRes = await getMinVoutAmount(toAddress, isApiMode);
-        if (minAmountRes.error || !minAmountRes.data) throw new Error(`getMinVoutAmount: ${minAmountRes.error}`);
-        const minAmount = minAmountRes.data;
-        if (minAmount > amount && !payload) throw new Error(`Minimum amount is: ${minAmount}`);
-
-        const _amount = Math.max(amount || 0, minAmount)
-        const inputsRes = getEnoughInputs(utxos, _amount);
-        const { finalInputs, fee } = inputsRes;
-        const _inputsSum = finalInputs.map(({amount}) => amount).reduce((a, b) => a + b, 0);
-        const inputsSum = safeNumber(_inputsSum);
-
-        const _toAmount = safeNumber(_amount - fee);
-        const toAmount = Math.max(minAmount, _toAmount)
-        const change = !payload 
-            ? safeNumber(inputsSum - _amount)
-            : safeNumber(inputsSum - _amount - fee);
-
-        if (inputsSum < safeNumber(fee + toAmount + change)) throw new Error("Not Enaugh coins for paying fees. Code 1");
-        if (inputsSum < _amount) throw new Error("Not Enaugh coins for paying fees. Code 2");
-        if (!finalInputs.length) throw new Error("Not Enaugh coins for paying fees. Code 3");
-
-        const _insForRawTx = finalInputs.map(({txid, vout }) => ({ txid, vout }));
-        const _outsForRawTx = { [toAddress]: toAmount };
-        if (change > 0) _outsForRawTx[fromAddress] = change;
-        const crtRes = await smartRpc('createrawtransaction', [_insForRawTx, _outsForRawTx], isApiMode);
-        if (crtRes.error || !crtRes.data) throw new Error(`createrawtransaction: ${crtRes.error}`);
-        let finalTx = crtRes.data;
-        if (payload) {
-            const crtxoprRes = await jsTlApi('tl_createrawtx_opreturn', [finalTx, payload], isApiMode);
-            if (crtxoprRes.error || !crtxoprRes.data) throw new Error(`tl_createrawtx_opreturn: ${crtxoprRes.error}`);
-            finalTx = crtxoprRes.data;
-        }
-        const data: any = { rawtx: finalTx, inputs: finalInputs };
-        if (addPsbt) {
-            const psbtHexConfig = {
-                rawtx: finalTx,
-                inputs: finalInputs,
-                network: network,
-            }
-            const psbtHexRes = buildPsbt(psbtHexConfig);
-            if (psbtHexRes.error || !psbtHexRes.data) throw new Error(`buildPsbt: ${psbtHexRes.error}`);
-            data.psbtHex = psbtHexRes.data;
-        }
-        return { data };
-    } catch (error) {
-        return { error: error.message || 'Undefined build Tx Error' };
-    }
+  txid: string;
+  vout: number;
+  amount: number;
+  scriptPubKey: string;
 }
 
-const getEnoughInputs2 = (_inputs: IInput[], amount: number) => {
-    const finalInputs: IInput[] = [];
-    _inputs.forEach(u => {
-        const _amountSum: number = finalInputs.map(r => r.amount).reduce((a, b) => a + b, 0);
-        const amountSum = safeNumber(_amountSum);
-        const _fee = safeNumber((0.2 * minFeeLtcPerKb) * (finalInputs.length + 1));
-        if (amountSum < safeNumber(amount + _fee)) finalInputs.push(u);
-    });
-    const fee = safeNumber((0.2 * minFeeLtcPerKb) * finalInputs.length);
-    return { finalInputs, fee };
-};
+const MIN_FEE_LTC_PER_KB = 0.0001; // Example minimum fee
 
-const getEnoughInputs = (_inputs: IInput[], amount: number) => {
-    const finalInputs: IInput[] = [];
-    _inputs.forEach(u => {
-        const _amountSum: number = finalInputs.map(r => r.amount).reduce((a, b) => a + b, 0);
-        const amountSum = safeNumber(_amountSum);
-        if (amountSum < amount) finalInputs.push(u);
-    });
-    const fee = safeNumber((0.2 * minFeeLtcPerKb) * finalInputs.length);
-    return { finalInputs, fee };
-};
+export class TxBuilder {
+  constructor(private walletService: WalletService) {}
 
-const getMinVoutAmount = async (toAddress: string, isApiMode: boolean) => {
-    try {
-        return { data: 0.0000546 };
-        const crtxrRes = await smartRpc('tl_createrawtx_reference', ['', toAddress], isApiMode);
-        if (crtxrRes.error || !crtxrRes.data) throw new Error(`tl_createrawtx_reference: ${crtxrRes.error}`);
-        const drwRes = await smartRpc('decoderawtransaction', [crtxrRes.data], isApiMode);
-        if (drwRes.error || !drwRes.data) throw new Error(`decoderawtransaction: ${drwRes.error}`);
-        const minAmount = parseFloat(drwRes.data.vout[0].value);
-        // if (minAmount !== 0.000036) throw new Error(`min Amount is not 0.000036`);
-        return { data: minAmount };
-    } catch (error) {
-        return { error: error.message || 'Undefined getMinVoutAmount Error' };
+  async buildTransaction(config: IBuildTxConfig): Promise<string> {
+    const { fromKeyPair, toKeyPair, amount, payload, network } = config;
+
+    // Step 1: Fetch UTXOs
+    const utxos = await this.fetchUTXOs(fromKeyPair.address);
+    if (!utxos.length) {
+      throw new Error('No UTXOs available');
     }
+
+    // Step 2: Select inputs
+    const { inputs, change } = this.selectInputs(utxos, amount, MIN_FEE_LTC_PER_KB);
+
+    // Step 3: Build outputs
+    const outputs: Record<string, number> = {
+      [toKeyPair.address]: safeNumber(amount),
+    };
+    if (change > 0) {
+      outputs[fromKeyPair.address] = safeNumber(change);
+    }
+
+    // Step 4: Build PSBT
+    const psbt = buildPsbt({
+      inputs,
+      outputs,
+      network,
+    });
+
+    // Step 5: Attach OP_RETURN payload (if any)
+    if (payload) {
+      psbt.addOutput({
+        script: Buffer.from(payload, 'utf8'),
+        value: 0,
+      });
+    }
+
+    // Step 6: Sign transaction using wallet
+    const signedPsbt = await this.walletService.signPSBT(psbt.toBase64());
+    if (!signedPsbt) {
+      throw new Error('Transaction signing failed');
+    }
+
+    return signedPsbt; // Return the signed PSBT or raw transaction
+  }
+
+  private async fetchUTXOs(address: string): Promise<IInput[]> {
+    // Example implementation: Replace with actual UTXO fetch logic
+    const utxoApi = `https://blockchain.info/unspent?active=${address}`;
+    const response = await fetch(utxoApi);
+    const { unspent_outputs: unspentOutputs } = await response.json();
+
+    return unspentOutputs.map((utxo: any) => ({
+      txid: utxo.tx_hash_big_endian,
+      vout: utxo.tx_output_n,
+      amount: utxo.value / 1e8, // Convert satoshis to BTC/LTC
+      scriptPubKey: utxo.script,
+    }));
+  }
+
+  private selectInputs(utxos: IInput[], targetAmount: number, feeRate: number) {
+    let selectedInputs: IInput[] = [];
+    let total = 0;
+
+    for (const utxo of utxos) {
+      selectedInputs.push(utxo);
+      total += utxo.amount;
+
+      const fee = selectedInputs.length * feeRate; // Simplified fee calculation
+      if (total >= targetAmount + fee) {
+        const change = total - targetAmount - fee;
+        return { inputs: selectedInputs, change };
+      }
+    }
+
+    throw new Error('Insufficient funds');
+  }
+
+
+export const buildLTCInstatTx = async (
+  txConfig: IBuildLTCITTxConfig,
+  walletService: WalletService
+): Promise<string> => {
+  try {
+    const { buyerKeyPair, sellerKeyPair, amount, payload, commitUTXOs, network } = txConfig;
+
+    const buyerAddress = buyerKeyPair.address;
+    const sellerAddress = sellerKeyPair.address;
+
+    // Step 1: Validate buyer and seller addresses
+    if (!buyerAddress || !sellerAddress) {
+      throw new Error('Invalid buyer or seller address');
+    }
+
+    // Step 2: Fetch additional UTXOs for the buyer
+    const additionalUTXOs = await fetchUTXOs(buyerAddress);
+    if (!additionalUTXOs.length) {
+      throw new Error('No additional UTXOs available for buyer');
+    }
+
+    // Combine token UTXOs and additional UTXOs
+    const utxos = [...commitUTXOs, ...additionalUTXOs];
+
+    // Step 3: Calculate required inputs and outputs
+    const buyerLtcAmount = 0.0001; // Example minimum amount buyer receives
+    const sellerLtcAmount = safeNumber(amount);
+
+    const { inputs, change } = selectInputs(utxos, safeNumber(sellerLtcAmount + buyerLtcAmount), 0.0001);
+
+    const outputs: Record<string, number> = {
+      [buyerAddress]: safeNumber(change),
+      [sellerAddress]: safeNumber(sellerLtcAmount),
+    };
+
+    // Step 4: Build the transaction
+    const psbt = buildPsbt({
+      inputs,
+      outputs,
+      network,
+    });
+
+    // Step 5: Add OP_RETURN payload
+    if (payload) {
+      psbt.addOutput({
+        script: Buffer.from(payload, 'utf8'),
+        value: 0, // OP_RETURN has no associated value
+      });
+    }
+
+    // Step 6: Sign the PSBT using the wallet
+    const signedTx = await walletService.signPSBT(psbt.toBase64());
+    if (!signedTx) {
+      throw new Error('Transaction signing failed');
+    }
+
+    return signedTx; // Return the signed transaction
+  } catch (error) {
+    console.error('Error building LTC transaction:', error.message);
+    throw new Error(error.message || 'Unknown build transaction error');
+  }
+};
+
+const fetchUTXOs = async (address: string): Promise<IInput[]> => {
+  const url = `https://api.blockcypher.com/v1/ltc/main/addrs/${address}?unspentOnly=true`;
+  const response = await fetch(url);
+  const data = await response.json();
+
+  return data.txrefs.map((utxo: any) => ({
+    txid: utxo.tx_hash,
+    vout: utxo.tx_output_n,
+    amount: utxo.value / 1e8, // Convert satoshis to LTC
+    scriptPubKey: utxo.script,
+  }));
+};
+
 }
-
-export const signTx = async (signOptions: ISignTxConfig) => {
-    try {
-        const { rawtx, wif, network, inputs } = signOptions;
-        const lastResult = signRawTransction({ rawtx, wif, network, inputs });
-        // if (lastResult.data) {
-        //     inputs.map(e => {
-        //         usedUTXOS.push(e.txid);
-        //         setTimeout(() => usedUTXOS = usedUTXOS.filter(q => q !== e.txid), 10000);
-        //     });
-        // }
-        return lastResult;
-    } catch (error) {
-        return { error: error.message };
-    }
-};

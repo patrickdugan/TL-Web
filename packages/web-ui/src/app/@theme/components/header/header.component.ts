@@ -140,24 +140,39 @@ export class HeaderComponent implements OnInit {
 
   async connectWallet() {
     try {
-      // Check if the browser wallet is available
-      if ((window as any).ethereum) {
+      // Check if the browser wallet (myWallet) is available
+      if ((window as any).myWallet) {
         // Request accounts from the wallet
-        const accounts = await (window as any).ethereum.request({
-          method: 'eth_requestAccounts',
-        });
+        const accounts = await (window as any).myWallet.requestAccounts();
 
         // Use the first account as the connected wallet address
-        this.walletAddress = accounts[0];
-        this.balanceVisible = true;
+        if (accounts && accounts.length > 0) {
+          this.walletAddress = accounts[0];
+          this.balanceVisible = true;
+          this.toastrService.success('Wallet connected successfully!');
+        } else {
+          throw new Error('No accounts returned by the wallet.');
+        }
 
-        this.toastrService.success('Wallet connected successfully!');
+        // Listen for account changes
+        (window as any).myWallet.on('accountsChanged', (newAccounts: string[]) => {
+          console.log('Accounts changed:', newAccounts);
+          this.walletAddress = newAccounts[0] || null;
+          this.toastrService.info('Account switched.');
+        });
+
+        // Listen for network changes (optional)
+        (window as any).myWallet.on('networkChanged', (network: string) => {
+          console.log('Network changed:', network);
+          this.toastrService.info(`Network changed to ${network}.`);
+        });
       } else {
-        this.toastrService.error('No wallet detected. Please install a browser wallet extension.');
+        this.toastrService.error('No wallet detected. Please install the browser wallet extension.');
       }
     } catch (error) {
       console.error('Wallet connection error:', error);
       this.toastrService.error('Failed to connect wallet.');
     }
   }
+
 }

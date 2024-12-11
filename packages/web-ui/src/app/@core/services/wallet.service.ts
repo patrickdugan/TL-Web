@@ -61,4 +61,6 @@ export class WalletService {
     }
     throw new Error('Wallet extension not detected');
   }
+
+  
 }
