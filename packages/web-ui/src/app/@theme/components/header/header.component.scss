@@ -60,26 +60,19 @@ mat-toolbar {
         box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
     }
     
-    .wallet-display {
-      font-size: 12px; /* Smaller font size */
-      color: #555; /* Subtle text color */
-      padding: 5px 10px;
-      background: #f9f9f9; /* Light background */
-      border: 1px solid #ddd; /* Subtle border */
-      border-radius: 5px; /* Rounded corners */
-      display: inline-block;
-      cursor: default;
-      text-align: center;
-  }
+    .wallet-address-display {
+      font-size: 0.9rem; /* Adjust font size to make it smaller */
+      color: #ddd; /* Subtle text color for better readability */
+      max-width: 200px; /* Adjust the width to control the truncation */
+      overflow: hidden; /* Ensure the text doesn't overflow */
+      text-overflow: ellipsis; /* Add ellipsis for truncated text */
+      white-space: nowrap; /* Prevent the text from wrapping */
+      display: inline-block; /* Ensure the element behaves like an inline block */
+      background: #2c2c2c; /* Slightly darker background */
+      padding: 4px 8px; /* Add some padding for spacing */
+      border-radius: 4px; /* Add rounded corners */
+    }
   
-  .wallet-display .wallet-text {
-      font-family: 'Courier New', Courier, monospace; /* Monospace font for addresses */
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-  }
-  
-      
 
 }
 

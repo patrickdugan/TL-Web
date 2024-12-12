@@ -29,7 +29,7 @@
                 (click)="connectWallet()">
                 Connect Wallet
               </button>
-              <div *ngIf="walletAddress">
+              <div *ngIf="walletAddress" class="wallet-address-display">
                 Connected Address: <span id="connectedAddress">{{ walletAddress | slice:0:6 }}...</span>
               </div>
             </div>
