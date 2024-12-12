@@ -32,16 +32,19 @@ export class MarketApiService {
 
     getSpotMarkets() {
         console.log('spot markets '+this.apiUrl + 'spot')
-        const spotURL = 'ws.layerwallet.com/markets/spot'
-        return this.http.get(spotURL)
-            .pipe(map((res: any) => res.data));
+        const spotURL = 'https://ws.layerwallet.com/markets/spot'
+        const markets =  this.http.get(spotURL)
+        console.log('returning spot markets '+JSON.stringify(markets))
+        const mapped = markets.pipe(map((res: any) => res.data));
+        console.log('mapped markets '+JSON.stringify(mapped))
+        return mapped
     }
 
     getFuturesMarkets() {    
         console.log('futures markets '+this.apiUrl + 'futures')
        
-          const futuresURL = 'ws.layerwallet.com/markets/futures'
-    
+          const futuresURL = 'https://ws.layerwallet.com/markets/futures'
+            
         return this.http.get(futuresURL)
             .pipe(map((res: any) => res.data));
     }
