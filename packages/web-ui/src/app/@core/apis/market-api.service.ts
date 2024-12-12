@@ -32,15 +32,17 @@ export class MarketApiService {
 
     getSpotMarkets() {
         console.log('spot markets '+this.apiUrl + 'spot')
-        if (!this.apiUrl) throw new Error("No Api Url found");
-        return this.http.get(this.apiUrl + 'spot')
+        const spotURL = 'ws.layerwallet.com/markets/spot'
+        return this.http.get(spotURL)
             .pipe(map((res: any) => res.data));
     }
 
     getFuturesMarkets() {    
         console.log('futures markets '+this.apiUrl + 'futures')
-        if (!this.apiUrl) throw new Error("No Api Url found");
-        return this.http.get(this.apiUrl + 'futures')
+       
+          const futuresURL = 'ws.layerwallet.com/markets/futures'
+    
+        return this.http.get(futuresURL)
             .pipe(map((res: any) => res.data));
     }
 }
