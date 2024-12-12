@@ -99,7 +99,6 @@ export class SocketService {
             this.obServerWaiting = false;
             console.error('OB socket connection error');
         });
-
     }
 
     // Disconnect from the orderbook service
