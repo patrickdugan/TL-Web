@@ -20,7 +20,7 @@ mat-toolbar {
             display: flex;
             justify-content: center;
             align-items: center;
-            min-width: 5rem;
+            min-width: 2rem;
             margin: 0 0.25rem;
           }
           cursor: pointer;
@@ -34,7 +34,7 @@ mat-toolbar {
       }
 
       .connect-button {
-        background: linear-gradient(90deg, #4facfe, #00f2fe); /* Gradient background */
+        background: linear-gradient(90deg, #2364AA, #1D3557); /* Darker gradient background */
         color: white; /* Button text color */
         border: none; /* Remove default border */
         border-radius: 25px; /* Rounded corners */
@@ -53,7 +53,32 @@ mat-toolbar {
         transform: scale(0.95); /* Slightly shrink when clicked */
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Reduce shadow */
       }
-      
+
+      .connect-button:hover {
+        background: linear-gradient(90deg, #1D3557, #2364AA); /* Reverse darker gradient */
+        transform: scale(1.05);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .wallet-display {
+      font-size: 12px; /* Smaller font size */
+      color: #555; /* Subtle text color */
+      padding: 5px 10px;
+      background: #f9f9f9; /* Light background */
+      border: 1px solid #ddd; /* Subtle border */
+      border-radius: 5px; /* Rounded corners */
+      display: inline-block;
+      cursor: default;
+      text-align: center;
+  }
+  
+  .wallet-display .wallet-text {
+      font-family: 'Courier New', Courier, monospace; /* Monospace font for addresses */
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+  }
+  
       
 
 }
