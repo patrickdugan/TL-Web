@@ -63,7 +63,7 @@ mat-toolbar {
     .wallet-address-display {
       font-size: 0.9rem; /* Adjust font size to make it smaller */
       color: #ddd; /* Subtle text color for better readability */
-      max-width: 200px; /* Adjust the width to control the truncation */
+      max-width: 400px; /* Adjust the width to control the truncation */
       overflow: hidden; /* Ensure the text doesn't overflow */
       text-overflow: ellipsis; /* Add ellipsis for truncated text */
       white-space: nowrap; /* Prevent the text from wrapping */
