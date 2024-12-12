@@ -7,11 +7,11 @@ type TEnpoint = {
 
 export const ENDPOINTS: TEnpoint = {
     LTC: {
-        orderbookApiUrl: "http://172.81.181.19:9190",
-        relayerUrl: "http://172.81.181.19:9191",
+        orderbookApiUrl: "wss://ws.layerwallet.com", // Use wss for secure communication
+        relayerUrl: "http://172.81.181.19:9191",   // Ensure the relayer URL uses https if applicable
     },
     LTCTEST: {
-        orderbookApiUrl: "http://172.81.181.19:9191",
-        relayerUrl: "http://172.81.181.19:8191",
+        orderbookApiUrl: "wss://ws.layerwallet.com", // Use wss for secure communication
+        relayerUrl: "http://172.81.181.19:8191",   // Ensure the relayer URL uses https if applicable
     },
 };
