@@ -128,7 +128,7 @@ export class AttestationService {
 
         // Check suspicious parameters
         const { issues, whois } = data;
-       const bannedCountries = ["US", "KP", "SY", "SD", "RU", "IR"]; // Add sanctioned country codes
+       const bannedCountries = ["US", "KP", "SY", "RU", "IR", "CU"]; // Add sanctioned country codes
 
         if (
           issues.is_vpn ||

@@ -112,14 +112,14 @@ export class PortfolioPageComponent implements OnInit {
     this.toastrService.info('Address Copied to clipboard', 'Copied');
   }
 
-  // getAddressAttestationStatus(address: string) {
-  //   return this.attestationService.getAttByAddress(address);
-  // }
+   getAddressAttestationStatus(address: string) {
+     return this.attestationService.getAttByAddress(address);
+   }
 
     async selfAttestate(address: string) {
       try {
           this.loadingService.isLoading = true;
-          const ipToCheck = await this.rpcService.rpc('tl_getIpByAddress', [address]);
+          //const ipToCheck = await this.rpcService.rpc('tl_getIpByAddress', [address]);
           const ipCheckResult = await this.attestationService.checkIP();
 
           const countryCode = ipCheckResult.attestation.country
@@ -140,7 +140,6 @@ export class PortfolioPageComponent implements OnInit {
               metaData: countryCode,
           });
 
-          const payloadRes = await this.rpcService.rpc('tl_createpayload_attestation', [attestationPayload]);
           const res = await this.txsService.buildSignSendTx({
               fromKeyPair: { address },
               toKeyPair: { address },
