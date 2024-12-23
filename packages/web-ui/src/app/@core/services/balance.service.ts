@@ -72,6 +72,20 @@ export class BalanceService {
     }
   }
 
+  getTokensBalancesByAddress(address: string): any[] {
+    return this._allBalancesObj[address]?.tokenBalances || [];
+  }
+
+  getCoinBalancesByAddress(address: string): { confirmed: number; unconfirmed: number; utxos: any[] } {
+    return this._allBalancesObj[address]?.coinBalance || { confirmed: 0, unconfirmed: 0, utxos: [] };
+  }
+
+  sumAvailableCoins(): number {
+    return Object.values(this._allBalancesObj)
+      .reduce((sum, balanceObj) => sum + (balanceObj.coinBalance?.confirmed || 0), 0);
+  }
+
+
   private async updateCoinBalanceForAddressFromWallet(address: string) {
     if (!address) throw new Error('No address provided for updating the balance');
     
@@ -101,7 +115,7 @@ export class BalanceService {
     if (!address) throw new Error('No address provided for updating the token balance');
 
     try {
-      const tokens = await this.tlApi.rpc('getAllBalancesForAddress', [address]).toPromise();
+      const tokens = await axios.get(url+'getAllBalancesForAddress', [address]).toPromise();
       if (!this._allBalancesObj[address]) this._allBalancesObj[address] = emptyBalanceObj;
 
       this._allBalancesObj[address].tokensBalance = tokens.map((token: any) => ({

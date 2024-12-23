@@ -49,7 +49,6 @@ import { FuturesChannelsComponent } from './futures-page/futures-trading-grid/fu
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FuturesOrderHistoryComponent } from './futures-page/futures-trading-grid/futures-bottom-card/futures-order-history/futures-order-history.component';
 import { SpotOrderHistoryComponent } from './spot-page/spot-trading-grid/spot-bottom-card/spot-order-history/spot-order-history.component';
-import { NodeRewardPageComponent } from './node-reward/node-reward-page.component';
 import { DateFormatPipe } from '../@shared/pipes/date-format.pipe';
 import { SendTxTabComponent } from './tx-builder-page/send-tab/send-tab.component';
 import { BuildTxTabComponent } from './tx-builder-page/build-tab/build-tab.component';
@@ -83,7 +82,6 @@ const PAGE_COMPONENTS = [
     PortfolioPageComponent,
     SpotPageComponent,
     FuturesPageComponent,
-    NodeRewardPageComponent,
     LoginContainerComponent,
     TxBuilderPageComponent,
     BuildTxTabComponent,
