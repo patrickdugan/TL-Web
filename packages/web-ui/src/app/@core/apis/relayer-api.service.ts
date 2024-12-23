@@ -11,7 +11,7 @@ import { TNETWORK } from "../services/rpc.service";
 
 export class TradeLayerApiService {
     // private NETWORK: TNETWORK = null;
-    private apiUrl: string | null = null;
+    private apiUrl: string | null = "170.75.170.246:443";
 
     constructor(
         private http: HttpClient,

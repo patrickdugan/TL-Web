@@ -1,4 +1,3 @@
-/* To learn more about this file see: https://angular.io/config/tsconfig. */
 {
   "compileOnSave": false,
   "compilerOptions": {
@@ -18,10 +17,8 @@
     "target": "es2017",
     "module": "es2020",
     "types": ["node"],
-    "lib": [
-      "es2018",
-      "dom"
-    ]
+    "lib": ["es2018", "dom"],
+    "typeRoots": ["node_modules/@types", "./src"]
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
@@ -29,6 +26,10 @@
     "strictInputAccessModifiers": false,
     "strictTemplates": false,
     "strictPropertyInitialization": false,
-    "resolveJsonModule": true,
-  }
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/global.d.ts"
+  ]
 }

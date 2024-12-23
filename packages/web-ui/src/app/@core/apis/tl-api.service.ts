@@ -11,7 +11,7 @@ export class NewTradeLayerApiService {
 
     // Replace this with your actual API URL
     private get apiUrl() {
-        return 'http://172.81.181.19:3000/';
+        return "https://api.layerwallet.com";
     }
 
     // Generalized RPC call
