@@ -92,8 +92,9 @@ export class HeaderComponent implements OnInit {
   }
 
   get availableBalance() {
-    return (this.balanceService.sumAvailableCoins).toFixed(6);
+    return this.balanceService.sumAvailableCoins().toFixed(6);
   }
+
 
   get isLoggedIn() {
     return this.authService.isLoggedIn;
@@ -139,37 +140,41 @@ export class HeaderComponent implements OnInit {
   }
 
   async connectWallet() {
-    try {
-      if ((window as any).myWallet) {
-        const accounts = await (window as any).myWallet.requestAccounts();
-        if (accounts && accounts.length > 0) {
-          console.log('showing myWallet accounts '+JSON.stringify(accounts))
-          this.walletAddress = accounts;
-          this.balanceVisible = true;
-          console.log('Connected Wallet Address:', this.walletAddress);
-          this.toastrService.success('Wallet connected successfully!');
+      try {
+        if (window.myWallet) {
+          const accounts = await window.myWallet.sendRequest('requestAccounts', {});
+          if (accounts && accounts.length > 0) {
+            this.walletAddress = accounts[0]; // Assuming the first account
+            this.balanceVisible = true;
+            console.log('Connected Wallet Address:', this.walletAddress);
+            this.toastrService.success('Wallet connected successfully!');
+          }
+
+          // Only add listeners if the `on` method exists
+          if (typeof window.myWallet.on === 'function') {
+            // Listen for account changes
+            window.myWallet.on('accountsChanged', (newAccounts: string[]) => {
+              console.log('Accounts changed:', newAccounts);
+              this.walletAddress = newAccounts[0] || null;
+              this.toastrService.info('Account switched.');
+            });
+
+            // Listen for network changes (optional)
+            window.myWallet.on('networkChanged', (network: string) => {
+              console.log('Network changed:', network);
+              this.toastrService.info(`Network changed to ${network}.`);
+            });
+          } else {
+            console.warn('Wallet does not support event listeners.');
+          }
+        } else {
+          this.toastrService.error('Wallet extension not detected. Redirecting...');
+          window.open('https://chrome.google.com/webstore/detail/your-wallet-extension-id', '_blank');
         }
-
-        // Listen for account changes
-        (window as any).myWallet.on('accountsChanged', (newAccounts: string[]) => {
-          console.log('Accounts changed:', newAccounts);
-          this.walletAddress = newAccounts[0] || null;
-          this.toastrService.info('Account switched.');
-        });
-
-        // Listen for network changes (optional)
-        (window as any).myWallet.on('networkChanged', (network: string) => {
-          console.log('Network changed:', network);
-          this.toastrService.info(`Network changed to ${network}.`);
-        });
-      } else {
-        this.toastrService.error('Wallet extension not detected. Redirecting...');
-        window.open('https://chrome.google.com/webstore/detail/your-wallet-extension-id', '_blank');
+      } catch (error: any) {
+        console.error('Wallet connection error:', error);
+        this.toastrService.error('Failed to connect wallet.');
       }
-    } catch (error: any) {
-      console.error('Wallet connection error:', error);
-      this.toastrService.error('Failed to connect wallet.');
     }
-  }
 
 }

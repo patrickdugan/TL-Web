@@ -2,9 +2,7 @@ import { Injectable } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
 import { AuthService } from './auth.service';
 import { WalletService } from './wallet.service';
-import { IUTXO, TxsService } from "./txs.service";
-import { ApiService } from "./api.service";
-import axios from 'axios';  // Add axios import
+import axios from 'axios';
 
 const minBlocksForBalanceConf: number = 1;
 const emptyBalanceObj = {
@@ -16,7 +14,7 @@ const emptyBalanceObj = {
   tokensBalance: [],
 };
 
-const url = "https://api.layerwallet.com"
+const url = "https://api.layerwallet.com";
 
 @Injectable({
   providedIn: 'root',
@@ -64,7 +62,7 @@ export class BalanceService {
         await this.updateCoinBalanceForAddressFromWallet(address);
         await this.updateTokensBalanceForAddress(address);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.toastrService.warning(
         error.message || 'Error with updating balances',
         'Balance Error'
@@ -73,24 +71,30 @@ export class BalanceService {
   }
 
   getTokensBalancesByAddress(address: string): any[] {
-    return this._allBalancesObj[address]?.tokenBalances || [];
+    return this._allBalancesObj[address]?.tokensBalance || [];
   }
 
   getCoinBalancesByAddress(address: string): { confirmed: number; unconfirmed: number; utxos: any[] } {
     return this._allBalancesObj[address]?.coinBalance || { confirmed: 0, unconfirmed: 0, utxos: [] };
   }
-
+  
   sumAvailableCoins(): number {
-    return Object.values(this._allBalancesObj)
-      .reduce((sum, balanceObj) => sum + (balanceObj.coinBalance?.confirmed || 0), 0);
+    try {
+      return Object.values(this._allBalancesObj)
+        .reduce((sum, balanceObj) => sum + (balanceObj.coinBalance?.confirmed || 0), 0);
+    } catch (error) {
+      console.error('Error calculating available coins:', error);
+      return 0; // Default to 0 in case of error
+    }
   }
 
 
   private async updateCoinBalanceForAddressFromWallet(address: string) {
     if (!address) throw new Error('No address provided for updating the balance');
-    
+
     try {
-      const unspentUtxos = await axios.get(url+'/balance/'+address)
+      const { data: unspentUtxos } = await axios.get(`${url}/balance/${address}`);
+
       const confirmed = unspentUtxos
         .filter((utxo: any) => utxo.confirmations >= minBlocksForBalanceConf)
         .reduce((sum: number, utxo: any) => sum + utxo.amount, 0);
@@ -106,7 +110,7 @@ export class BalanceService {
         unconfirmed: parseFloat(unconfirmed.toFixed(6)),
         utxos: unspentUtxos,
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to fetch coin balance for address ${address}: ${error.message}`);
     }
   }
@@ -115,7 +119,10 @@ export class BalanceService {
     if (!address) throw new Error('No address provided for updating the token balance');
 
     try {
-      const tokens = await axios.get(url+'getAllBalancesForAddress', [address]).toPromise();
+      const { data: tokens } = await axios.get(`${url}/getAllBalancesForAddress`, {
+        params: { address },
+      });
+
       if (!this._allBalancesObj[address]) this._allBalancesObj[address] = emptyBalanceObj;
 
       this._allBalancesObj[address].tokensBalance = tokens.map((token: any) => ({
@@ -128,10 +135,24 @@ export class BalanceService {
         vesting: token.vesting || 0,
         channel: token.channel || 0,
       }));
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to fetch token balance for address ${address}: ${error.message}`);
     }
   }
+
+  getTokenNameById(propertyId: number): string {
+  // Iterate through all addresses and find the token name by propertyId
+  for (const address in this._allBalancesObj) {
+    const tokens = this._allBalancesObj[address]?.tokensBalance || [];
+    const token = tokens.find((t: any) => t.propertyid === propertyId);
+    if (token) {
+      return token.name;
+    }
+  }
+  // Return a default value if no token is found
+  return 'Unknown Token';
+}
+
 
   private restartBalance() {
     this._allBalancesObj = {};

@@ -48,7 +48,7 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
     ) {}
 
     get spotKeyPair() {
-      return "asdfasdfasdfsadf"//this.authService.walletAddresses[0];
+      return this.authService.walletAddresses[0];
     }
 
     get spotAddress() {
@@ -177,19 +177,20 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
             return console.log('missing parameters for trade ' + propIdForSale + ' ' + propIdDesired + ' ' + price + ' ' + amount);
       }
 
-
+      console.log('this spotkey in buy/sell '+this.spotKeyPair)
       if (!this.spotKeyPair){
         return console.log('missing key pair');
       }
 
       const pubkeyRes = await this.rpcService.rpc("getaddressinfo", [this.spotKeyPair]);
+      console.log('pubkey '+JSON.stringify(pubkeyRes))
       if (pubkeyRes.error || !pubkeyRes.data?.pubkey) throw new Error(pubkeyRes.error || "No Pubkey Found");
       const pubkey = pubkeyRes.data.pubkey;
 
       // Get the available and channel amounts
       const tokenBalance = this.balanceService.getTokensBalancesByAddress(this.spotAddress)
           ?.find((t: any) => t.propertyid === propIdForSale);
-
+        console.log('token balance '+JSON.stringify(tokenBalance))
       let availableAmount = 0;
       let channelAmount = 0;
       
@@ -371,8 +372,15 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
     }
   
     isSpotAddressSelfAtt() {
-      const isKYC = this.attestationService.getAttByAddress(this.spotAddress);
-      return isKYC === true ? "YES" : "NO";
+        const attestationStatus = this.attestationService.getAttByAddress(this.spotAddress);
+        switch (attestationStatus) {
+            case 'active':
+                return "YES";
+            case 'inactive':
+                return "REVOKED";
+            default:
+                return "NO";
+        }
     }
 
     ngOnDestroy() {

@@ -17,7 +17,8 @@
     "target": "es2017",
     "module": "es2020",
     "types": ["node"],
-    "lib": ["es2018", "dom"]
+    "lib": ["es2018", "dom"],
+    "typeRoots": ["node_modules/@types", "./src"]
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
@@ -29,6 +30,6 @@
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.d.ts"
+    "src/global.d.ts"
   ]
 }
