@@ -56,7 +56,7 @@ export class BuySwapper extends Swap {
     private async onStep1(cpId: string, msData: IMSChannelData) {
         try {
             if (cpId !== this.cpInfo.socketId) throw new Error(`Error with p2p connection`);
-            const pubKeys = [this.cpInfo.keypair.pubkey, this.myInfo.keypair.pubkey];
+            let pubKeys = [this.cpInfo.keypair.pubkey, this.myInfo.keypair.pubkey];
         if (this.typeTrade === ETradeType.SPOT && 'propIdDesired' in this.tradeInfo) {
             let { propIdDesired, propIdForSale} = this.tradeInfo
             if(propIdDesired==0||propIdForSale==0){
