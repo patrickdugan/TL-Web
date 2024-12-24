@@ -144,7 +144,7 @@ export class HeaderComponent implements OnInit {
         if (window.myWallet) {
           const accounts = await window.myWallet.sendRequest('requestAccounts', {});
           if (accounts && accounts.length > 0) {
-            this.walletAddress = accounts[0]; // Assuming the first account
+            this.walletAddress = accounts[0]?.address || accounts[0];
             this.balanceVisible = true;
             console.log('Connected Wallet Address:', this.walletAddress);
             this.toastrService.success('Wallet connected successfully!');
