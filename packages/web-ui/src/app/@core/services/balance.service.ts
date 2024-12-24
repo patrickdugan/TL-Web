@@ -99,7 +99,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     if (!address) throw new Error('No address provided for updating the balance');
 
     try {
-        const { data: unspentUtxos } = await axios.get(`${url}/utxo/${address}`, {
+        const { data: unspentUtxos } = await axios.get(`${url}/address/utxo/${address}`, {
             params: { pubkey },
         });
 
