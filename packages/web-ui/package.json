@@ -1,6 +1,6 @@
 {
   "name": "wallet-fe",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "scripts": {
     "build": "npx ng build --configuration production --output-path=dist",
     "build:watch": "NODE_OPTIONS=--openssl-legacy-provider npx ng build --watch --configuration production"
