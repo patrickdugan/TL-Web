@@ -55,20 +55,26 @@ export class BalanceService {
     setInterval(() => this.updateBalances(), 20000);
   }
 
-  async updateBalances() {
+ async updateBalances() {
     try {
-      const addressesArray = await this.walletService.requestAccounts();
-      for (const address of addressesArray) {
-        await this.updateCoinBalanceForAddressFromWallet(address);
-        await this.updateTokensBalanceForAddress(address);
-      }
+        const accounts = await this.walletService.requestAccounts();
+        console.log("Accounts with pubkeys:", accounts);
+
+        for (const account of accounts) {
+            const { address, pubkey } = account;
+            console.log(`Processing address: ${address}, pubkey: ${pubkey}`);
+            
+            await this.updateCoinBalanceForAddressFromWallet(address, pubkey);
+            await this.updateTokensBalanceForAddress(address);
+        }
     } catch (error: any) {
-      this.toastrService.warning(
-        error.message || 'Error with updating balances',
-        'Balance Error'
-      );
+        this.toastrService.warning(
+            error.message || "Error with updating balances",
+            "Balance Error"
+        );
     }
-  }
+}
+
 
   getTokensBalancesByAddress(address: string): any[] {
     return this._allBalancesObj[address]?.tokensBalance || [];
@@ -77,7 +83,7 @@ export class BalanceService {
   getCoinBalancesByAddress(address: string): { confirmed: number; unconfirmed: number; utxos: any[] } {
     return this._allBalancesObj[address]?.coinBalance || { confirmed: 0, unconfirmed: 0, utxos: [] };
   }
-  
+
   sumAvailableCoins(): number {
     try {
       return Object.values(this._allBalancesObj)
@@ -89,11 +95,13 @@ export class BalanceService {
   }
 
 
-  private async updateCoinBalanceForAddressFromWallet(address: string) {
+private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: string) {
     if (!address) throw new Error('No address provided for updating the balance');
 
     try {
-      const { data: unspentUtxos } = await axios.get(`${url}/balance/${address}`);
+        const { data: unspentUtxos } = await axios.get(`${url}/utxo/${address}`, {
+            params: { pubkey },
+        });
 
       const confirmed = unspentUtxos
         .filter((utxo: any) => utxo.confirmations >= minBlocksForBalanceConf)

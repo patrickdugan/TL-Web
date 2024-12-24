@@ -20,15 +20,26 @@ export class WalletService {
     return !!window.myWallet;
   }
 
-  async requestAccounts(): Promise<string[]> {
+async requestAccounts(): Promise<{ address: string; pubkey: string }[]> {
     this.ensureWalletAvailable();
+
     try {
-      return await window.myWallet!.sendRequest('requestAccounts', {}); // Non-null assertion
-    } catch (error) {
-      console.error('Error requesting accounts:', error);
-      throw new Error('Failed to request accounts');
+        const accounts = await window.myWallet!.sendRequest('requestAccounts', {});
+        if (!accounts || accounts.length === 0) {
+            throw new Error('No accounts returned by the wallet');
+        }
+
+        // Ensure accounts have both address and pubkey
+        return accounts.map((account: { address: string; pubkey: string }) => ({
+            address: account.address,
+            pubkey: account.pubkey,
+        }));
+    } catch (error: any) {
+        console.error('Error requesting accounts:', error.message);
+        throw new Error('Failed to request accounts');
     }
-  }
+}
+
 
   async signMessage(message: string): Promise<string> {
     this.ensureWalletAvailable();
