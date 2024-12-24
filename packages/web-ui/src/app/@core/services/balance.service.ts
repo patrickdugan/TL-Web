@@ -127,8 +127,9 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     if (!address) throw new Error('No address provided for updating the token balance');
 
     try {
-      const { data: tokens } = await axios.get(`${url}/address/getAllBalancesForAddress/${address}`)
-
+      const { data: tokens } = await axios.get(`${url}/address/getAllBalancesForAddress`, {
+              params: { address },
+            });
       if (!this._allBalancesObj[address]) this._allBalancesObj[address] = emptyBalanceObj;
 
       this._allBalancesObj[address].tokensBalance = tokens.map((token: any) => ({
