@@ -99,9 +99,9 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     if (!address) throw new Error('No address provided for updating the balance');
 
     try {
-        const { data: unspentUtxos } = await axios.get(`${url}/address/utxo/${address}`, {
-            params: { pubkey },
-        });
+      const payload = { pubkey };
+      const { data: unspentUtxos } = await axios.post(`${url}/address/utxo/${address}`, payload);
+
 
       const confirmed = unspentUtxos
         .filter((utxo: any) => utxo.confirmations >= minBlocksForBalanceConf)
@@ -127,9 +127,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     if (!address) throw new Error('No address provided for updating the token balance');
 
     try {
-      const { data: tokens } = await axios.get(`${url}/getAllBalancesForAddress`, {
-        params: { address },
-      });
+      const { data: tokens } = await axios.get(`${url}/address/getAllBalancesForAddress/${address}`)
 
       if (!this._allBalancesObj[address]) this._allBalancesObj[address] = emptyBalanceObj;
 
