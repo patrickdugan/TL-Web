@@ -18,7 +18,7 @@ import { ENCODER } from 'src/app/utils/payloads/encoder'
   styleUrls: ['./portfolio-page.component.scss']
 })
 export class PortfolioPageComponent implements OnInit {
-  cryptoBalanceColumns: string[] = ['address', 'confirmed', 'unconfirmed', 'actions'];
+  cryptoBalanceColumns: string[] = ['attestation', 'address', 'confirmed', 'unconfirmed', 'actions'];
   tokensBalanceColums: string[] = ['propertyid', 'name', 'available', 'reserved', 'margin', 'channel', 'actions'];
   selectedAddress: string = '';
 
