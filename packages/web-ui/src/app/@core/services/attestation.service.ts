@@ -99,10 +99,6 @@ export class AttestationService {
         }
     }
 
-
-
-
-
     private removeAll() {
         this.attestations = [];
     }

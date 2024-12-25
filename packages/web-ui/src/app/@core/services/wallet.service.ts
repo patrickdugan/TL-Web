@@ -70,4 +70,16 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
       throw new Error('Failed to sign PSBT');
     }
   }
+
+  async fetchUserIP(): Promise<string> {
+    this.ensureWalletAvailable();
+    try {
+      const ip = await window.myWallet!.sendRequest('fetchUserIP', {}); // Non-null assertion
+      console.log('Fetched user IP:', ip);
+      return ip;
+    } catch (error) {
+      console.error('Error fetching user IP:', error);
+      throw new Error('Failed to fetch user IP');
+    }
+  }
 }

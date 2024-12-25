@@ -11,6 +11,7 @@ import { RpcService } from 'src/app/@core/services/rpc.service';
 import { TxsService } from 'src/app/@core/services/txs.service';
 import { PasswordDialog } from 'src/app/@shared/dialogs/password/password.component';
 import { ENCODER } from 'src/app/utils/payloads/encoder';
+import { WalletService } from 'src/app/@core/services/wallet.service'
 import axios from 'axios';
 
 @Component({
@@ -33,7 +34,8 @@ export class PortfolioPageComponent implements OnInit {
     private rpcService: RpcService,
     private txsService: TxsService,
     private attestationService: AttestationService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private walletService: WalletService
   ) {}
 
   get coinBalance() {
@@ -104,41 +106,25 @@ export class PortfolioPageComponent implements OnInit {
     return this.attestationService.getAttByAddress(address);
   }
 
-  async getUserPublicIP(): Promise<string> {
-    return new Promise((resolve, reject) => {
-     const timeout = setTimeout(() => {
-      reject(new Error("Fetching public IP timed out"));
-    }, 5000); // Timeout after 5 seconds
-
-      const pc = new RTCPeerConnection({ iceServers: [] });
-      pc.createDataChannel('');
-      pc.onicecandidate = (event) => {
-        if (event && event.candidate) {
-          const candidate = event.candidate.candidate;
-          const ipMatch = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/);
-          if (ipMatch) {
-            pc.close();
-            resolve(ipMatch[0]);
-          }
-        }
-      };
-      pc.onicecandidateerror = () => {
-        pc.close();
-        reject(new Error('Failed to fetch public IP'));
-      };
-      pc.createOffer()
-        .then((offer) => pc.setLocalDescription(offer))
-        .catch((error) => reject(error));
-    });
+   async getUserIP(): Promise<string> {
+    try {
+      const ip = await this.walletService.fetchUserIP();
+      console.log('User IP:', ip);
+      return ip;
+    } catch (error: any) {
+      console.error('Failed to fetch user IP:', error.message);
+      this.toastrService.error('Unable to fetch user IP.');
+      return 'error'; // Default value if fetching fails
+    }
   }
 
   async selfAttestate(address: string) {
     try {
       this.loadingService.isLoading = true;
 
-      const userIP = await this.getUserPublicIP();
+      const userIP = await this.getUserIP();
       console.log(`User's public IP: ${userIP}`);
-
+      if(userIP=='error'){return}
       const ipCheckResult = await axios.post('https://api.layerwallet.com/chain/check-ip', { ip: userIP });
 
       if (!ipCheckResult.data || !ipCheckResult.data.success) {
