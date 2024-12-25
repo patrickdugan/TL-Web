@@ -106,43 +106,53 @@ export class PortfolioPageComponent implements OnInit {
     return this.attestationService.getAttByAddress(address);
   }
 
-     async selfAttestate(address: string) {
-      try {
-        this.loadingService.isLoading = true;
+    async selfAttestate(address: string) {
+    try {
+      this.loadingService.isLoading = true;
 
-        const ipCheckResult = await this.walletService.checkIP();
-        const countryCode = ipCheckResult;
-        const bannedCountries = ["US", "KP", "SY", "SD", "RU", "IR"];
+      const response = await this.walletService.checkIP();
 
-        if (bannedCountries.includes(countryCode)) {
+       const { ip, isVpn, countryCode } = response;
+        console.log('Fetched IP details:', ip, isVpn, countryCode);
+
+        if (isVpn) {
           this.toastrService.error(
-            "Cannot attest addresses originating from a sanctioned country.",
-            `Address: ${address}`
+            'Your IP is flagged as a VPN or proxy. Please disable it to proceed.',
+            'VPN Detected'
           );
-          return;
+          return
         }
 
-        const attestationPayload = ENCODER.encodeAttestation({
-          revoke: 0,
-          id: 0,
-          targetAddress: address,
-          metaData: countryCode,
-        });
-
-        const res = await this.txsService.buildSignSendTx({
-          fromKeyPair: { address },
-          toKeyPair: { address },
-          payload: attestationPayload,
-        });
-
-        if (res.data) {
-          this.attestationService.setPendingAtt(address);
-          this.toastrService.success(res.data, "Transaction Sent");
+        if (['US', 'KP', 'SY', 'SD', 'RU', 'IR'].includes(countryCode)) {
+          this.toastrService.error(
+            'Your IP is from a prohibited country..',
+            'Sanctioned Country'
+          );
+          return
         }
-      } catch (error: any) {
-        this.toastrService.error(error.message, "Attestation Error");
-      } finally {
-        this.loadingService.isLoading = false;
+
+      const attestationPayload = ENCODER.encodeAttestation({
+        revoke: 0,
+        id: 0,
+        targetAddress: address,
+        metaData: countryCode,
+      });
+
+      const res = await this.txsService.buildSignSendTx({
+        fromKeyPair: { address },
+        toKeyPair: { address },
+        payload: attestationPayload,
+      });
+
+      if (res.data) {
+        this.attestationService.setPendingAtt(address);
+        this.toastrService.success(res.data, 'Transaction Sent');
       }
+    } catch (error: any) {
+      this.toastrService.error(error.message, 'Attestation Error');
+    } finally {
+      this.loadingService.isLoading = false;
     }
+  }
+
 }

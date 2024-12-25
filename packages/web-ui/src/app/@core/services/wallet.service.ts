@@ -71,16 +71,18 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
     }
   }
 
-  async checkIP(): Promise<string> {
-    this.ensureWalletAvailable();
-    try {
-      const ip = await window.myWallet!.sendRequest('fetchUserIP', {}); // Non-null assertion
-      console.log('Fetched user IP:', ip);
-      const countryCode = ip.countryCode
-      return countryCode;
-    } catch (error) {
-      console.error('Error fetching user IP:', error);
-      throw new Error('Failed to fetch user IP');
+  async checkIP(): Promise<{ ip: string; isVpn: boolean, countryCode: string }> {
+      try {
+        const response = await window.myWallet!.sendRequest('fetchUserIP', {});
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to fetch user IP.');
+        }
+        return response
+
+       
+      } catch (error: any) {
+        console.error('Error fetching user IP:', error.message);
+        return error
+      }
     }
-  }
 }
