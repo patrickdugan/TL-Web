@@ -74,9 +74,6 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
   async checkIP(): Promise<{ ip: string; isVpn: boolean, countryCode: string }> {
       try {
         const response = await window.myWallet!.sendRequest('fetchUserIP', {});
-        if (!response.success) {
-          throw new Error(response.error || 'Failed to fetch user IP.');
-        }
         return response
 
        
