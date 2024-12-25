@@ -123,7 +123,7 @@ export class PortfolioPageComponent implements OnInit {
           return
         }
 
-        if (['US', 'KP', 'SY', 'SD', 'RU', 'IR'].includes(countryCode)) {
+        if (['US', 'KP', 'SY', 'SD', 'RU', 'IR'].includes(countryCode.toUpperCase())) {
           this.toastrService.error(
             'Your IP is from a prohibited country..',
             'Sanctioned Country'
