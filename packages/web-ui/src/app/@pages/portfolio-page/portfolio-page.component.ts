@@ -106,6 +106,10 @@ export class PortfolioPageComponent implements OnInit {
 
   async getUserPublicIP(): Promise<string> {
     return new Promise((resolve, reject) => {
+     const timeout = setTimeout(() => {
+      reject(new Error("Fetching public IP timed out"));
+    }, 5000); // Timeout after 5 seconds
+
       const pc = new RTCPeerConnection({ iceServers: [] });
       pc.createDataChannel('');
       pc.onicecandidate = (event) => {
