@@ -68,9 +68,10 @@ class MyWalletProvider extends EventEmitter {
 
       const { type, data } = event.data;
       console.log('in listener in window.js '+type+' '+JSON.stringify(data))
+      console.log('data result '+JSON.stringify(data.result))
       if (type === 'response') {
         const { id, result, error } = data.payload;
-        console.log('window handle response '+data.result+' '+id)
+        console.log('window handle response '+data.result+' '+id+' err? '+error)
         const { resolve, reject } = this.pendingRequests.get(id) || {};
         if (resolve) {
           this.pendingRequests.delete(id);

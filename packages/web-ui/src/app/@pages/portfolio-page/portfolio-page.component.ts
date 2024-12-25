@@ -106,61 +106,43 @@ export class PortfolioPageComponent implements OnInit {
     return this.attestationService.getAttByAddress(address);
   }
 
-   async getUserIP(): Promise<string> {
-    try {
-      const ip = await this.walletService.fetchUserIP();
-      console.log('User IP:', ip);
-      return ip;
-    } catch (error: any) {
-      console.error('Failed to fetch user IP:', error.message);
-      this.toastrService.error('Unable to fetch user IP.');
-      return 'error'; // Default value if fetching fails
+     async selfAttestate(address: string) {
+      try {
+        this.loadingService.isLoading = true;
+
+        const ipCheckResult = await this.walletService.checkIP();
+        const countryCode = ipCheckResult;
+        const bannedCountries = ["US", "KP", "SY", "SD", "RU", "IR"];
+
+        if (bannedCountries.includes(countryCode)) {
+          this.toastrService.error(
+            "Cannot attest addresses originating from a sanctioned country.",
+            `Address: ${address}`
+          );
+          return;
+        }
+
+        const attestationPayload = ENCODER.encodeAttestation({
+          revoke: 0,
+          id: 0,
+          targetAddress: address,
+          metaData: countryCode,
+        });
+
+        const res = await this.txsService.buildSignSendTx({
+          fromKeyPair: { address },
+          toKeyPair: { address },
+          payload: attestationPayload,
+        });
+
+        if (res.data) {
+          this.attestationService.setPendingAtt(address);
+          this.toastrService.success(res.data, "Transaction Sent");
+        }
+      } catch (error: any) {
+        this.toastrService.error(error.message, "Attestation Error");
+      } finally {
+        this.loadingService.isLoading = false;
+      }
     }
-  }
-
-  async selfAttestate(address: string) {
-    try {
-      this.loadingService.isLoading = true;
-
-      const userIP = await this.getUserIP();
-      console.log(`User's public IP: ${userIP}`);
-      if(userIP=='error'){return}
-      const ipCheckResult = await axios.post('https://api.layerwallet.com/chain/check-ip', { ip: userIP });
-
-      if (!ipCheckResult.data || !ipCheckResult.data.success) {
-        this.toastrService.error('IP check failed. Unable to attest address.', 'Attestation Error');
-        return;
-      }
-
-      const countryCode = ipCheckResult.data.attestation.country;
-      const bannedCountries = ['US', 'KP', 'SY', 'SD', 'RU', 'IR'];
-
-      if (bannedCountries.includes(countryCode)) {
-        this.toastrService.error('Cannot attest addresses originating from a sanctioned country.', `Address: ${address}`);
-        return;
-      }
-
-      const attestationPayload = ENCODER.encodeAttestation({
-        revoke: 0,
-        id: 0,
-        targetAddress: address,
-        metaData: countryCode,
-      });
-
-      const res = await this.txsService.buildSignSendTx({
-        fromKeyPair: { address },
-        toKeyPair: { address },
-        payload: attestationPayload,
-      });
-
-      if (res.data) {
-        this.attestationService.setPendingAtt(address);
-        this.toastrService.success(res.data, 'Transaction Sent');
-      }
-    } catch (error: any) {
-      this.toastrService.error(error.message, 'Attestation Error');
-    } finally {
-      this.loadingService.isLoading = false;
-    }
-  }
 }
