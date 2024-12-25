@@ -81,5 +81,16 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
         console.error('Error fetching user IP:', error.message);
         return error
       }
+  }
+
+  async signPsbt(psbtHex: string, redeemKey?: string): Promise<string> {
+    this.ensureWalletAvailable();
+    try {
+        return await window.myWallet!.sendRequest('signPsbt', { psbtHex, redeemKey });
+    } catch (error) {
+        console.error('Error signing PSBT:', error);
+        throw new Error('Failed to sign PSBT');
     }
+  }
+
 }
