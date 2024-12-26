@@ -5,304 +5,404 @@ import { AuthService } from "./auth.service";
 import { BalanceService } from "./balance.service";
 import { LoadingService } from "./loading.service";
 import { RpcService, TNETWORK } from "./rpc.service";
-import * as bitcoin from './bitcoinjs-lib'; // Assuming bitcoinjs-lib is available
+import * as bitcore from 'bitcore-lib-litecoin'; // Use the Litecoin variant of Bitcore
+import axios from 'axios';
 
 export interface IUTXO {
-    amount: number;
-    confirmations: number;
-    scriptPubKey: string;
-    redeemScript?: string;
-    txid: string;
-    vout: number;
-};
+  amount: number;
+  confirmations: number;
+  scriptPubKey: string;
+  redeemScript?: string;
+  txid: string;
+  vout: number;
+}
+
 
 export interface ISignTxConfig {
-    rawtx: string;
-    wif: string;
-    inputs: IUTXO[];
+  rawtx: string;
+  wif: string;
+  inputs: IUTXO[];
 }
 
 export interface ISignPsbtConfig {
-    wif: string;
-    psbtHex: string;
+  psbtHex: string;
+  redeem?: string;
+  network?: string;
+  wif?: string;
 }
 
+
+const litecoinTestnet = {
+  name: 'ltc-testnet',
+  messagePrefix: '\x19Litecoin Signed Message:\n',
+  bech32: 'tltc',
+  bip32: {
+    public: 0x043587cf, // Testnet public key prefix
+    private: 0x04358394, // Testnet private key prefix
+  },
+  pubKeyHash: 0x6f, // Testnet P2PKH addresses start with 'm' or 'n'
+  scriptHash: 0x3a, // Testnet P2SH addresses start with '2'
+  wif: 0xef, // Testnet WIF starts with '9' or 'c'
+};
+
+const ltcNetwork = {
+  name: 'ltc',
+  alias: 'litecoin',
+  pubkeyhash: 0x30, // Litecoin P2PKH
+  scripthash: 0x32, // Litecoin P2SH
+  wif: 0xb0, // Litecoin WIF
+};
+
 export interface IBuildTxConfig {
-    fromKeyPair: {
-        address: string;
-        pubkey?: string;
-    },
-    toKeyPair: {
-        address: string;
-        pubkey?: string;
-    },
-    inputs?: IUTXO[];
-    amount?: number;
-    payload?: string;
-    addPsbt?: boolean;
-    network?: TNETWORK;
+  fromKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  toKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  inputs?: IUTXO[];
+  amount?: number;
+  payload?: string;
+  addPsbt?: boolean;
+  network?: TNETWORK;
+}
+
+export interface IBuildTradeConfig {
+  buyerKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  sellerKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  commitUTXOs?: IUTXO[];
+  amount?: number;
+  payload?: string;
+  addPsbt?: boolean;
+  network?: TNETWORK;
 }
 
 export interface IBuildLTCITTxConfig {
-    buyerKeyPair: {
-        address: string;
-        pubkey?: string;
-    };
-    sellerKeyPair: {
-        address: string;
-        pubkey?: string;
-    };
-    amount: number;
-    payload: string;
-    commitUTXOs: IUTXO[],
-    network?: TNETWORK;
+  buyerKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  sellerKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  amount: number;
+  payload: string;
+  inputs?: IUTXO[];
+  commitUTXOs: IUTXO[];
 }
+
 
 @Injectable({
-    providedIn: 'root',
+  providedIn: 'root',
 })
-
 export class TxsService {
-    constructor(
-        private rpcService: RpcService,
-        private apiService: ApiService,
-        private authService: AuthService,
-        private loadingService: LoadingService,
-        private toastrService: ToastrService,
-        private balanceService: BalanceService,
-    ) { }
+  private baseUrl = 'https://api.layerwallet.com';
 
-    get rpc() {
-        return this.rpcService.rpc.bind(this);
-    }
+  constructor(
+    private rpcService: RpcService,
+    private apiService: ApiService,
+    private authService: AuthService,
+    private loadingService: LoadingService,
+    private toastrService: ToastrService,
+    private balanceService: BalanceService
+  ) {}
 
-    get mainApi() {
-        return this.apiService.mainApi;
-    }
+  get rpc() {
+    return this.rpcService.rpc.bind(this);
+  }
 
-    get tlApi() {
-        return this.apiService.tlApi;
-    }
+  get mainApi() {
+    return this.apiService.mainApi;
+  }
 
-    async getWifByAddress(address: string) {
-        return this.rpcService.rpc('dumpprivkey', [address]);
-    }
+  get tlApi() {
+    return this.apiService.tlApi;
+  }
 
-    async buildLTCITTx(
-        buildTxConfig: IBuildLTCITTxConfig,
-    ): Promise<{ data?: { rawtx: string; inputs: IUTXO[], psbtHex?: string }, error?: string }> {
-        try {
-            const network = this.rpcService.NETWORK;
-            buildTxConfig.network = network;
-            const isApiMode = this.rpcService.isApiMode;
-            let result = await this.mainApi.buildLTCITTx(buildTxConfig, isApiMode).toPromise();
-            return result;
-        } catch (error: any) {
-            return { error: error.message }
-        }
-    }
+  async getWifByAddress(address: string) {
+    return this.rpcService.rpc('dumpprivkey', [address]);
+  }
 
-   /*async buildTx(
-        buildTxConfig: IBuildTxConfig
-    ): Promise<{ data?: { rawtx: string; inputs: IUTXO[], psbtHex?: string }, error?: string }> {
-        try {
-            console.log('Inputs in build:', JSON.stringify(buildTxConfig));
-            if (!buildTxConfig.inputs || buildTxConfig.inputs.length === 0) {
-                console.log('error: No inputs available for building the transaction. Please ensure your address has UTXOs.');
-            }
-
-            const network = this.rpcService.NETWORK;
-            buildTxConfig.network = network;
-            const isApiMode = this.rpcService.isApiMode;
-            let result = await this.mainApi.buildTx(buildTxConfig, isApiMode).toPromise();
-            return result;
-        } catch (error: any) {
-            return { error: error.message || 'An unexpected error occurred while building the transaction.' }
-        }
-    }*/
-
-async buildSignSendTx(
-    buildTxConfig: IBuildTxConfig,
-): Promise<{ data?: string, error?: string }> {
+  async buildLTCITTx(
+    buildTxConfig: IBuildLTCITTxConfig
+  ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
     try {
-        this.loadingService.isLoading = true;
-          console.log('Inputs in build:', JSON.stringify(buildTxConfig));
-        // Fetch UTXOs for the sender's address
-        const { fromKeyPair } = buildTxConfig;
-        const { data: utxos } = await axios.post(`api.layerwallet.com/address/utxo/${fromKeyPair.address}`);
-        if (!utxos || utxos.length === 0) {
-            return { error: 'No UTXOs available for the specified address.' };
-        }
-
-        // Select UTXOs (use largest first)
-        const selectedUTXO = utxos.reduce((prev, current) => (prev.amount > current.amount ? prev : current), utxos[0]);
-
-        // Define Litecoin network
-        const network = this.rpcService.NETWORK === 'mainnet' ? {
-            messagePrefix: '\x19Litecoin Signed Message:\n',
-            bech32: 'ltc',
-            bip32: { public: 0x019da462, private: 0x019d9cfe },
-            pubKeyHash: 0x30,
-            scriptHash: 0x32,
-            wif: 0xb0,
-        } : {
-            messagePrefix: '\x19Litecoin Signed Message:\n',
-            bech32: 'tltc',
-            bip32: { public: 0x043587cf, private: 0x04358394 },
-            pubKeyHash: 0x6f,
-            scriptHash: 0x3a,
-            wif: 0xef,
-        };
-
-        // Build the transaction using bitcoinjs-lib
-        const txb = new bitcoin.TransactionBuilder(network);
-
-        // Add input (UTXO)
-        txb.addInput(selectedUTXO.txid, selectedUTXO.vout);
-
-        // Add output (destination address and amount)
-        const amountInSatoshis = Math.round(buildTxConfig.amount * 1e8); // Convert amount to satoshis
-        txb.addOutput(buildTxConfig.toKeyPair.address, amountInSatoshis);
-
-        // Add change output (if applicable)
-        const fee = 5000; // Approximate fee in satoshis
-        const change = Math.round(selectedUTXO.amount * 1e8) - amountInSatoshis - fee;
-        if (change > 0) {
-            txb.addOutput(fromKeyPair.address, change);
-        }
-
-        // Get the raw transaction hex
-        const rawTx = txb.buildIncomplete().toHex();
-
-        // Pass raw transaction to the wallet extension for signing
-        const signRes = await window.myWallet.sendRequest('signTransaction', { transaction: rawTx });
-
-        if (!signRes || !signRes.success) {
-            return { error: signRes.error || 'Failed to sign the transaction.' };
-        }
-
-        // Broadcast the signed transaction
-        const sendRes = await this.sendTx(signRes.signedTransaction);
-        if (sendRes.error || !sendRes.data) {
-            return { error: sendRes.error || 'Failed to broadcast the transaction.' };
-        }
-
-        return { data: sendRes.data };
+      const response = await axios.post(`${this.baseUrl}/tx/tl_buildLTCITTx`, { params: [buildTxConfig] });
+      return response.data;
     } catch (error: any) {
-        console.error('Error during transaction creation:', error.message);
-        this.toastrService.error(error.message);
-        return { error: error.message };
-    } finally {
-        this.loadingService.isLoading = false;
+      console.error('Error in buildLTCITTx:', error.message);
+      return { error: error.message };
+    }
+  }
+
+  async buildTx(
+    buildTxConfig: IBuildTxConfig
+  ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/tx/tl_buildTx`, { params: [buildTxConfig] });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error in buildTx:', error.message);
+      return { error: error.message };
+    }
+  }
+
+  async buildTradeTx(
+    buildTxConfig: IBuildTradeConfig
+  ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/tx/tl_buildTradeTx`, { params: [buildTxConfig] });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error in buildTx:', error.message);
+      return { error: error.message };
+    }
+  }
+
+
+ async signTransaction(rawTx: string): Promise<any> {
+    try {
+        const response = await window.myWallet!.sendRequest('signTransaction', {
+            transaction: rawTx,
+        });
+
+        if (!response || !response.success) {
+            throw new Error(response?.error || 'Failed to sign transaction');
+        }
+
+        return response.data; // Signed transaction hex
+    } catch (error: any) {
+        console.error('Error signing transaction:', error.message);
+        throw new Error('Failed to sign transaction');
     }
 }
 
-    async signTx(signTxConfig: ISignTxConfig): Promise<{
-        data?: {
-            isValid: boolean,
-            signedHex?: string,
-            psbtHex?: string,
+
+  async signRawTxWithWallet(txHex: string): Promise<{
+    data: { isValid: boolean; signedHex?: string };
+    error?: string;
+  }> {
+    try {
+      const result = await this.rpcService.rpc('signrawtransactionwithwallet', [txHex]);
+      return {
+        data: { isValid: result.data.complete, signedHex: result.data.hex },
+      };
+    } catch (error: any) {
+      console.error('Error in signRawTxWithWallet:', error.message);
+          return {
+      data: { isValid: false }, // Default or placeholder value
+      error: error.message,
+    };
+
+    }
+  }
+
+  async getChannel(address: string) {
+    try {
+      const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannel`, { params: [address] });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error in getChannel:', error.message);
+      return { data: [] };
+    }
+  }
+
+  async checkMempool(txid: string) {
+    try {
+      const mempool = await this.rpcService.rpc('getrawmempool', []);
+      return mempool.data.includes(txid);
+    } catch (error: any) {
+      console.error('Error checking mempool:', error.message);
+      return false;
+    }
+  }
+
+  async predictColumn(channel: string, cpAddress: string) {
+    try {
+      const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannelColumn`, { params: [channel, cpAddress] });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error in predictColumn:', error.message);
+      return false;
+    }
+  }
+
+  async sendTxWithSpecRetry(rawTx: string): Promise<{ data?: string; error?: string }> {
+    const _sendTxWithRetry = async (
+      rawTx: string,
+      retriesLeft: number,
+      ms: number
+    ): Promise<{ data?: string; error?: string }> => {
+      try {
+        const result = await axios.post(`${this.baseUrl}/tx/sendrawtransaction`, { params: [rawTx] });
+        return result.data;
+      } catch (error: any) {
+        if (retriesLeft > 0 && error.message.includes('bad-txns-inputs-missingorspent')) {
+          await new Promise((resolve) => setTimeout(resolve, ms));
+          return _sendTxWithRetry(rawTx, retriesLeft - 1, ms);
+        }
+        return { error: error.message };
+      }
+    };
+
+    return _sendTxWithRetry(rawTx, 15, 800);
+  }
+
+  async buildSignSendTx(buildTxConfig: IBuildTxConfig): Promise<{ data?: string; error?: string }> {
+  try {
+    this.loadingService.isLoading = true;
+
+    // Collect parameters for the browser extension
+    const transactionData = {
+      fromAddress: buildTxConfig.fromKeyPair.address,
+      toAddress: buildTxConfig.toKeyPair.address,
+      amount: buildTxConfig.amount,
+      network: buildTxConfig.network,
+      payload: buildTxConfig.payload,
+    };
+
+    // Pass the transaction data to the browser extension
+    const response = await window.myWallet!.sendRequest('buildSignSendTx', transactionData);
+
+    if (!response || !response.success) {
+      return { error: response.error || 'Failed to build, sign, or send the transaction.' };
+    }
+
+    return { data: response.data };
+  } catch (error: any) {
+    console.error('Error in buildSignSendTx:', error.message);
+    return { error: error.message };
+  } finally {
+    this.loadingService.isLoading = false;
+  }
+}
+
+
+  /*async buildSignSendTx(buildTxConfig: IBuildTxConfig): Promise<{ data?: string; error?: string }> {
+    try {
+      this.loadingService.isLoading = true;
+
+      // Fetch UTXOs from the relayer
+      const utxoResponse = await axios.post<IUTXO[]>(
+        `${this.baseUrl}/address/utxo/${buildTxConfig.fromKeyPair.address}`
+      );
+      const utxos = utxoResponse.data;
+
+      if (!utxos || utxos.length === 0) {
+        return { error: 'No UTXOs available for the specified address.' };
+      }
+
+      // Select the largest UTXO
+      const selectedUTXO = utxos.reduce((prev, current) => (prev.amount > current.amount ? prev : current));
+
+      // Define Litecoin network
+      const network = buildTxConfig.network === 'mainnet' ? 'livenet' : 'testnet';
+
+      // Create the transaction
+      const tx = new bitcore.Transaction()
+        .from({
+          txId: selectedUTXO.txid,
+          outputIndex: selectedUTXO.vout,
+          script: selectedUTXO.scriptPubKey,
+          satoshis: Math.round(selectedUTXO.amount * 1e8),
+        })
+        .to(buildTxConfig.toKeyPair.address, Math.round((buildTxConfig.amount ?? 0) * 1e8))
+        .fee(5000); // Approximate fee in satoshis
+
+      // Add change output
+      const change = Math.round(selectedUTXO.amount * 1e8) - Math.round((buildTxConfig.amount ?? 0) * 1e8) - 5000;
+      if (change > 0) {
+        tx.change(buildTxConfig.fromKeyPair.address);
+      }
+
+      const rawTx = tx.serialize();
+
+      // Pass raw transaction to the wallet extension for signing
+      const signRes = await window.myWallet!.sendRequest('signTransaction', { transaction: rawTx });
+
+      if (!signRes || !signRes.success) {
+        return { error: signRes.error || 'Failed to sign the transaction.' };
+      }
+
+      // Broadcast the transaction
+      const sendRes = await axios.post(`${this.baseUrl}/rpc/sendrawtransaction`, { params: [signRes.signedTransaction] });
+
+      if (sendRes.data.error) {
+        return { error: sendRes.data.error };
+      }
+
+      return { data: sendRes.data.result }; // Transaction ID
+    } catch (error: any) {
+      console.error('Error during transaction creation:', error.message);
+      this.toastrService.error(error.message);
+      return { error: error.message };
+    } finally {
+      this.loadingService.isLoading = false;
+    }
+  }*/
+
+  async signPsbt(signPsbtConfig: ISignPsbtConfig): Promise<{
+    data?: {
+      psbtHex: string;
+      isValid: boolean;
+      isFinished: boolean;
+      finalHex?: string;
+      wif?: string
+    };
+    error?: string;
+  }> {
+    try {
+      if (!window.myWallet || typeof window.myWallet.sendRequest !== 'function') {
+        throw new Error('Wallet extension is not available or does not support signing PSBTs.');
+      }
+
+      const response = await window.myWallet!.sendRequest('signPsbt', {
+        psbtHex: signPsbtConfig.psbtHex,
+        redeemKey: signPsbtConfig.redeem,
+        network: signPsbtConfig.network,
+      });
+
+      if (!response || !response.success) {
+        return { error: response?.error || 'Failed to sign PSBT.' };
+      }
+
+      return {
+        data: {
+          psbtHex: response.data.psbtHex,
+          isValid: response.data.isValid,
+          isFinished: response.data.isFinished,
+          finalHex: response.data.finalHex,
         },
-        error?: string,
-    }> {
-        try {
-            const network = this.rpcService.NETWORK;
-            const result = await this.mainApi.signTx(signTxConfig, network).toPromise();
-            return result;
-        } catch (error: any) {
-            return { error: error.message }
-        }
+      };
+    } catch (error: any) {
+      console.error('Error signing PSBT:', error.message || error);
+      return { error: error.message || 'An unexpected error occurred while signing the PSBT.' };
     }
+  }
 
-    async signRawTxWithWallet(txHex: string): Promise<{
-        data: { isValid: boolean, signedHex?: string },
-        error?: string
-    }> {
-        const result = await this.rpcService.rpc('signrawtransactionwithwallet', [txHex]);
-        const data = { isValid: result.data.complete, signedHex: result.data.hex }
-        return { data };
+  async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/rpc/sendrawtransaction`, { params: [rawTx] });
+
+      if (response.data.error) {
+        return { error: response.data.error };
+      }
+
+      return { data: response.data.result }; // Transaction ID
+    } catch (error: any) {
+      console.error('Error broadcasting transaction:', error.message);
+      return { error: error.message };
     }
-
-    async signPsbt(signPsbtConfig: ISignPsbtConfig): Promise<{
-        data?: {
-            psbtHex: string;
-            isValid: boolean;
-            isFinished: boolean;
-            finalHex?: string;
-        },
-        error?: string,
-    }> {
-        try {
-            const network = this.rpcService.NETWORK;
-            const result = await this.mainApi.signPsbt(signPsbtConfig, network).toPromise();
-            return result
-        } catch (error: any) {
-            return { error: error.message }
-        }
-    }
-
-    async sendTx(rawTx: string) {
-        const result = await this.rpcService.rpc('sendrawtransaction', [rawTx]);
-        //if(typeof this.balanceService.updateBalances==='function'){ 
-        //console.log('checking balance service obj ' +JSON.stringify(this.balanceService)); // Check if balanceService is available
-        
-        
-        //this.balanceService.updateBalances();
-        //}else{
-        // console.log('update balances not found on balanceService')
-        //}
-        return result;
-    }
-
-    async getChannel(address: string) {
-        const channelRes = await this.tlApi.rpc('getChannel', [address]).toPromise();  // Pass address as an array
-        console.log('channel fetch in tx service ' + JSON.stringify(channelRes))
-        if (!channelRes.data || channelRes.error) return { data: [] };
-
-        return channelRes.data;
-    }
-
-
-    async checkMempool(txid: string) {
-        try {
-            const mempool = await this.rpcService.rpc('getrawmempool', []);
-            const isInMempool = mempool.data.includes(txid);
-
-
-            return isInMempool;
-        } catch (error) {
-            console.error('Error checking mempool:', error);
-            return false;
-        }
-    }
-
-    async predictColumn(channel: string, cpAddress: string) {
-        try {
-            const column = await this.tlApi.rpc('getChannelColumn', [channel, cpAddress]).toPromise();  // Pass parameters as an array
-            console.log('column prediction fetch in tx service ' + JSON.stringify(column))
-
-            return column.data;
-        } catch (error) {
-            console.error('Error checking column:', error);
-            return false;
-        }
-    }
-
-
-    async sendTxWithSpecRetry(rawTx: string) {
-        const _sendTxWithRetry = async (rawTx: string, retriesLeft: number, ms: number): Promise<{
-            data?: string,
-            error?: string,
-        }> => {
-            const result = await this.rpcService.rpc('sendrawtransaction', [rawTx]);
-            if (result.error && result.error.includes('bad-txns-inputs-missingorspent') && retriesLeft > 0) {
-                await new Promise(resolve => setTimeout(resolve, ms));
-                return _sendTxWithRetry(rawTx, retriesLeft - 1, ms);
-            }
-            return result;
-        }
-        return _sendTxWithRetry(rawTx, 15, 800);
-    }
+  }
 }
 
   

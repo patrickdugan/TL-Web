@@ -1,5 +1,5 @@
 import { Socket as SocketClient } from 'socket.io-client';
-import { IBuildLTCITTxConfig, IBuildTxConfig, IUTXO, TxsService } from "src/app/@core/services/txs.service";
+import { IBuildLTCITTxConfig, IBuildTxConfig, IBuildTradeConfig, IUTXO, TxsService } from "src/app/@core/services/txs.service";
 import { IMSChannelData, SwapEvent, IBuyerSellerInfo, TClient, IFuturesTradeProps, ISpotTradeProps, ETradeType } from "./common";
 import { Swap } from "./swap";
 import { ENCODER } from '../payloads/encoder';
@@ -131,6 +131,8 @@ export class BuySwapper extends Swap {
                     amount: amountForSale,
                 };
 
+
+
                 const rawHexRes = await this.txsService.buildLTCITTx(buildOptions);
                 if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
                 const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, rawHexRes.data.psbtHex);
@@ -200,14 +202,14 @@ export class BuySwapper extends Swap {
                     }
                     const cpitRes = { data: ENCODER.encodeTradeTokensChannel(cpitLTCOptions), error: null };
                     if (cpitRes.error || !cpitRes.data) throw new Error(`tl_createpayload_instant_trade: ${cpitRes.error}`);
-                    const buildOptions: IBuildLTCITTxConfig = {
+                    const buildOptions: IBuildTradeConfig = {
                         buyerKeyPair: this.myInfo.keypair,
                         sellerKeyPair: this.cpInfo.keypair,
                         commitUTXOs: [commitUTXO, utxoData],
                         payload: cpitRes.data,
                         amount: 0,
                     };
-                    const rawHexRes = await this.txsService.buildLTCITTx(buildOptions);
+                    const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
                     if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, rawHexRes.data.psbtHex);

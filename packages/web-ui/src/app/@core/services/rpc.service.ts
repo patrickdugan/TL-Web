@@ -5,6 +5,8 @@ import { SocketService } from "./socket.service";
 import { DialogService } from "./dialogs.service";
 import { LoadingService } from "./loading.service";
 import { BehaviorSubject } from "rxjs";
+import { IUTXO } from 'src/app/@core/services/txs.service';
+
 
 export type TNETWORK = 'LTC' | 'LTCTEST' | null;
 export enum ENetwork {
@@ -16,6 +18,50 @@ export interface IBlockSubsObj {
   type: "API" | "LOCAL";
   block: number;
   header: number;
+}
+
+export interface IBuildLTCITTxConfig {
+    buyerKeyPair: {
+        address: string;
+        pubkey?: string;
+    };
+    sellerKeyPair: {
+        address: string;
+        pubkey?: string;
+    };
+    amount: number;
+    payload: string;
+    commitUTXOs: IUTXO[];
+    network?: TNETWORK;
+}
+
+export interface ISignPsbtConfig {
+    psbtHex: string;
+    redeem: string;
+    network?: string;
+    wif?: string; // Add this
+}
+
+export interface ISignTxConfig {
+  rawtx: string;
+  wif: string;
+  inputs: IUTXO[];
+}
+
+export interface IBuildTxConfig {
+  fromKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  toKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  inputs?: IUTXO[];
+  amount?: number;
+  payload?: string;
+  addPsbt?: boolean;
+  network?: TNETWORK;
 }
 
 @Injectable({
