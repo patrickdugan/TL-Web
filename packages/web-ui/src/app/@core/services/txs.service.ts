@@ -150,6 +150,7 @@ export class TxsService {
       this.loadingService.isLoading = true;
 
       const response = await this.buildTx(buildTxConfig);
+      console.log('response '+JSON.stringify(response))
       if (!response.data?.rawtx) {
         throw new Error("Failed to build transaction");
       }
