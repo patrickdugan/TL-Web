@@ -138,9 +138,13 @@ export class PortfolioPageComponent implements OnInit {
         metaData: countryCode,
       });
 
+      console.log('attest payload '+attestationPayload)
+
       const res = await this.txsService.buildSignSendTx({
         fromKeyPair: { address },
         toKeyPair: { address },
+        amount: 0.0000564,
+        network: 'LTCTEST',
         payload: attestationPayload,
       });
 

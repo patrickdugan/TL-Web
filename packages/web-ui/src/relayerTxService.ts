@@ -22,6 +22,33 @@ export interface IInput {
   pubkey?: string;
 };
 
+import { Network } from 'bitcoinjs-lib';
+
+export const networks: Record<string, Network> = {
+  LTC: {
+    messagePrefix: '\x19Litecoin Signed Message:\n',
+    bip32: {
+      public: 0x019da462,
+      private: 0x019d9cfe,
+    },
+    pubKeyHash: 0x30,
+    scriptHash: 0x32,
+    wif: 0xb0,
+    bech32: 'ltc', // Add this
+  },
+  LTCTEST: {
+    messagePrefix: '\x19Litecoin Signed Message:\n',
+    bip32: {
+      public: 0x043587cf,
+      private: 0x04358394,
+    },
+    pubKeyHash: 0x6f,
+    scriptHash: 0x3a,
+    wif: 0xef,
+    bech32: 'tltc', // Add this
+  },
+};
+
 export interface IBuildTxConfig {
   fromKeyPair: {
     address: string;
@@ -129,9 +156,11 @@ const getMinVoutAmount = async (toAddress: string, isApiMode: boolean) => {
     const minAmount = parseFloat(drwRes.data.vout[0].value);
     return { data: minAmount };
     */
-  } catch (error) {
-    return { error: error.message || 'Undefined getMinVoutAmount Error' };
-  }
+ } catch (error: unknown) {
+  const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+  console.error(errorMessage);
+}
+
 };
 
 /**
@@ -172,7 +201,6 @@ const getEnoughInputs2 = (_inputs: IInput[], amount: number) => {
  * - Returns a PSBT hex (not signed).
  ********************************************************************/
 import { Psbt, Transaction } from 'bitcoinjs-lib';
-import { networks } from '../utils/networks';  // or wherever your network config is
 
 export const buildPsbt = (buildPsbtOptions: {
   rawtx: string,
@@ -259,11 +287,7 @@ export const buildLTCInstatTx = async (
     const utxos = [...commitUTXOs, ..._utxos];
 
     // 3) Figure out minimal LTC amount needed and gather enough inputs
-    const minAmountRes = await getMinVoutAmount(sellerAddress, isApiMode);
-    if (minAmountRes.error || !minAmountRes.data) {
-      throw new Error(`getMinVoutAmount: ${minAmountRes.error}`);
-    }
-    const minAmount = minAmountRes.data;
+    const minAmount = 0.000546 
     const buyerLtcAmount = minAmount;
     const sellerLtcAmount = Math.max(amount, minAmount);
     const minAmountForAllOuts = safeNumber(buyerLtcAmount + sellerLtcAmount);
@@ -294,18 +318,24 @@ export const buildLTCInstatTx = async (
     };
 
     // create raw transaction via RPC
-    const crtRes = await smartRpc('createrawtransaction', [_insForRawTx, _outsForRawTx], isApiMode);
-    if (crtRes.error || !crtRes.data) {
-      throw new Error(`createrawtransaction: ${crtRes.error}`);
-    }
+   const crtRes = await smartRpc('createrawtransaction', [_insForRawTx, _outsForRawTx], isApiMode);
+if (crtRes.error || !crtRes.data) {
+    throw new Error(`createrawtransaction: ${crtRes.error}`);
+}
+let finalTx = crtRes.data;
 
-    // attach OP_RETURN (payload) via local JS or a node service
-    const crtxoprRes = await jsTlApi('tl_createrawtx_opreturn', [crtRes.data, payload]);
-    if (crtxoprRes.error || !crtxoprRes.data) {
-      throw new Error(`tl_createrawtx_opreturn: ${crtxoprRes.error}`);
-    }
-
-    const finalTx = crtxoprRes.data; // hex of rawTx
+// Attach OP_RETURN payload
+if (payload) {
+    const data = Buffer.from(payload, 'utf8');
+    const embed = bitcoin.payments.embed({ data: [data] });
+    _outsForRawTx.push({
+        script: embed.output!,
+        value: 0,
+    });
+    finalTx = bitcoin.Transaction.fromHex(finalTx)
+        .addOutput(embed.output!, 0) // Add OP_RETURN to the transaction
+        .toHex(); // Convert back to hex
+}
 
     // 5) (Optional) Build PSBT from finalTx if you want to pass it somewhere for signing
     const psbtHexConfig = {
@@ -370,11 +400,8 @@ export const buildTx = async (txConfig: IBuildTxConfig, isApiMode: boolean) => {
     const utxos = [..._inputs, ..._utxos];
 
     // 3) Minimum amount logic if relevant
-    const minAmountRes = await getMinVoutAmount(toAddress, isApiMode);
-    if (minAmountRes.error || !minAmountRes.data) {
-      throw new Error(`getMinVoutAmount: ${minAmountRes.error}`);
-    }
-    const minAmount = minAmountRes.data;
+
+    const minAmount =0.000546 
     if ((minAmount > (amount || 0)) && !payload) {
       throw new Error(`Minimum amount is: ${minAmount}`);
     }
@@ -411,25 +438,29 @@ export const buildTx = async (txConfig: IBuildTxConfig, isApiMode: boolean) => {
     const _outsForRawTx: any = { [toAddress]: toAmount };
     if (change > 0) _outsForRawTx[fromAddress] = change;
 
-    const crtRes = await smartRpc('createrawtransaction', [_insForRawTx, _outsForRawTx], isApiMode);
+  const crtRes = await smartRpc('createrawtransaction', [_insForRawTx, _outsForRawTx], isApiMode);
     if (crtRes.error || !crtRes.data) {
-      throw new Error(`createrawtransaction: ${crtRes.error}`);
+        throw new Error(`createrawtransaction: ${crtRes.error}`);
     }
     let finalTx = crtRes.data;
 
-    // 7) If there's a payload to attach, do so
+    // Attach OP_RETURN payload
     if (payload) {
-      const crtxoprRes = await jsTlApi('tl_createrawtx_opreturn', [finalTx, payload], isApiMode);
-      if (crtxoprRes.error || !crtxoprRes.data) {
-        throw new Error(`tl_createrawtx_opreturn: ${crtxoprRes.error}`);
-      }
-      finalTx = crtxoprRes.data;
+        const data = Buffer.from(payload, 'utf8');
+        const embed = bitcoin.payments.embed({ data: [data] });
+        _outsForRawTx.push({
+            script: embed.output!,
+            value: 0,
+        });
+        finalTx = bitcoin.Transaction.fromHex(finalTx)
+            .addOutput(embed.output!, 0) // Add OP_RETURN to the transaction
+            .toHex(); // Convert back to hex
     }
 
-    // 8) Return the rawTx and optionally a PSBT
+    // Return the rawTx
     const data: any = {
-      rawtx: finalTx,
-      inputs: finalInputs,
+        rawtx: finalTx,
+        inputs: finalInputs,
     };
 
     if (addPsbt) {
@@ -449,7 +480,69 @@ export const buildTx = async (txConfig: IBuildTxConfig, isApiMode: boolean) => {
   } catch (error: any) {
     return { error: error.message || 'Undefined build Tx Error' };
   }
+};const buildTradeTx = async (tradeConfig: any) => {
+    try {
+        const { inputs, outputs, payload, network, isApiMode } = tradeConfig;
+
+        // Prepare inputs and outputs for RPC raw transaction creation
+        const rpcInputs = inputs.map((input: any) => ({
+            txid: input.txid,
+            vout: input.vout,
+        }));
+
+        const rpcOutputs: any = {};
+        outputs.forEach((output: any) => {
+            rpcOutputs[output.address] = output.amount; // Use amount in LTC/BTC
+        });
+
+        // Create the raw transaction using the RPC
+        const crtRes = await smartRpc('createrawtransaction', [rpcInputs, rpcOutputs], isApiMode);
+        if (crtRes.error || !crtRes.data) {
+            throw new Error(`createrawtransaction: ${crtRes.error}`);
+        }
+
+        let rawTx = crtRes.data;
+
+        // Add OP_RETURN payload using bitcoinjs-lib
+        if (payload) {
+            const tx = bitcoin.Transaction.fromHex(rawTx);
+            const data = Buffer.from(payload, 'utf8');
+            const embed = bitcoin.payments.embed({ data: [data] });
+
+            const builder = bitcoin.TransactionBuilder.fromTransaction(tx, bitcoin.networks[network]);
+            builder.addOutput(embed.output!, 0); // Add OP_RETURN output
+
+            rawTx = builder.build().toHex(); // Rebuild the transaction with OP_RETURN
+        }
+
+        // Convert the raw transaction into a PSBT
+        const psbt = new bitcoin.Psbt({ network: bitcoin.networks[network] });
+
+        // Add inputs to PSBT
+        inputs.forEach((input: any) => {
+            psbt.addInput({
+                hash: input.txid,
+                index: input.vout,
+                witnessUtxo: {
+                    script: Buffer.from(input.scriptPubKey, 'hex'),
+                    value: input.amount * 1e8, // Convert to satoshis
+                },
+            });
+        });
+
+        // Add outputs to PSBT
+        const tx = bitcoin.Transaction.fromHex(rawTx);
+        tx.outs.forEach((out: any) => {
+            psbt.addOutput(out);
+        });
+
+        // Return the raw transaction and PSBT
+        return { rawtx: rawTx, psbt: psbt.toHex() };
+    } catch (error: any) {
+        return { error: error.message || 'Failed to build trade transaction' };
+    }
 };
+
 
 
 /********************************************************************

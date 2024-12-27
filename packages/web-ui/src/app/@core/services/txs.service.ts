@@ -270,8 +270,12 @@ export class TxsService {
       payload: buildTxConfig.payload,
     };
 
+    const tx = await axios.post(`${this.baseUrl}/tx/sendrawtransaction`, { params: [rawTx] 
+
+    console.log('tx hex '+tx)
+
     // Pass the transaction data to the browser extension
-    const response = await window.myWallet!.sendRequest('buildSignSendTx', transactionData);
+    const response = await window.myWallet!.sendRequest('signTransaction', transactionData);
 
     if (!response || !response.success) {
       return { error: response.error || 'Failed to build, sign, or send the transaction.' };
