@@ -84,7 +84,7 @@ export class TxsService {
     buildTxConfig: IBuildTxConfig
   ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
     try {
-      const response = await axios.post(`${this.baseUrl}/tx/buildTx`, { params: [buildTxConfig] });
+      const response = await axios.post(`${this.baseUrl}/tx/buildTx`, { params: buildTxConfig });
       return response.data;
     } catch (error: any) {
       console.error("Error in buildTx:", error.message);
@@ -96,7 +96,7 @@ export class TxsService {
     tradeConfig: IBuildTradeConfig
   ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
     try {
-      const response = await axios.post(`${this.baseUrl}/tx/buildTradeTx`, { params: [tradeConfig] });
+      const response = await axios.post(`${this.baseUrl}/tx/buildTradeTx`, { params: tradeConfig });
       return response.data;
     } catch (error: any) {
       console.error("Error in buildTradeTx:", error.message);
@@ -108,7 +108,7 @@ export class TxsService {
     buildLTCITTxConfig: IBuildLTCITTxConfig
   ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
     try {
-      const response = await axios.post(`${this.baseUrl}/tx/buildLTCITTx`, { params: [buildLTCITTxConfig] });
+      const response = await axios.post(`${this.baseUrl}/tx/buildLTCITTx`, { params: buildLTCITTxConfig });
       return response.data;
     } catch (error: any) {
       console.error("Error in buildLTCITTx:", error.message);
