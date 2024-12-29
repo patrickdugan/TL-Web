@@ -107,7 +107,7 @@ export class PortfolioPageComponent implements OnInit {
     return this.attestationService.getAttByAddress(address);
   }
 
-    async selfAttestate(address: string) {
+    async selfAttestate(_address: string) {
     try {
       this.loadingService.isLoading = true;
 
@@ -135,18 +135,29 @@ export class PortfolioPageComponent implements OnInit {
       const attestationPayload = ENCODER.encodeAttestation({
         revoke: 0,
         id: 0,
-        targetAddress: address,
+        targetAddress: _address,
         metaData: countryCode,
       });
 
-      console.log('attest payload '+attestationPayload+' '+address)
+      console.log('attest payload '+attestationPayload+' '+_address)
 
-      const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${address}`);
+       const accounts = await this.walletService.requestAccounts();
+        console.log("Accounts with pubkeys:", accounts);
+        let _pubkey = ''
+        for (const account of accounts) {
+            const { address, pubkey } = account;
+            if(_address==address ){
+              _pubkey = pubkey ?? ''
+            }
+            console.log(`Processing address: ${address}, pubkey: ${pubkey}`);
+         }
+      const payload = { _pubkey };
+      const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${_address}`, payload);
 
 
       const res = await this.txsService.buildSignSendTx({
-        fromKeyPair: { address: address },
-        toKeyPair:   { address: address }, // e.g. same address if needed
+        fromKeyPair: { address: _address },
+        toKeyPair:   { address: _address }, // e.g. same address if needed
         amount:      0.0000564,
         network:     'LTCTEST',
         payload:     attestationPayload,
@@ -154,7 +165,7 @@ export class PortfolioPageComponent implements OnInit {
       });
 
       if (res.data) {
-        this.attestationService.setPendingAtt(address);
+        this.attestationService.setPendingAtt(_address);
         this.toastrService.success(res.data, 'Transaction Sent');
       }
     } catch (error: any) {
