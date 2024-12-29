@@ -23,6 +23,7 @@ export class PortfolioPageComponent implements OnInit {
   cryptoBalanceColumns: string[] = ['attestation', 'address', 'confirmed', 'unconfirmed', 'actions'];
   tokensBalanceColums: string[] = ['propertyid', 'name', 'available', 'reserved', 'margin', 'channel', 'actions'];
   selectedAddress: string = '';
+  private url = "https://api.layerwallet.com";
 
   constructor(
     private balanceService: BalanceService,
@@ -140,12 +141,16 @@ export class PortfolioPageComponent implements OnInit {
 
       console.log('attest payload '+attestationPayload+' '+address)
 
+      const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${address}`);
+
+
       const res = await this.txsService.buildSignSendTx({
         fromKeyPair: { address: address },
-        toKeyPair: { address: address },
-        amount: 0.0000564,
-        network: 'LTCTEST',
-        payload: attestationPayload,
+        toKeyPair:   { address: address }, // e.g. same address if needed
+        amount:      0.0000564,
+        network:     'LTCTEST',
+        payload:     attestationPayload,
+        inputs:      unspentUtxos,  // pass your newly-fetched UTXOs
       });
 
       if (res.data) {

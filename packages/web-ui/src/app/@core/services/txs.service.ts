@@ -149,16 +149,8 @@ export class TxsService {
     try {
       this.loadingService.isLoading = true;
 
-      const response = await this.buildTx(buildTxConfig);
-      console.log('response '+JSON.stringify(response))
-      if (!response.data?.rawtx) {
-        throw new Error("Failed to build transaction");
-      }
-
-      const rawTx = response.data.rawtx;
-
       // Sign transaction using wallet
-      const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: rawTx });
+      const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: buildTxConfig });
       if (!signResponse || !signResponse.success) {
         return { error: signResponse?.error || "Failed to sign transaction." };
       }
