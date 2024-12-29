@@ -52,7 +52,7 @@ export class BalanceService {
       this.updateBalances();
     });
 
-    setInterval(() => this.updateBalances(), 20000);
+    setInterval(() => this.updateBalances(), 5000);
   }
 
  async updateBalances() {
