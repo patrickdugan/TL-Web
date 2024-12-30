@@ -155,8 +155,8 @@ export class TxsService {
         return { error: signResponse?.error || "Failed to sign transaction." };
       }
       console.log('sign response '+JSON.stringify(signResponse))
-      const signedTx = signResponse.data.rawData;
-
+      const signedTx = signResponse.data.rawTx;
+      console.log('signed tx'+signedTx)
       // Broadcast signed transaction
       const sendResponse = await this.sendTx(signedTx);
       if (sendResponse.error) {
