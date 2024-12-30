@@ -212,9 +212,7 @@ export class TxsService {
 
   async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
     try {
-      const response = await axios.post(`${this.baseUrl}/tx/sendtx`, {
-        params: [rawTx],
-      });
+      const response = await axios.post(`${this.baseUrl}/tx/sendtx`, {rawTx});
 
       if (response.data.error) {
         return { error: response.data.error };
