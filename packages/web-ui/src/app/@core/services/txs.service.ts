@@ -158,7 +158,7 @@ export class TxsService {
       const signedTx = signResponse.data.rawData;
 
       // Broadcast signed transaction
-      const sendResponse = await this.sendTx(signedTx.data.rawTx);
+      const sendResponse = await this.sendTx(signedTx);
       if (sendResponse.error) {
         throw new Error(sendResponse.error);
       }
