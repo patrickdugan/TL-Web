@@ -155,7 +155,7 @@ export class TxsService {
         return { error: signResponse?.error || "Failed to sign transaction." };
       }
       console.log('sign response '+JSON.stringify(signResponse))
-      const signedTx = signResponse.data;
+      const signedTx = signResponse.data.rawData;
 
       // Broadcast signed transaction
       const sendResponse = await this.sendTx(signedTx);
@@ -212,7 +212,7 @@ export class TxsService {
 
   async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
     try {
-      const response = await axios.post(`${this.baseUrl}/rpc/sendrawtransaction`, {
+      const response = await axios.post(`${this.baseUrl}/tx/sendtx`, {
         params: [rawTx],
       });
 
