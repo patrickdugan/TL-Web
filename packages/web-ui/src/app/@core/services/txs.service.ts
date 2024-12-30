@@ -158,12 +158,13 @@ export class TxsService {
       const signedTx = signResponse.data.rawTx;
       console.log('signed tx'+signedTx)
       // Broadcast signed transaction
-      const sendResponse = await this.sendTx(signedTx);
-      if (sendResponse.error) {
-        throw new Error(sendResponse.error);
-      }
+     const sendResponse = await this.sendTx(signedTx);
+    if (sendResponse.error) {
+      return { error: sendResponse.error };
+    }
+    console.log('Transaction ID:', sendResponse.data);
 
-      return { data: sendResponse.data }; // Transaction ID
+    return { data: sendResponse.data }; // Pass only the `txid`
     } catch (error: any) {
       console.error("Error in buildSignSendTx:", error.message);
       return { error: error.message };
@@ -210,20 +211,26 @@ export class TxsService {
     }
   }
 
-  async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
-    try {
-      const response = await axios.post(`${this.baseUrl}/tx/sendTx`, {rawTx});
-      console.log('send response '+JSON.stringify(response))
-      if (response.data.error) {
-        return { error: response.data.error };
-      }
+async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
+  try {
+    const response = await axios.post(`${this.baseUrl}/tx/sendTx`, { rawTx });
+    console.log('send response:', JSON.stringify(response));
 
-      return { data: response.data.result }; // Transaction ID
-    } catch (error: any) {
-      console.error("Error broadcasting transaction:", error.message);
-      return { error: error.message };
+    if (response.data.error) {
+      return { error: response.data.error };
     }
+
+    const txid = response.data.txid?.data;
+
+    return { data: txid }; // Ensure the returned type matches the Promise<{ data?: string; error?: string }>
+  } catch (error: any) {
+    console.error("Error broadcasting transaction:", error.message);
+    return { error: error.message };
   }
+}
+
+
+
 
     async predictColumn(channel: string, cpAddress: string) {
       try {

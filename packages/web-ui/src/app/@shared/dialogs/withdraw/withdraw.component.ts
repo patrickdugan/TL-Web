@@ -8,6 +8,7 @@ import { LoadingService } from 'src/app/@core/services/loading.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { IBuildTxConfig, TxsService } from 'src/app/@core/services/txs.service';
 import { ENCODER } from 'src/app/utils/payloads/encoder';
+import axios from 'axios';
 
 @Component({
   selector: 'withdraw-dialog',
@@ -128,6 +129,10 @@ export class WithdrawDialog {
                 } else {
                     txOptions.amount = amount
                 }
+                const payload = {pubkey:''}
+                 const { data: unspentUtxos } = await
+                 axios.post(`https://api.layerwallet.com/address/utxo/${fromAddress}`, payload);
+                 txOptions.inputs= unspentUtxos
                 return { data: txOptions };
             } catch (error: any) {
                 return { error: error.message}
