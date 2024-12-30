@@ -154,7 +154,7 @@ export class TxsService {
       if (!signResponse || !signResponse.success) {
         return { error: signResponse?.error || "Failed to sign transaction." };
       }
-
+      console.log('sign response '+JSON.stringify(signResponse))
       const signedTx = signResponse.data;
 
       // Broadcast signed transaction
