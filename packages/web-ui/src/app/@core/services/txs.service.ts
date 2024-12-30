@@ -158,7 +158,7 @@ export class TxsService {
       const signedTx = signResponse.data.rawData;
 
       // Broadcast signed transaction
-      const sendResponse = await this.sendTx(signedTx);
+      const sendResponse = await this.sendTx(signedTx.data.rawTx);
       if (sendResponse.error) {
         throw new Error(sendResponse.error);
       }
@@ -213,7 +213,7 @@ export class TxsService {
   async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
     try {
       const response = await axios.post(`${this.baseUrl}/tx/sendTx`, {rawTx});
-
+      console.log('send response '+JSON.stringify(response))
       if (response.data.error) {
         return { error: response.data.error };
       }
