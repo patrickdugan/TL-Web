@@ -5,7 +5,7 @@ import { ApiService } from 'src/app/@core/services/api.service';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
-import { RpcService } from 'src/app/@core/services/rpc.service';
+import { RpcService, TNETWORK } from 'src/app/@core/services/rpc.service';
 import { IBuildTxConfig, TxsService } from 'src/app/@core/services/txs.service';
 import { ENCODER } from 'src/app/utils/payloads/encoder';
 import axios from 'axios';
@@ -130,8 +130,10 @@ export class WithdrawDialog {
                     txOptions.amount = amount
                 }
                 const payload = {pubkey:''}
+
+                const network = this.rpcService.NETWORK
                  const { data: unspentUtxos } = await
-                 axios.post(`https://api.layerwallet.com/address/utxo/${fromAddress}`, payload);
+                 axios.post(`https://api.layerwallet.com/${network}/address/utxo/${fromAddress}`, payload);
                  txOptions.inputs= unspentUtxos
                 return { data: txOptions };
             } catch (error: any) {

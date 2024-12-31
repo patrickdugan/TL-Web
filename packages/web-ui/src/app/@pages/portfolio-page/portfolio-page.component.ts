@@ -7,7 +7,7 @@ import { AuthService } from 'src/app/@core/services/auth.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 import { DialogService, DialogTypes } from 'src/app/@core/services/dialogs.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
-import { RpcService } from 'src/app/@core/services/rpc.service';
+import { RpcService, TNETWORK } from 'src/app/@core/services/rpc.service';
 import { TxsService } from 'src/app/@core/services/txs.service';
 import { PasswordDialog } from 'src/app/@shared/dialogs/password/password.component';
 import { ENCODER } from 'src/app/utils/payloads/encoder';
@@ -151,8 +151,10 @@ export class PortfolioPageComponent implements OnInit {
             }
             console.log(`Processing address: ${address}, pubkey: ${pubkey}`);
          }
+        
+        const network = this.rpcService.NETWORK; // 'LTC' or 'LTCTEST'
       const payload = { _pubkey };
-      const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${_address}`, payload);
+      const { data: unspentUtxos } = await axios.post(`${this.url}/${network}/address/utxo/${_address}`, payload);
 
 
       const res = await this.txsService.buildSignSendTx({

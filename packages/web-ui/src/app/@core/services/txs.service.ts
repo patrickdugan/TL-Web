@@ -70,6 +70,7 @@ export interface IBuildLTCITTxConfig {
 })
 export class TxsService {
   private baseUrl = "https://api.layerwallet.com";
+  private network = this.rpcService.NETWORK
 
   constructor(
     private rpcService: RpcService,
@@ -213,7 +214,7 @@ export class TxsService {
 
 async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
   try {
-    const response = await axios.post(`${this.baseUrl}/tx/sendTx`, { rawTx });
+    const response = await axios.post(`${this.baseUrl}/${this.network}/tx/sendTx`, { rawTx });
     console.log('send response:', JSON.stringify(response));
 
     if (response.data.error) {
@@ -234,7 +235,7 @@ async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
 
     async predictColumn(channel: string, cpAddress: string) {
       try {
-        const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannelColumn`, { params: [channel, cpAddress] });
+        const response = await axios.post(`${this.baseUrl}/${this.network}/rpc/tl_getChannelColumn`, { params: [channel, cpAddress] });
         return response.data;
       } catch (error: any) {
         console.error('Error in predictColumn:', error.message);
@@ -259,7 +260,7 @@ async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
         ms: number
       ): Promise<{ data?: string; error?: string }> => {
         try {
-          const result = await axios.post(`${this.baseUrl}/tx/sendrawtransaction`, { params: [rawTx] });
+          const result = await axios.post(`${this.baseUrl}/${this.network}/tx/sendrawtransaction`, { params: [rawTx] });
           return result.data;
         } catch (error: any) {
           if (retriesLeft > 0 && error.message.includes('bad-txns-inputs-missingorspent')) {
