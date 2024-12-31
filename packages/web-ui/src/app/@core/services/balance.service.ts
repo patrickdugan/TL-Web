@@ -101,7 +101,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
 
     try {
       const payload = { pubkey };
-      const { data: unspentUtxos } = await axios.post(`${url}/${this.Rpcservice.NETWORK}/address/utxo/${address}`, payload);
+      const { data: unspentUtxos } = await axios.post(`${url}/${this.RpcService.NETWORK}/address/utxo/${address}`, payload);
 
 
       const confirmed = unspentUtxos
@@ -128,7 +128,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     if (!address) throw new Error('No address provided for updating the token balance');
 
     try {
-      const { data: tokens } = await axios.get(`${url}/${this.Rpcservice.NETWORK}/address/balance/${address}`);
+      const { data: tokens } = await axios.get(`${url}/${this.RpcService.NETWORK}/address/balance/${address}`);
       if (!this._allBalancesObj[address]) this._allBalancesObj[address] = emptyBalanceObj;
 
       this._allBalancesObj[address].tokensBalance = tokens.map((token: any) => ({
