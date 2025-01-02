@@ -15,7 +15,7 @@ const emptyBalanceObj = {
   tokensBalance: [],
 };
 
-const url = "https://api.layerwallet.com";
+let url = "https://api.layerwallet.com";
 
 @Injectable({
   providedIn: 'root',
@@ -44,6 +44,11 @@ export class BalanceService {
   }
 
   async onInit() {
+    if(this.rpcService.NETWORK=="LTCTEST"){
+      url = 'https://testnet-api.layerwallet.com'
+      console.log('network in portfolio '+this.rpcService.NETWORK+' '+url)
+    }
+
     if (!this.walletService.isWalletAvailable()) {
       console.warn('Wallet extension not detected');
       return;
@@ -58,6 +63,7 @@ export class BalanceService {
   }
 
  async updateBalances() {
+
     try {
         const accounts = await this.walletService.requestAccounts();
         console.log("Accounts with pubkeys:", accounts);
@@ -102,7 +108,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
 
     try {
       const payload = { pubkey };
-      const { data: unspentUtxos } = await axios.post(`${url}/${this.rpcService.NETWORK}/address/utxo/${address}`, payload);
+      const { data: unspentUtxos } = await axios.post(`${url}/address/utxo/${address}`, payload);
 
 
       const confirmed = unspentUtxos
@@ -129,7 +135,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     if (!address) throw new Error('No address provided for updating the token balance');
 
     try {
-      const { data: tokens } = await axios.get(`${url}/${this.rpcService.NETWORK}/address/balance/${address}`);
+      const { data: tokens } = await axios.get(`${url}/address/balance/${address}`);
       if (!this._allBalancesObj[address]) this._allBalancesObj[address] = emptyBalanceObj;
 
       this._allBalancesObj[address].tokensBalance = tokens.map((token: any) => ({

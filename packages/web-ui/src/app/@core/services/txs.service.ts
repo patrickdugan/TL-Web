@@ -213,8 +213,12 @@ export class TxsService {
   }
 
 async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
+    if(this.rpcService.NETWORK=="LTCTEST"){
+      this.baseUrl = 'https://testnet-api.layerwallet.com'
+      console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
+    }
   try {
-    const response = await axios.post(`${this.baseUrl}/${this.network}/tx/sendTx`, { rawTx });
+    const response = await axios.post(`${this.baseUrl}/tx/sendTx`, { rawTx });
     console.log('send response:', JSON.stringify(response));
 
     if (response.data.error) {

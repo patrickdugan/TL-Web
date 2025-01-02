@@ -132,8 +132,13 @@ export class WithdrawDialog {
                 const payload = {pubkey:''}
 
                 const network = this.rpcService.NETWORK
+                let url = 'https://api.layerwallet.com'
+                if(network=='LTCTEST'){
+                    url = 'https://testnet-api.layerwallet.com'
+                }
+
                  const { data: unspentUtxos } = await
-                 axios.post(`https://api.layerwallet.com/${network}/address/utxo/${fromAddress}`, payload);
+                 axios.post(`${url}/address/utxo/${fromAddress}`, payload);
                  txOptions.inputs= unspentUtxos
                 return { data: txOptions };
             } catch (error: any) {

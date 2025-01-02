@@ -153,8 +153,13 @@ export class PortfolioPageComponent implements OnInit {
          }
         
         const network = this.rpcService.NETWORK; // 'LTC' or 'LTCTEST'
+        if(network=='LTCTEST'){
+          this.url = 'https://testnet-api.layerwallet.com'
+        }
+        console.log('network in portfolio '+network+' '+this.url)
+
       const payload = { _pubkey };
-      const { data: unspentUtxos } = await axios.post(`${this.url}/${network}/address/utxo/${_address}`, payload);
+      const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${_address}`, payload);
 
 
       const res = await this.txsService.buildSignSendTx({
