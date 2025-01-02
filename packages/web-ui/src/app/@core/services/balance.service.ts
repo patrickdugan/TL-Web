@@ -15,12 +15,12 @@ const emptyBalanceObj = {
   tokensBalance: [],
 };
 
-let url = "https://api.layerwallet.com";
 
 @Injectable({
   providedIn: 'root',
 })
 export class BalanceService {
+  private url = "https://api.layerwallet.com";
   private _allBalancesObj: {
     [key: string]: {
       coinBalance: {
@@ -44,10 +44,6 @@ export class BalanceService {
   }
 
   async onInit() {
-    if(this.rpcService.NETWORK=="LTCTEST"){
-      url = 'https://testnet-api.layerwallet.com'
-      console.log('network in portfolio '+this.rpcService.NETWORK+' '+url)
-    }
 
     if (!this.walletService.isWalletAvailable()) {
       console.warn('Wallet extension not detected');
@@ -63,6 +59,11 @@ export class BalanceService {
   }
 
  async updateBalances() {
+      console.log('network detected in balances '+this.rpcService.NETWORK)
+     if(this.rpcService.NETWORK=="LTCTEST"){
+      this.url = 'https://testnet-api.layerwallet.com'
+      console.log('network in portfolio '+this.rpcService.NETWORK+' '+this.url)
+    }
 
     try {
         const accounts = await this.walletService.requestAccounts();
@@ -108,7 +109,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
 
     try {
       const payload = { pubkey };
-      const { data: unspentUtxos } = await axios.post(`${url}/address/utxo/${address}`, payload);
+      const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${address}`, payload);
 
 
       const confirmed = unspentUtxos
@@ -135,7 +136,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     if (!address) throw new Error('No address provided for updating the token balance');
 
     try {
-      const { data: tokens } = await axios.get(`${url}/address/balance/${address}`);
+      const { data: tokens } = await axios.get(`${this.url}/address/balance/${address}`);
       if (!this._allBalancesObj[address]) this._allBalancesObj[address] = emptyBalanceObj;
 
       this._allBalancesObj[address].tokensBalance = tokens.map((token: any) => ({
