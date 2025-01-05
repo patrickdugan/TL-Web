@@ -159,6 +159,7 @@ export class PortfolioPageComponent implements OnInit {
         console.log('network in portfolio '+network+' '+this.url)
 
       const payload = { _pubkey };
+      console.log('attestation utxo query '+`${this.url}/address/utxo/${_address}`)
       const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${_address}`, payload);
 
 
