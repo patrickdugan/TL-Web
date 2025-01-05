@@ -146,8 +146,10 @@ export class PortfolioPageComponent implements OnInit {
         let _pubkey = ''
         for (const account of accounts) {
             const { address, pubkey } = account;
-            if(_address==address ){
+            console.log('account '+ account)
+            if(_address==address){
               _pubkey = pubkey ?? ''
+              console.log('do we have a winner '+_pubkey)
             }
             console.log(`Processing address: ${address}, pubkey: ${pubkey}`);
          }
