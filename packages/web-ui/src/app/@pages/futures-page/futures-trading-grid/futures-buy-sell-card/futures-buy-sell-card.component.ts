@@ -8,6 +8,7 @@ import { ApiService } from 'src/app/@core/services/api.service';
 import { AttestationService } from 'src/app/@core/services/attestation.service';
 import { AuthService, EAddress } from 'src/app/@core/services/auth.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
+import { WalletService } from 'src/app/@core/services/wallet.service'
 import { FuturesMarketService, IFutureMarket, IToken } from 'src/app/@core/services/futures-services/futures-markets.service';
 import { FuturesOrderbookService } from 'src/app/@core/services/futures-services/futures-orderbook.service';
 import { FuturesOrdersService, IFuturesTradeConf } from 'src/app/@core/services/futures-services/futures-orders.service';
@@ -40,17 +41,19 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       private loadingService: LoadingService,
       private rpcService: RpcService,
       private apiService: ApiService,
+      private walletService: WalletService,
       private futuresOrdersService: FuturesOrdersService,
       private futuresOrderbookService: FuturesOrderbookService,
       public matDialog: MatDialog,
     ) {}
 
     get futureKeyPair() {
-      return this.authService.walletAddresses[0];
+      const accounts = this.balanceService.allAccounts
+      return accounts[0];
     }
 
     get futureAddress() {
-      return this.futureKeyPair;
+      return this.futureKeyPair.address;
     }
 
     get isLoading(): boolean {
@@ -160,9 +163,8 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
         const leverage = contractInfo.leverage || 10; // Fetch leverage from contractInfo, default to 10 if not provided
         const initialMargin = this.calculateInitialMargin(isInverse, amount, price, leverage, notional);
 
-        const pubkeyRes = await this.rpcService.rpc("getaddressinfo", [this.futureKeyPair]);
-        if (pubkeyRes.error || !pubkeyRes.data?.pubkey) throw new Error(pubkeyRes.error || "No Pubkey Found");
-        const pubkey = pubkeyRes.data.pubkey;
+
+        const pubkey = this.futureKeyPair.pubkey
 
         // Get the available and channel amounts
         const tokenBalance = this.balanceService.getTokensBalancesByAddress(this.futureAddress)
@@ -192,7 +194,7 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
 
         const order: IFuturesTradeConf = { 
           keypair: {
-            address: this.futureKeyPair,
+            address: this.futureKeyPair.address,
             pubkey: pubkey,
           },
           action: isBuy ? "BUY" : "SELL",

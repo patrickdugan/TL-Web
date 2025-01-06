@@ -10,6 +10,7 @@ import { AuthService, EAddress } from 'src/app/@core/services/auth.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 import { DialogService, DialogTypes } from 'src/app/@core/services/dialogs.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
+import { WalletService } from 'src/app/@core/services/wallet.service'
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { IMarket, IToken, SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
 import { SpotOrderbookService } from 'src/app/@core/services/spot-services/spot-orderbook.service';
@@ -43,16 +44,18 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
       private loadingService: LoadingService,
       private rpcService: RpcService,
       private apiService: ApiService,
+      private walletService: WalletService,
       public matDialog: MatDialog,
       private dialogService: DialogService,
     ) {}
 
     get spotKeyPair() {
-      return this.authService.walletAddresses[0];
+      const accounts = this.balanceService.allAccounts
+      return accounts[0];
     }
 
     get spotAddress() {
-      return this.spotKeyPair;
+      return this.spotKeyPair.address;
     }
 
     get isLoading(): boolean {
@@ -182,10 +185,7 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
         return console.log('missing key pair');
       }
 
-      const pubkeyRes = await this.rpcService.rpc("getaddressinfo", [this.spotKeyPair]);
-      console.log('pubkey '+JSON.stringify(pubkeyRes))
-      if (pubkeyRes.error || !pubkeyRes.data?.pubkey) throw new Error(pubkeyRes.error || "No Pubkey Found");
-      const pubkey = pubkeyRes.data.pubkey;
+      const pubkey = this.spotKeyPair.pubkey
 
       // Get the available and channel amounts
       const tokenBalance = this.balanceService.getTokensBalancesByAddress(this.spotAddress)
@@ -209,7 +209,7 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
       // Pass both availableAmount and channelAmount to the swap service
       const order: ISpotTradeConf = { 
         keypair: {
-          address: this.spotKeyPair,
+          address: this.spotKeyPair.address,
           pubkey: pubkey,
         },
         action: isBuy ? "BUY" : "SELL",

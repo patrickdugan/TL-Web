@@ -21,6 +21,9 @@ const emptyBalanceObj = {
 })
 export class BalanceService {
   private url = "https://api.layerwallet.com";
+  
+  private accounts: { address: string; pubkey: string }[] = [];
+  
   private _allBalancesObj: {
     [key: string]: {
       coinBalance: {
@@ -31,7 +34,7 @@ export class BalanceService {
       tokensBalance: any[];
     };
   } = {};
-
+  
   constructor(
     private authService: AuthService,
     private toastrService: ToastrService,
@@ -41,6 +44,10 @@ export class BalanceService {
 
   get allBalances() {
     return this._allBalancesObj;
+  }
+
+  get allAccounts() {
+    return this.accounts;
   }
 
   async onInit() {
@@ -68,6 +75,14 @@ export class BalanceService {
     try {
         const accounts = await this.walletService.requestAccounts();
         console.log("Accounts with pubkeys:", accounts);
+
+        // Store accounts for synchronous access
+      this.accounts = accounts.map((account) => ({
+        address: account.address,
+        pubkey: account.pubkey || '',
+      }));
+
+
 
         for (const account of accounts) {
             const { address, pubkey } = account;
