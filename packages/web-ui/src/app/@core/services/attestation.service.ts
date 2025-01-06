@@ -76,7 +76,7 @@ export class AttestationService {
 
         try {
             const payload = { address, id: 0 };
-            const response = await axios.post(`${url}/rpc/tl_getattestations`, payload);
+            const response = await axios.post(`${url}/rpc/tl_getAttestations`, payload);
 
             const attestationArray = response?.data || [];
             const attestationData = attestationArray.find(
