@@ -83,7 +83,8 @@ export class AttestationService {
                 (entry: any) => entry?.data?.status === 'active'
             );
 
-            const isAttested = !!attestationData;
+            const isAttested = attestationData?.data?.status === 'active';
+            console.log(`Attestation data for ${address}:`, attestationData);
 
             // Update the attestation array
             const existing = this.attestations.find((a) => a.address === address);
@@ -91,7 +92,11 @@ export class AttestationService {
                 existing.isAttested = isAttested;
                 existing.data = attestationData?.data || null;
             } else {
-                this.attestations.push({ address, isAttested, data: attestationData?.data || null });
+                this.attestations.push({ 
+                    address, 
+                    isAttested, 
+                    data: attestationData?.data || null 
+                });
             }
 
             console.log(`Attestation updated for ${address}:`, isAttested);
@@ -102,6 +107,30 @@ export class AttestationService {
             return false;
         }
     }
+
+    getAttByAddress(address: string): string | 'PENDING' | false {
+        if (!this.looping) {
+            this.startAttestationUpdateInterval();
+        }
+
+        const attestation = this.attestations.find(e => e.address === address);
+
+        console.log('Attestation object:', JSON.stringify(attestation));
+
+        // If no attestation found, return false
+        if (!attestation) {
+            return false;
+        }
+
+        // If attestation is pending
+        if (attestation.isAttested === 'PENDING') {
+            return 'PENDING';
+        }
+
+        // Return true/false based on the status
+        return attestation.isAttested ? true : false;
+    }
+
 
 
     private removeAll() {
@@ -114,30 +143,6 @@ export class AttestationService {
             attestation.isAttested = isAttested || 'PENDING'; // Update to 'true' if attested, else remain 'PENDING'
         }
     }
-
-    
-    getAttByAddress(address: string): string | 'PENDING' | false {
-        if(this.looping ==false){
-            this.startAttestationUpdateInterval()
-        }
-        const attestation = this.attestations.find(e => e.address === address);
-
-        console.log('Attestation object:', JSON.stringify(attestation));
-
-        // If attestation is undefined, return false
-        if (!attestation) {
-            return false;
-        }
-
-        // Explicitly check if the attestation is marked as 'PENDING'
-        if (attestation.isAttested === 'PENDING') {
-            return 'PENDING';
-        }
-
-        // Return the status if attestation data exists
-        return attestation.data?.status || false;
-    }
-
 
     setPendingAtt(address: string) {
         const existing = this.attestations.find(a => a.address === address);
