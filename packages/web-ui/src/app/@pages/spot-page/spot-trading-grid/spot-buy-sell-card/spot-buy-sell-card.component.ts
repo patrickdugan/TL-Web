@@ -371,17 +371,18 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
       return safeNumber(num);
     }
   
-    isSpotAddressSelfAtt() {
-        const attestationStatus = this.attestationService.getAttByAddress(this.spotAddress);
-        switch (attestationStatus) {
-            case 'active':
-                return "YES";
-            case 'inactive':
-                return "REVOKED";
-            default:
-                return "NO";
-        }
+   isSpotAddressSelfAtt() {
+    const attestationStatus = this.attestationService.getAttByAddress(this.spotAddress);
+    switch (attestationStatus) {
+        case true:
+            return "YES";
+        case false:
+            return "REVOKED";
+        case 'PENDING':
+        default:
+            return "NO";
     }
+}
 
     ngOnDestroy() {
       this.destroyed$.next(true);

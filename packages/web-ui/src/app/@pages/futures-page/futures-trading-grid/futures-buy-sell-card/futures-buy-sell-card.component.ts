@@ -310,17 +310,19 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       return safeNumber(num);
     }
   
-    isFutureAddressSelfAtt() {
-        const attestationStatus = this.attestationService.getAttByAddress(this.futureAddress);
-        switch (attestationStatus) {
-            case 'active':
-                return "YES";
-            case 'inactive':
-                return "REVOKED";
-            default:
-                return "NO";
-        }
+    
+isFutureAddressSelfAtt() {
+    const attestationStatus = this.attestationService.getAttByAddress(this.futureAddress);
+    switch (attestationStatus) {
+        case true:
+            return "YES";
+        case false:
+            return "REVOKED";
+        case 'PENDING':
+        default:
+            return "NO";
     }
+}
 
 
     ngOnDestroy() {

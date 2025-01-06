@@ -83,7 +83,7 @@ export class AttestationService {
                 (entry: any) => entry?.data?.status === 'active'
             );
 
-            const isAttested = attestationData?.data?.status === 'active';
+            const isAttested = !!attestationData && attestationData.data?.status === 'active';
             console.log(`Attestation data for ${address}:`, attestationData);
 
             // Update the attestation array
@@ -92,10 +92,10 @@ export class AttestationService {
                 existing.isAttested = isAttested;
                 existing.data = attestationData?.data || null;
             } else {
-                this.attestations.push({ 
-                    address, 
-                    isAttested, 
-                    data: attestationData?.data || null 
+                this.attestations.push({
+                    address,
+                    isAttested,
+                    data: attestationData?.data || null,
                 });
             }
 
@@ -108,7 +108,7 @@ export class AttestationService {
         }
     }
 
-    getAttByAddress(address: string): string | 'PENDING' | false {
+    getAttByAddress(address: string): boolean | 'PENDING' | false {
         if (!this.looping) {
             this.startAttestationUpdateInterval();
         }
@@ -127,11 +127,9 @@ export class AttestationService {
             return 'PENDING';
         }
 
-        // Return true/false based on the status
-        return attestation.isAttested ? true : false;
+        // Explicitly cast attestation status to boolean for true/false
+        return !!attestation.isAttested;
     }
-
-
 
     private removeAll() {
         this.attestations = [];
