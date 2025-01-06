@@ -3,6 +3,7 @@ import { ToastrService } from "ngx-toastr";
 import { AuthService } from "./auth.service";
 import { RpcService } from "./rpc.service";
 import { ApiService } from "./api.service";
+import {WalletService} from "./wallet.service"
 import axios from 'axios'
 
 @Injectable({
@@ -20,7 +21,8 @@ export class AttestationService {
         private authService: AuthService,
         private rpcService: RpcService,
         private apiService: ApiService,
-        private toastrService: ToastrService,
+        private walletService: WalletService,
+        private toastrService: ToastrService
     ) { }
 
     private readonly CRIMINAL_IP_API_KEY = "RKohp7pZw3LsXBtbmU3vcaBByraHPzDGrDnE0w1vI0qTEredJnMPfXMRS7Rk";
@@ -48,65 +50,47 @@ export class AttestationService {
         setInterval(() => this.checkAllAtt(), 20000); // Update every 20 seconds
     }
 
-    private async checkAllAtt() {
-      console.log('list of all addresses '+this.authService.listOfallAddresses)
-        const addressesList = this.authService.listOfallAddresses
-            
-        for (let i = 0; i < addressesList.length; i++) {
-            console.log('updating attestations? '+JSON.stringify(this.attestations))
-            const address = addressesList[i];
+   private async checkAllAtt() {
+    try {
+        const accounts = await this.walletService.requestAccounts();
+        const addresses = accounts.map((account) => account.address);
+        console.log('Addresses fetched from wallet: ', addresses);
+
+        for (const address of addresses) {
             await this.checkAttAddress(address);
         }
+    } catch (error: any) {
+        console.error('Error checking attestations:', error.message);
     }
+}
+
 
       async checkAttAddress(address: string): Promise<boolean> {
-        console.log('Checking attestation for address: ' + address);
-        let url = 'https://api.layerwallet.com'
-        if(this.rpcService.NETWORK=="LTCTEST"){
-             url = 'https://testnet-api.layerwallet.com'
-             console.log('network in portfolio '+this.rpcService.NETWORK+' '+url)
-        }
-        
-        try {
-        let payload = { address, id: 0 };
-            const aRes = await axios.post(`${url}/rpc/tl_getattestations`, payload);
+    console.log('Checking attestation for address: ' + address);
 
-           //await this.tlApi.rpc('getAttestations', [address, 0]).toPromise();
-            console.log('Raw attestation response:', JSON.stringify(aRes));
+    const url = this.rpcService.NETWORK === "LTCTEST"
+        ? 'https://testnet-api.layerwallet.com'
+        : 'https://api.layerwallet.com';
 
-            // Extract and flatten the 'data' array
-            const attestationArray = aRes?.data || [];
-            
-            // Find the most recent 'active' attestation
-            const attestationData = attestationArray.find(
-                (entry: any) => entry?.data?.status === 'active'
-            );
+    try {
+        const payload = { address, id: 0 };
+        const response = await axios.post(`${url}/rpc/tl_getattestations`, payload);
 
-            const isAttested = !!attestationData;
+        const attestationArray = response?.data || [];
+        const attestationData = attestationArray.find(
+            (entry: any) => entry?.data?.status === 'active'
+        );
 
-            // Update attestation cache
-            const existing = this.attestations.find(a => a.address === address);
+        const isAttested = !!attestationData;
+        console.log(`Attestation status for ${address}:`, isAttested);
 
-            if (existing) {
-                existing.isAttested = isAttested;
-                existing.data = attestationData?.data || null; // Store the full attestation data
-            } else {
-                this.attestations.push({ 
-                    address, 
-                    isAttested, 
-                    data: attestationData?.data || null 
-                });
-            }
-
-            console.log(`Attestation updated for ${address}: ${isAttested}`);
-            return isAttested;
-
-        } catch (error: any) {
-            console.error('Error fetching attestations:', error.message);
-            this.toastrService.error(error.message, `Error fetching attestation for ${address}`);
-            return false;
-        }
+        return isAttested;
+    } catch (error: any) {
+        console.error('Error checking attestation:', error.message);
+        throw error;
     }
+}
+
 
     private removeAll() {
         this.attestations = [];
