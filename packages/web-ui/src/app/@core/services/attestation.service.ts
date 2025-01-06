@@ -61,8 +61,17 @@ export class AttestationService {
 
       async checkAttAddress(address: string): Promise<boolean> {
         console.log('Checking attestation for address: ' + address);
+        let url = 'https://api.layerwallet.com'
+        if(this.rpcService.NETWORK=="LTCTEST"){
+             url = 'https://testnet-api.layerwallet.com'
+             console.log('network in portfolio '+this.rpcService.NETWORK+' '+url)
+        }
+        
         try {
-            const aRes = await this.tlApi.rpc('getAttestations', [address, 0]).toPromise();
+        let payload = { address, id: 0 };
+            const aRes = await axios.post(`${url}/rpc/tl_getattestations`, payload);
+
+           //await this.tlApi.rpc('getAttestations', [address, 0]).toPromise();
             console.log('Raw attestation response:', JSON.stringify(aRes));
 
             // Extract and flatten the 'data' array
