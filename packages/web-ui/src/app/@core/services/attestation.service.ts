@@ -17,6 +17,8 @@ export class AttestationService {
       data?: { status: string; [key: string]: any }; // Optional data field
     }[] = [];
 
+    private looping: boolean = false
+
     constructor(
         private authService: AuthService,
         private rpcService: RpcService,
@@ -46,50 +48,60 @@ export class AttestationService {
     }
 
     startAttestationUpdateInterval() {
+        this.looping = true
         this.checkAllAtt(); // Call immediately to fetch fresh data
         setInterval(() => this.checkAllAtt(), 20000); // Update every 20 seconds
     }
 
-   private async checkAllAtt() {
-    try {
-        const accounts = await this.walletService.requestAccounts();
-        const addresses = accounts.map((account) => account.address);
-        console.log('Addresses fetched from wallet: ', addresses);
+    private async checkAllAtt() {
+        try {
+            const accounts = await this.walletService.requestAccounts();
+            const addresses = accounts.map((account) => account.address);
+            console.log('Addresses fetched from wallet: ', addresses);
 
-        for (const address of addresses) {
-            await this.checkAttAddress(address);
+            for (const address of addresses) {
+                await this.checkAttAddress(address);
+            }
+        } catch (error: any) {
+            console.error('Error checking attestations:', error.message);
         }
-    } catch (error: any) {
-        console.error('Error checking attestations:', error.message);
     }
-}
 
+    async checkAttAddress(address: string): Promise<boolean> {
+        console.log('Checking attestation for address: ' + address);
 
-      async checkAttAddress(address: string): Promise<boolean> {
-    console.log('Checking attestation for address: ' + address);
+        const url = this.rpcService.NETWORK === "LTCTEST"
+            ? 'https://testnet-api.layerwallet.com'
+            : 'https://api.layerwallet.com';
 
-    const url = this.rpcService.NETWORK === "LTCTEST"
-        ? 'https://testnet-api.layerwallet.com'
-        : 'https://api.layerwallet.com';
+        try {
+            const payload = { address, id: 0 };
+            const response = await axios.post(`${url}/rpc/tl_getattestations`, payload);
 
-    try {
-        const payload = { address, id: 0 };
-        const response = await axios.post(`${url}/rpc/tl_getattestations`, payload);
+            const attestationArray = response?.data || [];
+            const attestationData = attestationArray.find(
+                (entry: any) => entry?.data?.status === 'active'
+            );
 
-        const attestationArray = response?.data || [];
-        const attestationData = attestationArray.find(
-            (entry: any) => entry?.data?.status === 'active'
-        );
+            const isAttested = !!attestationData;
 
-        const isAttested = !!attestationData;
-        console.log(`Attestation status for ${address}:`, isAttested);
+            // Update the attestation array
+            const existing = this.attestations.find((a) => a.address === address);
+            if (existing) {
+                existing.isAttested = isAttested;
+                existing.data = attestationData?.data || null;
+            } else {
+                this.attestations.push({ address, isAttested, data: attestationData?.data || null });
+            }
 
-        return isAttested;
-    } catch (error: any) {
-        console.error('Error checking attestation:', error.message);
-        throw error;
+            console.log(`Attestation updated for ${address}:`, isAttested);
+            return isAttested;
+        } catch (error: any) {
+            console.error('Error checking attestation:', error.message);
+            this.toastrService.error(error.message, `Error fetching attestation for ${address}`);
+            return false;
+        }
     }
-}
 
 
     private removeAll() {
@@ -105,6 +117,9 @@ export class AttestationService {
 
     
     getAttByAddress(address: string): string | 'PENDING' | false {
+        if(this.looping ==false){
+            this.startAttestationUpdateInterval()
+        }
         const attestation = this.attestations.find(e => e.address === address);
 
         console.log('Attestation object:', JSON.stringify(attestation));
