@@ -48,7 +48,7 @@ export class AppComponent {
   }
 
   get isCoreStarted() {
-    return this.rpcService.isCoreStarted;
+    return //this.rpcService.isCoreStarted;
   }
 
   get isNetworkSelected() {
@@ -65,7 +65,7 @@ export class AppComponent {
 
   handleInits() {
     this.connectionService.onInit();
-    this.rpcService.onInit();
+    //this.rpcService.onInit();
     this.balanceService.onInit();
     this.attestationService.onInit();
     this.swapService.onInit();

@@ -99,7 +99,7 @@ export class RpcService {
 
     onInit() {
       return
-      this.socket.on('core-error', error => {
+      /*this.socket.on('core-error', error => {
         this.clearRpcConnection();
         if (!this._stoppedByTerminated) {
           this.toastrService.error(error || 'Undefiend Reason', 'Core Stopped Working');
@@ -116,7 +116,7 @@ export class RpcService {
         this.headerBlock = header;
         const blockSubsObj: IBlockSubsObj = { type: "LOCAL", block: lastBlock, header };
         this.blockSubs$.next(blockSubsObj);
-      });
+      });*/
 
       setInterval(() => this.checkNetworkInfo(), 8000);
     }
