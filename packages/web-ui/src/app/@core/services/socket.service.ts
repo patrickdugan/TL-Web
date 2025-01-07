@@ -81,7 +81,14 @@ export class SocketService {
     // Initiate a connection to the orderbook service (OB socket)
     obSocketConnect(url: string) {
         this.obServerWaiting = true;
-        this._obServerSocket = io(url, { reconnection: false });
+        this._obServerSocket = io(url, {
+            reconnection: false,
+            transports: ['websocket'], // Force WebSocket to avoid falling back to polling
+            path: '/socket.io/', // Ensure the correct path is used
+            secure: true, // Enforce secure connection
+        });
+
+
 
         this.obSocket?.on('connect', () => {
             this.obServerWaiting = false;
