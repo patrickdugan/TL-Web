@@ -83,8 +83,6 @@ export class SocketService {
         this.obServerWaiting = true;
         this._obServerSocket = io(url, {
             reconnection: false,
-            transports: ['websocket'], // Force WebSocket to avoid falling back to polling
-            path: '/socket.io/', // Ensure the correct path is used
             secure: true, // Enforce secure connection
         });
 
