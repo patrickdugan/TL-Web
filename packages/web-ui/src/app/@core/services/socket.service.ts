@@ -229,7 +229,8 @@ export class SocketService {
       this._universalSocket?.on(eventName, (data: any) => {
         // Forward everything to an RxJS Subject so you can pick it up 
         // in your components the same way as you previously did
-        const fullEventName = `${obEventPrefix}::${eventName}`;
+        const fullEventName = `${eventName}`;
+        console.log('inside socket service '+fullEventName+' '+JSON.stringify(data))
         this.emitEvent(fullEventName, data);
       });
     });
