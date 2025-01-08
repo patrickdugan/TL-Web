@@ -165,6 +165,8 @@ export class SocketService {
     console.log('Connecting obSocket to', url);
     this._universalSocket = io(url, {
       reconnection: false,
+      path: '/socket.io/', // This path must match Nginx's WebSocket path
+      transports: ['websocket'],
       secure: true,
     });
 
