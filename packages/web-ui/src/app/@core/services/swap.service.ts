@@ -29,33 +29,22 @@ export class SwapService {
         private soundsService: SoundsService,
     ) {}
 
-    private retrySocketConnection() {
-        if (!this.socketService.obSocket?.connected) {
-            console.log('Attempting to reconnect to obSocket...');
-            this.socketService.obSocketConnect('https://your-socket-url'); // Replace with actual URL
-        }
-    }
-
     public onInit() {
         const socket = this.socketService.obSocket;
-
-        if (!socket) {
-            console.warn('obSocket is not connected. Retrying...');
-            this.retrySocketConnection();
-            return;
+        if(socket){
+                socket.on(`new-channel`, async (swapConfig: IChannelSwapData) => {
+                console.log('new channel '+JSON.stringify(swapConfig))
+                this.loadingService.tradesLoading = false;
+                const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer);
+                
+                if (!res || res.error || !res.data?.txid) {
+                    this.toastrService.error(res?.error || 'Unknown Error', 'Trade Error');
+                } else {
+                    this.soundsService.playSound(ESounds.TRADE_COMPLETED);
+                    this.toastrService.success('Trade Completed', res.data.txid, { timeOut: 3000 });
+                }
+            });
         }
-
-        socket.on(`new-channel`, async (swapConfig: IChannelSwapData) => {
-            this.loadingService.tradesLoading = false;
-            const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer);
-            
-            if (!res || res.error || !res.data?.txid) {
-                this.toastrService.error(res?.error || 'Unknown Error', 'Trade Error');
-            } else {
-                this.soundsService.playSound(ESounds.TRADE_COMPLETED);
-                this.toastrService.success('Trade Completed', res.data.txid, { timeOut: 3000 });
-            }
-        });
     }
 
     private async channelSwap(tradeInfo: ITradeInfo<any>, isBuyer: boolean) {

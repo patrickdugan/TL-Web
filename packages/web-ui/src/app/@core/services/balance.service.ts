@@ -75,10 +75,10 @@ export class BalanceService {
   }
 
  async updateBalances() {
-      console.log('network detected in balances '+this.rpcService.NETWORK)
+      console.log('network detected in balances '+this._NETWORK)
      if(this._NETWORK=="LTCTEST"){
       this.url = 'https://testnet-api.layerwallet.com'
-      console.log('network in portfolio '+this.rpcService.NETWORK+' '+this.url)
+      console.log('network in portfolio '+this._NETWORK+' '+this.url)
     }else{
       this.url = 'https://api.layerwallet.com'
     }
