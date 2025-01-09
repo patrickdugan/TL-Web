@@ -23,6 +23,11 @@ export class SocketService {
    */
   private _universalSocket: Socket | null = null;
 
+  get universalSocket(): Socket | null {
+    return this._universalSocket;
+}
+
+
   /** 
    * We keep references so the rest of your code compiles:
    * - `_socket` is used by `get socket()`, `mainSocketConnect()`, etc.
