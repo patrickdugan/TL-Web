@@ -3,6 +3,7 @@ import { ToastrService } from 'ngx-toastr';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
 import { Subject } from 'rxjs';
+import {SwapService} from './swap.service'
 
 /** Same prefix from your original code. */
 export const obEventPrefix = 'OB_SOCKET';
@@ -22,7 +23,7 @@ export class SocketService {
    * `this._obServerSocket` point to. This is our "universal" connection.
    */
   private _universalSocket: Socket | null = null;
-
+  private swapService: SwapService
   get universalSocket(): Socket | null {
     return this._universalSocket;
 }
@@ -187,6 +188,8 @@ export class SocketService {
 
       console.log('OB socket connected, ID:', this._universalSocket?.id);
       this.toasterService.success('OB Socket Connected', 'Socket');
+
+    this.swapService.onInit();
 
       // register the “orderbook” event handling or others
       this.handleUniversalSocketEvents();

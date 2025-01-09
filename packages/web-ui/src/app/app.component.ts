@@ -68,7 +68,7 @@ export class AppComponent {
     //this.rpcService.onInit();
     this.balanceService.onInit();
     this.attestationService.onInit();
-    this.swapService.onInit();
+    //this.swapService.onInit();
     this.nodeRewardService.onInit();
   }
 
