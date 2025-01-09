@@ -239,7 +239,7 @@ export class SocketService {
         // in your components the same way as you previously did
         const fullEventName = `${eventName}`;
          const cpSocketId = data.isBuyer ? data.tradeInfo.seller.socketId : data.tradeInfo.buyer.socketId;
-        //console.log('inside socket service '+fullEventName+' '+JSON.stringify(data.socketId))
+        console.log('inside socket service '+fullEventName+' '+JSON.stringify(data.socketId))
         if(eventName=="new-channel"){console.log('new channel with socket '+cpSocketId)}
 
         this.emitEvent(fullEventName, data);
