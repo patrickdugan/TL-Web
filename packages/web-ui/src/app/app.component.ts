@@ -56,7 +56,7 @@ export class AppComponent {
   }
 
   get socketsLoading() {
-    return this.socketService.socketsLoading;
+    return //this.socketService.socketsLoading;
   }
 
   get allConnected() {

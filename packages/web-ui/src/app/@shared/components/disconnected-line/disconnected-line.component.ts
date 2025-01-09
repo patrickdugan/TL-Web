@@ -22,6 +22,6 @@ export class DisconnectedLineComponent {
   }
 
   mainSocketReconenct() {
-    this.socketService.mainSocketConnect();
+    this.socketService.obSocketConnect('https://ws.layerwallet.com/443');
   }
 }

@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AuthService } from 'src/app/@core/services/auth.service';
-import { obEventPrefix, SocketService } from 'src/app/@core/services/socket.service';
+import { /*obEventPrefix,*/ SocketService } from 'src/app/@core/services/socket.service';
 import { Subscription } from 'rxjs';
 import { FuturesOrdersService } from 'src/app/@core/services/futures-services/futures-orders.service';
 import { IFuturesOrder } from 'src/app/@core/services/futures-services/futures-orderbook.service';
@@ -35,7 +35,7 @@ export class FuturesOrdersComponent implements OnInit, OnDestroy {
     }
 
      private subscribe() {
-       this.socketService.obSocket?.on(`${obEventPrefix}::placed-orders`, (orders: { openedOrders: IFuturesOrder[], orderHistory: IFuturesOrder[] }) => {
+       this.socketService.obSocket?.on('placed-orders', (orders: { openedOrders: IFuturesOrder[], orderHistory: IFuturesOrder[] }) => {
          const { openedOrders, orderHistory } = orders;
 
          this.futuresOrdersService.orderHistory = orderHistory
@@ -43,7 +43,7 @@ export class FuturesOrdersComponent implements OnInit, OnDestroy {
          this.futuresOrdersService.openedOrders = openedOrders.filter(q => q.type === "FUTURES");
        });
        this.futuresOrdersService.closeOpenedOrder('test-for-update');
-       this.socketService.obSocket?.on(`${obEventPrefix}::disconnect`, () => {
+       this.socketService.obSocket?.on('disconnect', () => {
          this.futuresOrdersService.openedOrders = [];
        });
 

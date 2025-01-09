@@ -1,27 +1,24 @@
 import { Injectable } from "@angular/core";
 import { ToastrService } from "ngx-toastr";
 import { RpcService } from "./rpc.service";
-import { obEventPrefix, SocketService } from "./socket.service";
+import { SocketService } from "./socket.service";
 import { TxsService } from "./txs.service";
 import { LoadingService } from "./loading.service";
-// swap.service.ts
-import { BuySwapper, SellSwapper, ITradeInfo } from 'src/app/utils/swapper/'; // Keep this import for other classes
-import { ISpotTradeProps, IFuturesTradeProps } from 'src/app/utils/swapper/common'; // Import ISpotTradeProps from common.ts
-
+import { BuySwapper, SellSwapper, ITradeInfo } from "src/app/utils/swapper/"; 
+import { ISpotTradeProps, IFuturesTradeProps } from "src/app/utils/swapper/common";
 import { ISpotOrder } from "./spot-services/spot-orderbook.service";
-import { IFuturesOrder} from "./futures-services/futures-orderbook.service"
+import { IFuturesOrder } from "./futures-services/futures-orderbook.service";
 import { ESounds, SoundsService } from "./sound.service";
 
 interface IChannelSwapData {
-    tradeInfo: ITradeInfo<any>; // Changed to any since tradeInfo could be either spot or futures
-    unfilled: ISpotOrder|IFuturesOrder; // if using futures logic
+    tradeInfo: ITradeInfo<any>; 
+    unfilled: ISpotOrder | IFuturesOrder; 
     isBuyer: boolean;
 }
 
 @Injectable({
     providedIn: 'root',
 })
-
 export class SwapService {
     constructor(
         private socketService: SocketService,
@@ -32,24 +29,23 @@ export class SwapService {
         private soundsService: SoundsService,
     ) {}
 
-    retrySocketConnection() {
-        if (!this.socketService.universalSocket?.connected) {
-            console.log('Attempting to reconnect to socket...');
-            this.socketService.mainSocketConnect(); // or your equivalent connection method
+    private retrySocketConnection() {
+        if (!this.socketService.obSocket?.connected) {
+            console.log('Attempting to reconnect to obSocket...');
+            this.socketService.obSocketConnect('https://your-socket-url'); // Replace with actual URL
         }
     }
 
-    onInit() {
+    public onInit() {
+        const socket = this.socketService.obSocket;
 
-             const socket = this.socketService.universalSocket;
+        if (!socket) {
+            console.warn('obSocket is not connected. Retrying...');
+            this.retrySocketConnection();
+            return;
+        }
 
-    if (!socket) {
-        console.warn('Socket is not connected. Retrying...');
-        this.retrySocketConnection();
-        return;
-    }
-
-        this.socketService.universalSocket?.on(`new-channel`, async (swapConfig: IChannelSwapData) => {
+        socket.on(`new-channel`, async (swapConfig: IChannelSwapData) => {
             this.loadingService.tradesLoading = false;
             const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer);
             
@@ -64,11 +60,13 @@ export class SwapService {
 
     private async channelSwap(tradeInfo: ITradeInfo<any>, isBuyer: boolean) {
         const { buyer, seller, props, type } = tradeInfo;
-        console.log('inside channel swap '+JSON.stringify(tradeInfo))
-        const socket = this.socketService.universalSocket;
+        console.log('Inside channel swap:', JSON.stringify(tradeInfo));
+        const socket = this.socketService.obSocket;
+
         if (!socket) {
-            throw new Error("Socket is not connected");
+            throw new Error("obSocket is not connected");
         }
+
         if (type === "SPOT") {
             const { transfer } = props as ISpotTradeProps;
 
@@ -95,8 +93,6 @@ export class SwapService {
 
             const res = await swapper.onReady();
             return res;
-            // Add futures swapper logic if needed here
-            //throw new Error("Futures trading not supported yet.");
         } else {
             throw new Error(`Unsupported trade type: ${type}`);
         }

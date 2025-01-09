@@ -4,7 +4,7 @@ import { ApiService } from 'src/app/@core/services/api.service';
 import { ConnectionService } from 'src/app/@core/services/connections.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
-import { obEventPrefix, SocketService } from 'src/app/@core/services/socket.service';
+import { /*obEventPrefix,*/ SocketService } from 'src/app/@core/services/socket.service';
 import { environment } from 'src/environments/environment';
 
 @Component({
@@ -44,14 +44,14 @@ export class ServersDialog implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.socketService.obSocket?.on(`${obEventPrefix}::connect`, () => {
+    this.socketService.obSocket?.on('connect', () => {
       const orderbookUrl = this.selectedOrderbookServer === "@custom"
         ? this.customOrderbookUrl
         : this.selectedOrderbookServer;
       this.apiService.orderbookUrl = orderbookUrl;
     });
 
-    this.socketService.obSocket?.on(`${obEventPrefix}::disconnect`, () => {
+    this.socketService.obSocket?.on('disconnect', () => {
       this.apiService.orderbookUrl = null;
     });
   }

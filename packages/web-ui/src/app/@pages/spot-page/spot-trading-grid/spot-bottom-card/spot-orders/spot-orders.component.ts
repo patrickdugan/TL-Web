@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AuthService } from 'src/app/@core/services/auth.service';
-import { obEventPrefix, SocketService } from 'src/app/@core/services/socket.service';
+import { /*obEventPrefix,*/ SocketService } from 'src/app/@core/services/socket.service';
 import { ISpotOrder } from 'src/app/@core/services/spot-services/spot-orderbook.service';
 import { Subscription } from 'rxjs';
 import { SpotOrdersService } from 'src/app/@core/services/spot-services/spot-orders.service';
@@ -35,7 +35,7 @@ export class SpotOrdersComponent implements OnInit, OnDestroy {
     }
 
     private subsribe() {
-       this.socketService.obSocket?.on(`${obEventPrefix}::placed-orders`, (orders: { openedOrders: ISpotOrder[], orderHistory: ISpotOrder[] }) => {
+       this.socketService.obSocket?.on('placed-orders', (orders: { openedOrders: ISpotOrder[], orderHistory: ISpotOrder[] }) => {
           const { openedOrders, orderHistory } = orders;
           console.log('orders '+JSON.stringify(openedOrders)+' '+JSON.stringify(orderHistory))
           this.spotOrdersService.orderHistory = orderHistory
@@ -44,7 +44,7 @@ export class SpotOrdersComponent implements OnInit, OnDestroy {
         });
 
         //this.spotOrdersService.closeOpenedOrder('test-for-update');
-        this.socketService.obSocket?.on(`${obEventPrefix}::disconnect`, () => {
+        this.socketService.obSocket?.on('disconnect', () => {
           this.spotOrdersService.openedOrders = [];
         });
 
