@@ -138,7 +138,7 @@ export class RpcService {
     }
 
     get socket() {
-      return this.socketService.obSocket;
+      return //this.socketService.socket;
     }
 
     get mainApi() {
