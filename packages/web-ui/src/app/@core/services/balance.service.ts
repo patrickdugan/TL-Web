@@ -3,6 +3,7 @@ import { ToastrService } from 'ngx-toastr';
 import { AuthService } from './auth.service';
 import { WalletService } from './wallet.service';
 import { RpcService, TNETWORK } from "./rpc.service";
+
 import axios from 'axios';
 
 const minBlocksForBalanceConf: number = 1;
@@ -23,7 +24,7 @@ export class BalanceService {
   private url = "https://api.layerwallet.com";
   
   private accounts: { address: string; pubkey: string }[] = [];
-  
+  private _NETWORK: string = "LTC"; // Use a different backing field
   private _allBalancesObj: {
     [key: string]: {
       coinBalance: {
@@ -44,6 +45,14 @@ export class BalanceService {
 
   get allBalances() {
     return this._allBalancesObj;
+  }
+
+  set NETWORK(network: string) {
+    this._NETWORK = network; // Assign to the backing field
+  }
+
+  get NETWORK(): string {
+    return this._NETWORK; // Return the backing field
   }
 
   get allAccounts() {
@@ -67,9 +76,11 @@ export class BalanceService {
 
  async updateBalances() {
       console.log('network detected in balances '+this.rpcService.NETWORK)
-     if(this.rpcService.NETWORK=="LTCTEST"){
+     if(this._NETWORK=="LTCTEST"){
       this.url = 'https://testnet-api.layerwallet.com'
       console.log('network in portfolio '+this.rpcService.NETWORK+' '+this.url)
+    }else{
+      this.url = 'https://api.layerwallet.com'
     }
 
     try {

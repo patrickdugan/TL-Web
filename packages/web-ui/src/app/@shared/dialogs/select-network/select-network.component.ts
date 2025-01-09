@@ -5,6 +5,7 @@ import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/@core/services/loading.service';
 import { ENetwork, RpcService } from 'src/app/@core/services/rpc.service';
 import { WindowsService } from 'src/app/@core/services/windows.service';
+import {BalanceService } from 'src/app/@core/services/balance.service'
 
 @Component({
   selector: 'select-network-dialog',
@@ -22,6 +23,7 @@ export class SelectNetworkDialog {
     private toastrService: ToastrService,
     private loadingService: LoadingService,
     private windowsService: WindowsService,
+    private balanceService: BalanceService
   ) {}
 
   async selectNetwork() {
@@ -29,6 +31,7 @@ export class SelectNetworkDialog {
       this.loadingService.isLoading = true;
       this.rpcService.NETWORK = this.network;
       this.rpcService.isNetworkSelected = true;
+      this.balanceService.NETWORK = this.network;
       this.dialogRef.close();
       this.router.navigateByUrl('/');
       const tab = this.windowsService.tabs.find(t => t.title === "Servers");

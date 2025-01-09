@@ -154,7 +154,7 @@ export class PortfolioPageComponent implements OnInit {
             console.log(`Processing address: ${address}, pubkey: ${pubkey}`);
          }
         
-        const network = this.rpcService.NETWORK; // 'LTC' or 'LTCTEST'
+        const network = this.balanceService.NETWORK; // 'LTC' or 'LTCTEST'
         if(network=='LTCTEST'){
           this.url = 'https://testnet-api.layerwallet.com'
         }
