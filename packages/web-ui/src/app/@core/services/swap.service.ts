@@ -30,8 +30,7 @@ export class SwapService {
     ) {}
 
     public onInit() {
-        console.log('socket init in swap service init '+socket)
-        this.socketService.obSocket?.on(`new-channel`, async (swapConfig:IChannelSwapData) => {
+        this.socketService.obSocket?.on(`new-channel`, async (swapConfig: IChannelSwapData) => {
                 console.log('new channel '+JSON.stringify(swapConfig))
                 this.loadingService.tradesLoading = false;
                 const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer);
@@ -43,7 +42,6 @@ export class SwapService {
                     this.toastrService.success('Trade Completed', res.data.txid, { timeOut: 3000 });
                 }
             });
-        }
     }
 
     private async channelSwap(tradeInfo: ITradeInfo<any>, isBuyer: boolean) {
