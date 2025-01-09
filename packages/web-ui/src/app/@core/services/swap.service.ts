@@ -32,11 +32,23 @@ export class SwapService {
         private soundsService: SoundsService,
     ) {}
 
-    onInit() {
-        if (!this.socketService.universalSocket) {
-                throw new Error("Socket is not connected");
-            }
+    retrySocketConnection() {
+        if (!this.socketService.universalSocket?.connected) {
+            console.log('Attempting to reconnect to socket...');
+            this.socketService.mainSocketConnect(); // or your equivalent connection method
+        }
+    }
 
+
+    onInit() {
+
+             const socket = this.socketService.universalSocket;
+
+    if (!socket) {
+        console.warn('Socket is not connected. Retrying...');
+        this.retrySocketConnection();
+        return;
+    }
 
         this.socketService.universalSocket?.on(`new-channel`, async (swapConfig: IChannelSwapData) => {
             this.loadingService.tradesLoading = false;
