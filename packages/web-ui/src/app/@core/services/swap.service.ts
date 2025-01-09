@@ -31,7 +31,9 @@ export class SwapService {
 
     public onInit() {
         const socket = this.socketService.obSocket;
+        console.log('socket init in swap service init '+socket)
         if(socket){
+            console.log('establishing new channel listener')
                 socket.on(`new-channel`, async (swapConfig: IChannelSwapData) => {
                 console.log('new channel '+JSON.stringify(swapConfig))
                 this.loadingService.tradesLoading = false;
