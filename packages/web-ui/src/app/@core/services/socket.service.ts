@@ -4,6 +4,8 @@ import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
 import { Subject } from 'rxjs';
 import { SwapService } from './swap.service';
+import { ESounds, SoundsService } from "./sound.service";
+import { LoadingService } from "./loading.service";
 
 @Injectable({
   providedIn: 'root',
@@ -16,7 +18,9 @@ export class SocketService {
 
   constructor(
     private toasterService: ToastrService,
-    private swapService: SwapService
+    private swapService: SwapService,
+    private soundsService: SoundsService,
+    private loadingService: LoadingService
   ) {}
 
   // ----------------------------
@@ -47,7 +51,6 @@ export class SocketService {
       this.toasterService.success('OB Socket Connected', 'Socket');
 
       // Initialize SwapService after socket connection
-      this.swapService.onInit();
 
       // Register event listeners
       this.handleObSocketEvents();
@@ -92,7 +95,9 @@ export class SocketService {
     events.forEach((eventName) => {
       this._obSocket?.on(eventName, (data: any) => {
         console.log(`Event received: ${eventName}`, data);
-
+        if(eventName=='new-channel'&& this._obSocket){
+            const res = this.swapService.onInit(data,this._obSocket);
+        }
         // Emit the event via RxJS Subject
         this.emitEvent(eventName, data);
       });

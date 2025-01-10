@@ -12,7 +12,6 @@ export abstract class Swap {
         public tradeInfo: ISpotTradeProps|IFuturesTradeProps, 
         public myInfo: IBuyerSellerInfo,
         public cpInfo: IBuyerSellerInfo,
-        public client: TClient,
         public socket: SocketClient,
         public txsService: TxsService,
     ) { }

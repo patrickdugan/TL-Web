@@ -51,6 +51,19 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
     }
   }
 
+  async addMultisig(m: number, pubkeys: string[]): Promise<{ address: string; redeemKey?: string }> {
+  this.ensureWalletAvailable();
+  try {
+    // Use actual variables `m` and `pubkeys` in the payload
+    const payload = { m, pubkeys };
+    return await window.myWallet!.sendRequest('addMultisig', payload); // Non-null assertion
+  } catch (error) {
+    console.error('Error adding multisig address:', error);
+    throw new Error('Failed to add multisig address');
+  }
+}
+
+
   async signTransaction(transaction: string): Promise<string> {
     this.ensureWalletAvailable();
     try {

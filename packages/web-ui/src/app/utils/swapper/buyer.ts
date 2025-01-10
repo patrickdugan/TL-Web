@@ -4,6 +4,8 @@ import { IMSChannelData, SwapEvent, IBuyerSellerInfo, TClient, IFuturesTradeProp
 import { Swap } from "./swap";
 import { ENCODER } from '../payloads/encoder';
 import { ToastrService } from "ngx-toastr";
+import { WalletService } from 'src/app/@core/services/wallet.service';
+import axios from 'axios';
 
 export class BuySwapper extends Swap {
     private tradeStartTime: number; // Add this declaration for tradeStartTime
@@ -12,12 +14,12 @@ export class BuySwapper extends Swap {
         tradeInfo: ISpotTradeProps,//IFuturesTradeProps |, 
         buyerInfo: IBuyerSellerInfo,
         sellerInfo: IBuyerSellerInfo,
-        client: TClient,
         socket: SocketClient,
         txsService: TxsService,
-        private toastrService: ToastrService
+        private toastrService: ToastrService,
+        private walletService: WalletService
     ) {
-        super(typeTrade, tradeInfo, buyerInfo, sellerInfo, client, socket, txsService);
+        super(typeTrade, tradeInfo, buyerInfo, sellerInfo, socket, txsService);
         this.handleOnEvents();
         this.tradeStartTime = Date.now(); // Start time of the trade
         this.onReady();
@@ -63,9 +65,9 @@ export class BuySwapper extends Swap {
                 pubKeys = [this.myInfo.keypair.pubkey,this.cpInfo.keypair.pubkey]
             }
         }
-            const amaRes = await this.client("addmultisigaddress", [2, pubKeys]);
-            if (amaRes.error || !amaRes.data) throw new Error(`addmultisigaddress: ${amaRes.error}`);
-            if (amaRes.data.redeemScript !== msData.redeemScript) throw new Error(`redeemScript of Multysig is not matching`);
+            const amaRes = await this.walletService.addMultisig(2, pubKeys);
+          
+            if (amaRes.redeemKey !== msData.redeemScript) throw new Error(`redeemScript of Multysig is not matching`);
             this.multySigChannelData = msData;
             const swapEvent = new SwapEvent('BUYER:STEP2', this.myInfo.socketId);
             this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
@@ -81,9 +83,11 @@ export class BuySwapper extends Swap {
         if (cpId !== this.cpInfo.socketId) throw new Error(`Error with p2p connection`);
         if (!this.multySigChannelData) throw new Error(`Wrong Multisig Data Provided`);
 
-        const gbcRes = await this.client('getblockcount');
-        if (gbcRes.error || !gbcRes.data) throw new Error(`Block: ${gbcRes.error}`);
-        const bbData = parseFloat(gbcRes.data) + 10;
+        const gbcRes = await axios('https://api.layerwallet.com/chain/info');
+        if (!gbcRes.data || typeof gbcRes.data.blocks === 'undefined') {
+            throw new Error('Unexpected response: blocks not found');
+          }
+        const bbData = parseFloat(gbcRes.data.blocks) + 10;
         console.log('examing this.tradeInfo object '+JSON.stringify(this.tradeInfo))
         // Preserve the ctcpParams logic based on trade type
         if (this.typeTrade === ETradeType.SPOT && 'propIdDesired' in this.tradeInfo) {
@@ -174,11 +178,11 @@ export class BuySwapper extends Swap {
                     if (commitTxSendRes.error || !commitTxSendRes.data) throw new Error(`Failed to send transaction`);
 
                     // Handle UTXO creation for the next step
-                    const drtRes = await this.client("decoderawtransaction", [rawtx]);
-                    if (drtRes.error || !drtRes.data?.vout) throw new Error(`decoderawtransaction: ${drtRes.error}`);
+                    const drtRes = await axios.post("https://api.layerwallet.com/tx/decode", {rawtx});
+                    if (!drtRes.data?.vout) throw new Error(`decoderawtransaction failed}`);
 
                     const vout = drtRes.data.vout.find((o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address);
-                    if (!vout) throw new Error(`decoderawtransaction (2): ${drtRes.error}`);
+                    if (!vout) throw new Error(`decoderawtransaction (2) failed`);
 
                     const utxoData = {
                         amount: vout.value,
@@ -187,10 +191,6 @@ export class BuySwapper extends Swap {
                         scriptPubKey: this.multySigChannelData.scriptPubKey,
                         redeemScript: this.multySigChannelData.redeemScript,
                     } as IUTXO;
-
-                    
-                    // const cpitLTCOptions = [ propIdDesired, (amountDesired).toString(), propIdForSale, (amountForSale).toString(), bbData ];
-                    // const cpitRes = await this.client('tl_createpayload_instant_trade', cpitLTCOptions);
 
                     const cpitLTCOptions = {
                         propertyId1: propIdForSale,

@@ -4,6 +4,8 @@ import { IMSChannelData, SwapEvent, IBuyerSellerInfo, TClient, IFuturesTradeProp
 import { Swap } from "./swap";
 import { ENCODER } from '../payloads/encoder';
 import { ToastrService } from "ngx-toastr";
+import { WalletService } from 'src/app/@core/services/wallet.service';
+import axios from 'axios';
 
 export class SellSwapper extends Swap {
         private tradeStartTime: number; // Add this declaration for tradeStartTime
@@ -12,12 +14,12 @@ export class SellSwapper extends Swap {
         tradeInfo: ISpotTradeProps, // IFuturesTradeProps can be added if needed for futures
         sellerInfo: IBuyerSellerInfo,
         buyerInfo: IBuyerSellerInfo,
-        client: TClient,
         socket: SocketClient,
         txsService: TxsService,
-        private toastrService: ToastrService
+        private toastrService: ToastrService,
+        private walletService: WalletService
     ) {
-        super(typeTrade, tradeInfo, sellerInfo, buyerInfo, client, socket, txsService);
+        super(typeTrade, tradeInfo, sellerInfo, buyerInfo, socket, txsService);
         this.handleOnEvents();
         this.tradeStartTime = Date.now(); // Start time of the trade
         this.onReady();
@@ -67,13 +69,10 @@ export class SellSwapper extends Swap {
             }
         }
             console.log('showing pubkeys before adding multisig '+JSON.stringify(pubKeys))
-            const amaRes = await this.client("addmultisigaddress", [2, pubKeys]);
-            if (amaRes.error || !amaRes.data) throw new Error(`addmultisigaddress: ${amaRes.error}`);
-            this.multySigChannelData = amaRes.data as IMSChannelData;
-
-            const validateMS = await this.client("validateaddress", [this.multySigChannelData.address]);
-            if (validateMS.error || !validateMS.data?.scriptPubKey) throw new Error(`Init Trade: validateaddress: ${validateMS.error}`);
-            console.log('validateMS return from validateaddress in seller init '+JSON.stringify(validateMS))
+            const amaRes = await this.walletService.addMultisig(2, pubKeys)
+            this.multySigChannelData = amaRes as IMSChannelData;
+            const validateMS = await axios.get(`https://api.layerwallet.com/address/validate/$this.multySigChannelData.address`)
+            
             this.multySigChannelData.scriptPubKey = validateMS.data.scriptPubKey;
 
             const swapEvent = new SwapEvent(`SELLER:STEP1`, this.myInfo.socketId, this.multySigChannelData);
@@ -152,10 +151,10 @@ export class SellSwapper extends Swap {
             //    throw new Error('Signed Hex is undefined for Commit TX');
             //}
 
-            const drtRes = await this.client("decoderawtransaction", [rawtx]);
-            if (drtRes.error || !drtRes.data?.vout) throw new Error(`decoderawtransaction: ${drtRes.error}`);
+            const drtRes = await axios.post("https://api.layerwallet.com/tx/decode", {rawtx});
+            
             const vout = drtRes.data.vout.find((o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address);
-            if (!vout) throw new Error(`decoderawtransaction (2): ${drtRes.error}`);
+            if (!vout) throw new Error(`decoderawtransaction (2) failed`);
             const utxoData = {
                 amount: vout.value,
                 vout: vout.n,
