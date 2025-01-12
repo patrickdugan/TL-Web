@@ -56,6 +56,7 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
   try {
     // Use actual variables `m` and `pubkeys` in the payload
     const payload = { m, pubkeys };
+    console.log('about to call window with multisig params '+JSON.stringify(payload))
     return await window.myWallet!.sendRequest('addMultisig', payload); // Non-null assertion
   } catch (error) {
     console.error('Error adding multisig address:', error);
