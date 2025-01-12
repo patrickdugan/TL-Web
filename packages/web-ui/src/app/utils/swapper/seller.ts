@@ -150,11 +150,24 @@ export class SellSwapper extends Swap {
             //} else {
             //    throw new Error('Signed Hex is undefined for Commit TX');
             //}
-
-            const drtRes = await axios.post("https://api.layerwallet.com/tx/decode", {rawtx});
             
-            const vout = drtRes.data.vout.find((o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address);
-            if (!vout) throw new Error(`decoderawtransaction (2) failed`);
+            const drtRes = await this.txsService.decode(rawtx);
+
+            // Parse the raw JSON string into an object
+            const decodedData = typeof drtRes.data === 'string' ? JSON.parse(drtRes.data) : drtRes.data;
+
+            if (!decodedData?.vout) {
+              throw new Error(`decoderawtransaction failed`);
+            }
+
+            const vout = decodedData.vout.find(
+              (o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address
+            );
+
+            if (!vout) {
+              throw new Error(`decoderawtransaction (2) failed`);
+            }
+
             const utxoData = {
                 amount: vout.value,
                 vout: vout.n,
@@ -175,16 +188,11 @@ export class SellSwapper extends Swap {
     private async onStep4(cpId: string, psbtHex: string) {
             this.logTime('Step 4 Start');
        try{
-            //if (cpId !== this.cpInfo.socketId) return console.log(`Error with p2p connection`);
-            //if (!psbtHex) throw new Error(`PsbtHex for syncing not provided`);
-            console.log('params for the errs I commented '+psbtHex+' '+cpId+' '+this.cpInfo.socketId)
-            const wifRes = await this.txsService.getWifByAddress(this.myInfo.keypair.address);
-            if (wifRes.error || !wifRes.data) return console.log(`WIF not found: ${this.myInfo.keypair.address}`);
-            console.log('inside step 4 '+JSON.stringify(wifRes))
-            const signRes = await this.txsService.signPsbt({ wif: wifRes.data, psbtHex });
-            if (signRes.error || !signRes.data?.psbtHex) return console.log(`Sign Tx: ${signRes.error}`);
+            const signRes = await this.txsService.signRawTxWithWallet(psbtHex);
+
+            if (signRes.error || !signRes.data?.signedHex) return console.log(`Sign Tx: ${signRes.error}`);
             console.log('sign res '+JSON.stringify(signRes))
-            const swapEvent = new SwapEvent(`SELLER:STEP5`, this.myInfo.socketId, signRes.data.psbtHex);
+            const swapEvent = new SwapEvent(`SELLER:STEP5`, this.myInfo.socketId, signRes.data.signedHex);
             this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent); 
         } catch (error: any) {
             const errorMessage = error.message || 'Undefined Error';

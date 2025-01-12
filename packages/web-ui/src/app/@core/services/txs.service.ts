@@ -5,6 +5,7 @@ import { AuthService } from "./auth.service";
 import { BalanceService } from "./balance.service";
 import { LoadingService } from "./loading.service";
 import { RpcService, TNETWORK } from "./rpc.service";
+import {WalletService} from "./wallet.service"
 import axios from "axios";
 
 export interface IUTXO {
@@ -78,7 +79,8 @@ export class TxsService {
     private authService: AuthService,
     private loadingService: LoadingService,
     private toastrService: ToastrService,
-    private balanceService: BalanceService
+    private balanceService: BalanceService,
+    private walletService: WalletService
   ) {}
 
   async buildTx(
@@ -108,8 +110,9 @@ export class TxsService {
   async buildLTCITTx(
     buildLTCITTxConfig: IBuildLTCITTxConfig
   ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
+    const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address,buildLTCITTxConfig.buyerKeyPair.pubkey ?? '')
     try {
-      const response = await axios.post(`${this.baseUrl}/tx/buildLTCITTx`, { params: buildLTCITTxConfig });
+      const response = await window.myWallet?.sendRequest("buildUTXOTrade", { config: buildLTCITTxConfig, outputs: utxos });
       return response.data;
     } catch (error: any) {
       console.error("Error in buildLTCITTx:", error.message);
@@ -117,13 +120,29 @@ export class TxsService {
     }
   }
 
+  async fetchUTXOs(address: string, pubkey:string): Promise<{ data?: string; error?: string }>{
+      if(this.balanceService.NETWORK=="LTCTEST"){
+          this.baseUrl = 'https://testnet-api.layerwallet.com'
+          console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+      }
+
+      try {
+        const response = await axios.post(`${this.baseUrl}/address/utxo/$address`,{pubkey});
+        return response.data;
+      } catch (error: any) {
+        console.error('Error in getChainInfo:', error.message);
+        return error;
+      }  
+  }
+
   async signRawTxWithWallet(
     txHex: string
   ): Promise<{ data: { isValid: boolean; signedHex?: string }; error?: string }> {
     try {
-      const result = await this.rpcService.rpc("signrawtransactionwithwallet", [txHex]);
+      const result = await this.walletService.signTransaction(txHex);
+      const parsed = JSON.parse(result)
       return {
-        data: { isValid: result.data.complete, signedHex: result.data.hex },
+        data: { isValid: parsed.data.complete, signedHex: parsed.data.hex },
       };
     } catch (error: any) {
       console.error("Error in signRawTxWithWallet:", error.message);
@@ -212,8 +231,23 @@ export class TxsService {
     }
   }
 
+async decode(rawTx:string): Promise<{ data?: string; error?: string }>{
+    if(this.balanceService.NETWORK=="LTCTEST"){
+          this.baseUrl = 'https://testnet-api.layerwallet.com'
+          console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+      }
+
+      try {
+        const response = await axios.post('${this.baseUrl}/tx/decode',{rawTx});
+        return response.data;
+      } catch (error: any) {
+        console.error('Error in getChainInfo:', error.message);
+        return error;
+      }
+}
+
 async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
-    if(this.rpcService.NETWORK=="LTCTEST"){
+    if(this.balanceService.NETWORK=="LTCTEST"){
       this.baseUrl = 'https://testnet-api.layerwallet.com'
       console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
     }
@@ -234,16 +268,33 @@ async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
   }
 }
 
+async getChainInfo(): Promise<{ data?: string; error?: string }>{
+      if(this.balanceService.NETWORK=="LTCTEST"){
+          this.baseUrl = 'https://testnet-api.layerwallet.com'
+          console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+      }
 
-
-
-    async predictColumn(channel: string, cpAddress: string) {
       try {
-        const response = await axios.post(`${this.baseUrl}/${this.network}/rpc/tl_getChannelColumn`, { params: [channel, cpAddress] });
+        const response = await axios.post('${this.baseUrl}/chain/info');
+        return response.data;
+      } catch (error: any) {
+        console.error('Error in getChainInfo:', error.message);
+        return error;
+      }
+}
+
+
+    async predictColumn(myAddress: string, cpAddress: string): Promise<{ data?: string; error?: string }>{
+      if(this.balanceService.NETWORK=="LTCTEST"){
+        this.baseUrl = 'https://testnet-api.layerwallet.com'
+        console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+      }
+      try {
+        const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannelColumn`, { myAddress, cpAddress });
         return response.data;
       } catch (error: any) {
         console.error('Error in predictColumn:', error.message);
-        return false;
+        return error;
       }
     }
 
@@ -263,8 +314,12 @@ async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
         retriesLeft: number,
         ms: number
       ): Promise<{ data?: string; error?: string }> => {
+      if(this.balanceService.NETWORK=="LTCTEST"){
+        this.baseUrl = 'https://testnet-api.layerwallet.com'
+        console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
+      }
         try {
-          const result = await axios.post(`${this.baseUrl}/${this.network}/tx/sendrawtransaction`, { params: [rawTx] });
+          const result = await axios.post(`${this.baseUrl}/tx/sendTx`, {rawTx});
           return result.data;
         } catch (error: any) {
           if (retriesLeft > 0 && error.message.includes('bad-txns-inputs-missingorspent')) {
