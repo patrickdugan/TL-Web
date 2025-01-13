@@ -113,7 +113,7 @@ export class TxsService {
   try {
     // Fetch account details from balanceService
     const allAccounts = this.balanceService.allAccounts; // Assuming this returns an array of accounts with `address` and `pubkey`
-    
+    console.log('before checking for pubkey '+buildLTCITTxConfig.buyerKeyPair.pubkey)
     // Match the address and find the corresponding pubkey if available
     const matchingAccount = allAccounts.find(
       (account) => account.address === buildLTCITTxConfig.buyerKeyPair.address
@@ -121,7 +121,7 @@ export class TxsService {
 
     // Use the pubkey from the matched account or fallback to the one in the config
     const pubkey = matchingAccount?.pubkey || buildLTCITTxConfig.buyerKeyPair.pubkey || '';
-
+    console.log('about to call for utxo in build ltc trade '+buildLTCITTxConfig.buyerKeyPair.address+' '+pubkey )
     // Fetch UTXOs
     const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address, pubkey);
 
@@ -144,9 +144,10 @@ export class TxsService {
           this.baseUrl = 'https://testnet-api.layerwallet.com'
           console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
       }
-
+      const uri = this.baseUrl+'/address/utxo/'+address 
+      console.log(uri)
       try {
-        const response = await axios.post(`${this.baseUrl}/address/utxo/$address`,{pubkey});
+        const response = await axios.post(uri,{pubkey});
         return response.data;
       } catch (error: any) {
         console.error('Error in fetch UTXOs:', error.message);
