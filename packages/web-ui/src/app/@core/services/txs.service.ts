@@ -275,7 +275,7 @@ async getChainInfo(): Promise<{ data?: string; error?: string }>{
       }
 
       try {
-        const response = await axios.post(`${this.baseUrl}/chain/info`);
+        const response = await axios.get(`${this.baseUrl}/chain/info`);
         return response.data;
       } catch (error: any) {
         console.error('Error in getChainInfo:', error.message);
