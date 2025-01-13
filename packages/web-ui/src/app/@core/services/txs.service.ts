@@ -130,7 +130,7 @@ export class TxsService {
         const response = await axios.post(`${this.baseUrl}/address/utxo/$address`,{pubkey});
         return response.data;
       } catch (error: any) {
-        console.error('Error in getChainInfo:', error.message);
+        console.error('Error in fetch UTXOs:', error.message);
         return error;
       }  
   }
@@ -241,7 +241,7 @@ async decode(rawTx:string): Promise<{ data?: string; error?: string }>{
         const response = await axios.post('${this.baseUrl}/tx/decode',{rawTx});
         return response.data;
       } catch (error: any) {
-        console.error('Error in getChainInfo:', error.message);
+        console.error('Error in decode:', error.message);
         return error;
       }
 }
@@ -275,7 +275,7 @@ async getChainInfo(): Promise<{ data?: string; error?: string }>{
       }
 
       try {
-        const response = await axios.post('${this.baseUrl}/chain/info');
+        const response = await axios.post(`${this.baseUrl}/chain/info`);
         return response.data;
       } catch (error: any) {
         console.error('Error in getChainInfo:', error.message);
