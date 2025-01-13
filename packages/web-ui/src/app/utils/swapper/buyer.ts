@@ -67,6 +67,7 @@ export class BuySwapper extends Swap {
         }
             const amaRes = await this.walletService.addMultisig(2, pubKeys);
             console.log('adding multisig from wallet '+JSON.stringify(amaRes))
+            console.log('matching redeem keys '+amaRes.redeemKey + ' '+msData.redeemScript)
             if (amaRes.redeemKey !== msData.redeemScript) throw new Error(`redeemScript of Multysig is not matching`);
             this.multySigChannelData = msData;
             const swapEvent = new SwapEvent('BUYER:STEP2', this.myInfo.socketId);
@@ -84,7 +85,8 @@ export class BuySwapper extends Swap {
             if (cpId !== this.cpInfo.socketId) throw new Error(`Error with p2p connection`);
             if (!this.multySigChannelData) throw new Error(`Wrong Multisig Data Provided`);
 
-            const gbcRes = await this.txsService.getChainInfo();let chainInfo;
+            const gbcRes = await this.txsService.getChainInfo();
+            let chainInfo;
 
             if (typeof gbcRes === 'string') {
                 // Parse the string response
