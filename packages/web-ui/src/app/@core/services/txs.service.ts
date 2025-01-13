@@ -108,7 +108,7 @@ export class TxsService {
   }
 
  async buildLTCITTx(
-  buildLTCITTxConfig: IBuildLTCITTxConfig
+  buildLTCITTxConfig: IBuildLTCITTxConfig, satsPaid: number
 ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
   try {
     // Fetch account details from balanceService
@@ -129,6 +129,8 @@ export class TxsService {
     const response = await window.myWallet?.sendRequest("buildUTXOTrade", {
       config: buildLTCITTxConfig,
       outputs: utxos,
+      network: this.balanceService.NETWORK,
+      satsPaid: satsPaid
     });
 
     return response.data;
