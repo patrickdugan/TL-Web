@@ -107,18 +107,37 @@ export class TxsService {
     }
   }
 
-  async buildLTCITTx(
-    buildLTCITTxConfig: IBuildLTCITTxConfig
-  ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
-    const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address,buildLTCITTxConfig.buyerKeyPair.pubkey ?? '')
-    try {
-      const response = await window.myWallet?.sendRequest("buildUTXOTrade", { config: buildLTCITTxConfig, outputs: utxos });
-      return response.data;
-    } catch (error: any) {
-      console.error("Error in buildLTCITTx:", error.message);
-      return { error: error.message };
-    }
+ async buildLTCITTx(
+  buildLTCITTxConfig: IBuildLTCITTxConfig
+): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
+  try {
+    // Fetch account details from balanceService
+    const allAccounts = this.balanceService.allAccounts; // Assuming this returns an array of accounts with `address` and `pubkey`
+    
+    // Match the address and find the corresponding pubkey if available
+    const matchingAccount = allAccounts.find(
+      (account) => account.address === buildLTCITTxConfig.buyerKeyPair.address
+    );
+
+    // Use the pubkey from the matched account or fallback to the one in the config
+    const pubkey = matchingAccount?.pubkey || buildLTCITTxConfig.buyerKeyPair.pubkey || '';
+
+    // Fetch UTXOs
+    const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address, pubkey);
+
+    // Send the buildUTXOTrade request
+    const response = await window.myWallet?.sendRequest("buildUTXOTrade", {
+      config: buildLTCITTxConfig,
+      outputs: utxos,
+    });
+
+    return response.data;
+  } catch (error: any) {
+    console.error("Error in buildLTCITTx:", error.message);
+    return { error: error.message };
   }
+}
+
 
   async fetchUTXOs(address: string, pubkey:string): Promise<{ data?: string; error?: string }>{
       if(this.balanceService.NETWORK=="LTCTEST"){
