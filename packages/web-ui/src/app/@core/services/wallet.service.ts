@@ -51,7 +51,7 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
     }
   }
 
-  async addMultisig(m: number, pubkeys: string[]): Promise<{ address: string; redeemKey?: string }> {
+  async addMultisig(m: number, pubkeys: string[]): Promise<{ address: string; redeemScript?: string }> {
   this.ensureWalletAvailable();
   try {
     // Use actual variables `m` and `pubkeys` in the payload
