@@ -55,10 +55,10 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
 
   async addMultisig(m: number, pubkeys: string[]): Promise<{ address: string; redeemScript?: string }> {
   this.ensureWalletAvailable();
-
+const payload = { m, pubkeys, network: this.balanceService.NETWORK};
   try {
     // Use actual variables `m` and `pubkeys` in the payload
-    const payload = { m, pubkeys, network: this.balanceService.NETWORK};
+    
     console.log('about to call window with multisig params '+JSON.stringify(payload))
     return await window.myWallet!.sendRequest('addMultisig', payload); // Non-null assertion
   } catch (error) {
