@@ -75,7 +75,7 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
   async signTransaction(transaction: string): Promise<string> {
     this.ensureWalletAvailable();
     try {
-      return await window.myWallet!.sendRequest('signTx', { transaction }); // Non-null assertion
+      return await window.myWallet!.sendRequest('signTransaction', { transaction }); // Non-null assertion
     } catch (error) {
       console.error('Error signing transaction:', error);
       throw new Error('Failed to sign transaction');
