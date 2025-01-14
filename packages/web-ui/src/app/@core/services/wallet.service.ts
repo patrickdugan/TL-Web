@@ -55,7 +55,10 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
 
   async addMultisig(m: number, pubkeys: string[]): Promise<{ address: string; redeemScript?: string }> {
   this.ensureWalletAvailable();
-const payload = { m, pubkeys, network: this.balanceService.NETWORK};
+
+  console.log('showing network in walletService '+this.balanceService.NETWORK)
+
+  const payload = { m, pubkeys, network: this.balanceService.NETWORK};
 
     console.log('about to call window with multisig params '+JSON.stringify(payload))
   try {
