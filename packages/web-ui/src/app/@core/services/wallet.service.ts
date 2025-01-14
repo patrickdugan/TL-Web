@@ -71,11 +71,10 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
   }
 }
 
-
-  async signTransaction(transaction: string): Promise<string> {
+ async signTransaction(transaction: string, network: string): Promise<string> {
     this.ensureWalletAvailable();
     try {
-      return await window.myWallet!.sendRequest('signTransaction', { transaction }); // Non-null assertion
+      return await window.myWallet!.sendRequest('signTransaction', { transaction, network }); // Non-null assertion
     } catch (error) {
       console.error('Error signing transaction:', error);
       throw new Error('Failed to sign transaction');
@@ -85,7 +84,7 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
   async signPSBT(psbt: string): Promise<string> {
     this.ensureWalletAvailable();
     try {
-      return await window.myWallet!.sendRequest('signPSBT', { psbt }); // Non-null assertion
+      return await window.myWallet!.sendRequest('signPSBT', { transaction:psbt, network: this.balanceService.NETWORK }); // Non-null assertion
     } catch (error) {
       console.error('Error signing PSBT:', error);
       throw new Error('Failed to sign PSBT');

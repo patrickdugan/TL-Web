@@ -320,9 +320,9 @@ export class BuySwapper extends Swap {
         if (!psbtHex) return this.terminateTrade('Step 5: PsbtHex Not Provided');
         
         
-        const signRes = await this.txsService.signRawTxWithWallet(psbtHex);
+        const signRes = await this.txsService.signPsbt(psbtHex);
         if (signRes.error || !signRes.data) return this.terminateTrade(`Step 5: signPsbt: ${signRes.error}`);
-        if (!signRes.data.isValid || !signRes.data.signedHex) return this.terminateTrade(`Step 5: Transaction not Fully Synced`);
+        if (!signRes.data.isValid || !signRes.data.finalHex) return this.terminateTrade(`Step 5: Transaction not Fully Synced`);
          const currentTime = Date.now();
         // Notify user that signing is done and the process will wait for UTXOs to appear in mempool
         this.toastrService.info(`Signed! ${currentTime - this.tradeStartTime} ms`);
@@ -336,7 +336,7 @@ export class BuySwapper extends Swap {
 
         //if (!isInMempool) return this.terminateTrade('Step 5: UTXOs not found in mempool after multiple attempts.');
 
-        const finalTxIdRes = await this.txsService.sendTxWithSpecRetry(signRes.data.signedHex);
+        const finalTxIdRes = await this.txsService.sendTxWithSpecRetry(signRes.data.finalHex);
         if (finalTxIdRes.error || !finalTxIdRes.data) return this.terminateTrade(`Step 5: sendRawTransaction: ${finalTxIdRes.error}` || `Error with sending Raw Tx`);
         
         if (this.readyRes) this.readyRes({ data: { txid: finalTxIdRes.data, seller: false, trade: this.tradeInfo } });

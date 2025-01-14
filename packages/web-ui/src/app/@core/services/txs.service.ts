@@ -169,7 +169,7 @@ export class TxsService {
     txHex: string
   ): Promise<{ data: { isValid: boolean; signedHex?: string }; error?: string }> {
     try {
-      const result = await this.walletService.signTransaction(txHex);
+      const result = await this.walletService.signTransaction(txHex,this.balanceService.NETWORK);
       const parsed = JSON.parse(result)
       return {
         data: { isValid: parsed.data.complete, signedHex: parsed.data.hex },
@@ -200,7 +200,7 @@ export class TxsService {
       this.loadingService.isLoading = true;
 
       // Sign transaction using wallet
-      const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: buildTxConfig });
+      const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: buildTxConfig, network: this.balanceService.NETWORK });
       if (!signResponse || !signResponse.success) {
         return { error: signResponse?.error || "Failed to sign transaction." };
       }
@@ -223,7 +223,7 @@ export class TxsService {
     }
   }
 
-  async signPsbt(signPsbtConfig: ISignPsbtConfig): Promise<{
+  async signPsbt(psbtHex: string): Promise<{
     data?: {
       psbtHex: string;
       isValid: boolean;
@@ -238,9 +238,8 @@ export class TxsService {
       }
 
       const response = await window.myWallet.sendRequest("signPsbt", {
-        psbtHex: signPsbtConfig.psbtHex,
-        redeemKey: signPsbtConfig.redeem,
-        network: signPsbtConfig.network,
+        psbtHex: psbtHex,
+        network: this.balanceService.NETWORK,
       });
 
       if (!response || !response.success) {
