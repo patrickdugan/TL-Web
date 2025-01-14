@@ -15,6 +15,7 @@ export interface IUTXO {
   redeemScript?: string;
   txid: string;
   vout: number;
+  pubkey?: string;
 }
 
 export interface ISignTxConfig {
