@@ -109,7 +109,7 @@ class MyWalletProvider extends EventEmitter {
   keepAlive() {
     setInterval(() => {
       this.sendRequest('keepAlive', {});
-    }, 10000);
+    }, 20000);
   }
 
   handleAccountsChanged(accounts) {

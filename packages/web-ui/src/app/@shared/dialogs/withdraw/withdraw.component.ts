@@ -129,17 +129,9 @@ export class WithdrawDialog {
                 } else {
                     txOptions.amount = amount
                 }
-                const payload = {pubkey:''}
 
-                const network = this.rpcService.NETWORK
-                let url = 'https://api.layerwallet.com'
-                if(network=='LTCTEST'){
-                    url = 'https://testnet-api.layerwallet.com'
-                }
-
-                 const { data: unspentUtxos } = await
-                 axios.post(`${url}/address/utxo/${fromAddress}`, payload);
-                 txOptions.inputs= unspentUtxos
+                const balanceObj = this.balanceService.getCoinBalancesByAddress(this.fromAddress);
+                 txOptions.inputs= balanceObj.utxos
                 return { data: txOptions };
             } catch (error: any) {
                 return { error: error.message}
@@ -158,7 +150,7 @@ export class WithdrawDialog {
                 return;
             }
             
-            const res = await this.txsService.buildSignSendTx(txOptionsRes.data);
+            const res = await this.txsService.buildSignSendTx(txOptionsRes.data,);
             if (res.error || !res.data) {
                 this.toastrService.error(res.error, 'Transaction Error');
                 return;
