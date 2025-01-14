@@ -126,12 +126,19 @@ export class TxsService {
     const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address, pubkey);
 
     // Send the buildUTXOTrade request
-    const response = await window.myWallet?.sendRequest("buildUTXOTrade", {
+    /*const response = await window.myWallet?.sendRequest("buildUTXOTrade", {
       config: buildLTCITTxConfig,
       outputs: utxos,
       network: this.balanceService.NETWORK,
       satsPaid: satsPaid
-    });
+    });*/
+
+    if(this.balanceService.NETWORK=="LTCTEST"){
+          this.baseUrl = 'https://testnet-api.layerwallet.com'
+          console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+    }
+    const uri = this.baseUrl+'/tx/buildLTCTradeTx/'
+    const response = await axios.post(uri,{buildLTCITTxConfig});
 
     return response.data;
   } catch (error: any) {

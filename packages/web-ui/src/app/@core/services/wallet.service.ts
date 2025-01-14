@@ -1,10 +1,12 @@
 import { Injectable } from '@angular/core';
+import {BalanceService} from './balance.service'
 
 @Injectable({
   providedIn: 'root',
 })
 export class WalletService {
-  constructor() {
+  constructor(private balanceService: BalanceService) {
+    
     if (!window.myWallet) {
       console.warn('Wallet extension not detected');
     }
@@ -53,9 +55,10 @@ async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
 
   async addMultisig(m: number, pubkeys: string[]): Promise<{ address: string; redeemScript?: string }> {
   this.ensureWalletAvailable();
+
   try {
     // Use actual variables `m` and `pubkeys` in the payload
-    const payload = { m, pubkeys };
+    const payload = { m, pubkeys, network: this.balanceService.NETWORK};
     console.log('about to call window with multisig params '+JSON.stringify(payload))
     return await window.myWallet!.sendRequest('addMultisig', payload); // Non-null assertion
   } catch (error) {
