@@ -124,7 +124,7 @@ export class TxsService {
     const pubkey = matchingAccount?.pubkey || buildLTCITTxConfig.buyerKeyPair.pubkey || '';
     console.log('about to call for utxo in build ltc trade '+buildLTCITTxConfig.buyerKeyPair.address+' '+pubkey )
     // Fetch UTXOs
-    const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address, pubkey);
+    //const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address, pubkey);
 
     // Send the buildUTXOTrade request
     /*const response = await window.myWallet?.sendRequest("buildUTXOTrade", {
@@ -140,7 +140,7 @@ export class TxsService {
     }
     const uri = this.baseUrl+'/tx/buildLTCTradeTx'
     const response = await axios.post(uri,{buildLTCITTxConfig});
-
+    console.log('utxo build response '+JSON.stringify(response))
     return response.data;
   } catch (error: any) {
     console.error("Error in buildLTCITTx:", error.message);
