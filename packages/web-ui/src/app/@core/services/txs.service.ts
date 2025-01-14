@@ -138,7 +138,7 @@ export class TxsService {
           this.baseUrl = 'https://testnet-api.layerwallet.com'
           console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
     }
-    const uri = this.baseUrl+'/tx/buildLTCTradeTx/'
+    const uri = this.baseUrl+'/tx/buildLTCTradeTx'
     const response = await axios.post(uri,{buildLTCITTxConfig});
 
     return response.data;
