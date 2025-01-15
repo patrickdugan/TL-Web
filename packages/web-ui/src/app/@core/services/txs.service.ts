@@ -350,7 +350,7 @@ async getChainInfo(): Promise<{ data?: string; error?: string }>{
       }
         try {
           const result = await axios.post(`${this.baseUrl}/tx/sendTx`, {rawTx});
-          return result.data;
+          return result.data.txid.data;
         } catch (error: any) {
           if (retriesLeft > 0 && error.message.includes('bad-txns-inputs-missingorspent')) {
             await new Promise((resolve) => setTimeout(resolve, ms));
