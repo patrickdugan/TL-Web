@@ -338,6 +338,7 @@ export class BuySwapper extends Swap {
         //if (!isInMempool) return this.terminateTrade('Step 5: UTXOs not found in mempool after multiple attempts.');
 
         const finalTxIdRes = await this.txsService.sendTxWithSpecRetry(signRes.data.finalHex);
+        console.log('send result '+JSON.stringify(finalTxIdRes))
         if (finalTxIdRes?.error || !finalTxIdRes?.data) return this.terminateTrade(`Step 5: sendRawTransaction: ${finalTxIdRes.error}` || `Error with sending Raw Tx`);
         
         if (this.readyRes) this.readyRes({ data: { txid: finalTxIdRes.data, seller: false, trade: this.tradeInfo } });
