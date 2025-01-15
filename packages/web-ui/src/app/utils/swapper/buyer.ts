@@ -322,8 +322,8 @@ export class BuySwapper extends Swap {
         
         
         const signRes = await this.txsService.signPsbt(psbtHex);
-        
-        if (!signRes.data?.isValid || !signRes.data?.finalHex) return this.terminateTrade(`Step 5: Transaction not Fully Synced`);
+        console.log('sign res in step 5 '+JSON.stringify(signRes))
+        if (!signRes.data?.finalHex) return this.terminateTrade(`Step 5: Transaction not Fully Synced`);
          const currentTime = Date.now();
         // Notify user that signing is done and the process will wait for UTXOs to appear in mempool
         this.toastrService.info(`Signed! ${currentTime - this.tradeStartTime} ms`);
