@@ -153,6 +153,7 @@ export class BuySwapper extends Swap {
                     };
                     console.log('build config before querying for LTC tx build '+JSON.stringify(buildOptions))
                     const rawHexRes = await this.txsService.buildLTCITTx(buildOptions,satsPaid);
+
                     console.log('build ltc trade in step 3 '+JSON.stringify(rawHexRes))
                     if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, rawHexRes.data?.psbtHex);
@@ -321,8 +322,8 @@ export class BuySwapper extends Swap {
         
         
         const signRes = await this.txsService.signPsbt(psbtHex);
-        if (signRes.error || !signRes.data) return this.terminateTrade(`Step 5: signPsbt: ${signRes.error}`);
-        if (!signRes.data.isValid || !signRes.data.finalHex) return this.terminateTrade(`Step 5: Transaction not Fully Synced`);
+        
+        if (!signRes.data?.isValid || !signRes.data?.finalHex) return this.terminateTrade(`Step 5: Transaction not Fully Synced`);
          const currentTime = Date.now();
         // Notify user that signing is done and the process will wait for UTXOs to appear in mempool
         this.toastrService.info(`Signed! ${currentTime - this.tradeStartTime} ms`);
@@ -337,7 +338,7 @@ export class BuySwapper extends Swap {
         //if (!isInMempool) return this.terminateTrade('Step 5: UTXOs not found in mempool after multiple attempts.');
 
         const finalTxIdRes = await this.txsService.sendTxWithSpecRetry(signRes.data.finalHex);
-        if (finalTxIdRes.error || !finalTxIdRes.data) return this.terminateTrade(`Step 5: sendRawTransaction: ${finalTxIdRes.error}` || `Error with sending Raw Tx`);
+        if (finalTxIdRes?.error || !finalTxIdRes?.data) return this.terminateTrade(`Step 5: sendRawTransaction: ${finalTxIdRes.error}` || `Error with sending Raw Tx`);
         
         if (this.readyRes) this.readyRes({ data: { txid: finalTxIdRes.data, seller: false, trade: this.tradeInfo } });
                 

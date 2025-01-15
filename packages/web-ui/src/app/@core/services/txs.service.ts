@@ -237,11 +237,12 @@ export class TxsService {
         throw new Error("Wallet extension not available for signing PSBT.");
       }
 
+      console.log('about to call sign Psbt in tx service '+psbtHex+' '+this.balanceService.NETWORK)
       const response = await window.myWallet.sendRequest("signPsbt", {
         psbtHex: psbtHex,
         network: this.balanceService.NETWORK,
       });
-
+      console.log('response in sign PSBT '+JSON.stringify(response))
       if (!response || !response.success) {
         return { error: response?.error || "Failed to sign PSBT." };
       }
@@ -251,7 +252,7 @@ export class TxsService {
           psbtHex: response.data.psbtHex,
           isValid: response.data.isValid,
           isFinished: response.data.isFinished,
-          finalHex: response.data.finalHex,
+          finalHex: response.data.rawTx,
         },
       };
     } catch (error: any) {
