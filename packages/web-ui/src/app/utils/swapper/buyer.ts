@@ -139,8 +139,8 @@ export class BuySwapper extends Swap {
                         amount: tokensSold,
                         columnA: isA === 1,
                         satsExpected: satsPaid,
-                        tokenOutput: 0,
-                        payToAddress: 1
+                        tokenOutput: 1,
+                        payToAddress: 0
                     });
 
                     console.log('ltc trade payload '+JSON.stringify(payload))
