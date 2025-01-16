@@ -233,15 +233,18 @@ async buildSignSendTxGrabUTXO(
       }
       console.log('sign response '+JSON.stringify(signResponse))
       const signedTx = signResponse.data.rawTx;
+
       console.log('signed tx'+signedTx)
       // Broadcast signed transaction
      const sendResponse = await this.sendTx(signedTx);
+     const commitUTXO = {amount: 0.0000546, confirmations:0, vout: 0, txid: sendResponse.data as string,}
+    
     if (sendResponse.error) {
       return { error: sendResponse.error };
     }
     console.log('Transaction ID:', sendResponse.data);
     
-    return { txid: sendResponse.data, commitUTXO: biggestInput.finalInputs[0] };
+    return { txid: sendResponse.data, commitUTXO: commitUTXO };
     } catch (error: any) {
       console.error("Error in buildSignSendTx:", error.message);
       return { error: error.message };

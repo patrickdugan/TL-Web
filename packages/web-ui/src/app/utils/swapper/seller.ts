@@ -137,7 +137,7 @@ export class SellSwapper extends Swap {
             const commitTxRes = await this.txsService.buildSignSendTxGrabUTXO(commitTxConfig);
             if (commitTxRes.error || !commitTxRes.txid) throw new Error(`Build Commit TX: ${commitTxRes.error}`);
 
-            const commitUTXO = commitTxRes.commitUTXO;
+            let commitUTXO = commitTxRes.commitUTXO;
             
 
             const utxoData = {
@@ -147,7 +147,7 @@ export class SellSwapper extends Swap {
                 scriptPubKey: this.multySigChannelData.scriptPubKey,
                 redeemScript: this.multySigChannelData.redeemScript,
             } as IUTXO;
-
+            console.log('commit utxoData to pass to buyer '+JSON.stringify(utxoData))
             const swapEvent = new SwapEvent(`SELLER:STEP3`, this.myInfo.socketId, utxoData);
             this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (error: any) {
