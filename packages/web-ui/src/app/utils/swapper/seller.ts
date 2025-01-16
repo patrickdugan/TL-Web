@@ -71,10 +71,7 @@ export class SellSwapper extends Swap {
             console.log('showing pubkeys before adding multisig '+JSON.stringify(pubKeys))
             const amaRes = await this.walletService.addMultisig(2, pubKeys)
             this.multySigChannelData = amaRes as IMSChannelData;
-            const validateMS = await axios.get(`https://api.layerwallet.com/address/validate/$this.multySigChannelData.address`)
             
-            this.multySigChannelData.scriptPubKey = validateMS.data.scriptPubKey;
-
             const swapEvent = new SwapEvent(`SELLER:STEP1`, this.myInfo.socketId, this.multySigChannelData);
             this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (error: any) {
@@ -92,7 +89,8 @@ export class SellSwapper extends Swap {
 
             const fromKeyPair = { address: this.myInfo.keypair.address };
             const toKeyPair = { address: this.multySigChannelData.address };
-            const commitTxConfig: IBuildTxConfig = { fromKeyPair, toKeyPair };
+            const amount = 0.0000546
+            const commitTxConfig: IBuildTxConfig = { fromKeyPair, toKeyPair, amount };
 
             let propIdDesired: number = 0;
             let amountDesired: number = 0;
@@ -110,7 +108,8 @@ export class SellSwapper extends Swap {
                     throw new Error('propIdDesired or amountDesired is undefined');
                 }
 
-            const column = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address);
+            const column = 'A' //since only one side has a token on the channel and we use converse keys for LTC trades this function is redundant, also buggy and laggy... await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address);
+            
             const isColumnA = column === 'A';
 
             let payload;
@@ -135,43 +134,16 @@ export class SellSwapper extends Swap {
 
             commitTxConfig.payload = payload;
 
-            const commitTxRes = await this.txsService.buildTx(commitTxConfig);
-            if (commitTxRes.error || !commitTxRes.data) throw new Error(`Build Commit TX: ${commitTxRes.error}`);
+            const commitTxRes = await this.txsService.buildSignSendTxGrabUTXO(commitTxConfig);
+            if (commitTxRes.error || !commitTxRes.txid) throw new Error(`Build Commit TX: ${commitTxRes.error}`);
 
-            const { rawtx } = commitTxRes.data;
-            const signCommitTxRes = await this.txsService.signRawTxWithWallet(rawtx);
-            if (signCommitTxRes.error || !signCommitTxRes.data?.signedHex) throw new Error(`Sign Commit TX: ${signCommitTxRes.error}`);
-
-            const signedHex = signCommitTxRes.data.signedHex;
-            //if (signedHex) {
-                const commitTxSendRes = await this.txsService.sendTx(signedHex);
-                if (commitTxSendRes.error || !commitTxSendRes.data) throw new Error(`Send Commit TX: ${commitTxSendRes.error}`);
-                console.log(`Commit TX sent with txid: ${commitTxSendRes.data}`);
-            //} else {
-            //    throw new Error('Signed Hex is undefined for Commit TX');
-            //}
+            const commitUTXO = commitTxRes.commitUTXO;
             
-            const drtRes = await this.txsService.decode(rawtx);
-
-            // Parse the raw JSON string into an object
-            const decodedData = typeof drtRes.data === 'string' ? JSON.parse(drtRes.data) : drtRes.data;
-
-            if (!decodedData?.vout) {
-              throw new Error(`decoderawtransaction failed`);
-            }
-
-            const vout = decodedData.vout.find(
-              (o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address
-            );
-
-            if (!vout) {
-              throw new Error(`decoderawtransaction (2) failed`);
-            }
 
             const utxoData = {
-                amount: vout.value,
-                vout: vout.n,
-                txid: commitTxSendRes.data,
+                amount: commitUTXO?.amount || 0,
+                vout: commitUTXO?.vout || 0,
+                txid: commitTxRes.txid,
                 scriptPubKey: this.multySigChannelData.scriptPubKey,
                 redeemScript: this.multySigChannelData.redeemScript,
             } as IUTXO;
@@ -188,11 +160,11 @@ export class SellSwapper extends Swap {
     private async onStep4(cpId: string, psbtHex: string) {
             this.logTime('Step 4 Start');
        try{
-            const signRes = await this.txsService.signRawTxWithWallet(psbtHex);
+            const signRes = await this.txsService.signPsbt(psbtHex);
 
-            if (signRes.error || !signRes.data?.signedHex) return console.log(`Sign Tx: ${signRes.error}`);
+            if (signRes.error || !signRes.data?.finalHex) return console.log(`Sign Tx: ${signRes.error}`);
             console.log('sign res '+JSON.stringify(signRes))
-            const swapEvent = new SwapEvent(`SELLER:STEP5`, this.myInfo.socketId, signRes.data.signedHex);
+            const swapEvent = new SwapEvent(`SELLER:STEP5`, this.myInfo.socketId, signRes.data.finalHex);
             this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent); 
         } catch (error: any) {
             const errorMessage = error.message || 'Undefined Error';

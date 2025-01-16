@@ -20,6 +20,7 @@ const emptyBalanceObj = {
 @Injectable({
   providedIn: 'root',
 })
+
 export class BalanceService {
   private url = "https://api.layerwallet.com";
   

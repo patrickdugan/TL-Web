@@ -11,7 +11,7 @@ import axios from "axios";
 export interface IUTXO {
   amount: number;
   confirmations: number;
-  scriptPubKey: string;
+  scriptPubKey?: string;
   redeemScript?: string;
   txid: string;
   vout: number;
@@ -190,6 +190,63 @@ export class TxsService {
     } catch (error: any) {
       console.error("Error checking mempool:", error.message);
       return false;
+    }
+  }
+
+
+getEnoughInputs2(
+  utxos: IUTXO[],
+  amount: number
+): { finalInputs: IUTXO[]; fee: number }{
+  const sortedUtxos = [...utxos].sort((a, b) => b.amount - a.amount); // Sort by amount (largest first)
+  const finalInputs: IUTXO[] = [];
+  let total = 0;
+
+  for (const utxo of sortedUtxos) {
+    finalInputs.push(utxo);
+    total += utxo.amount;
+    if (total >= amount) break;
+  }
+
+  if (total < amount) {
+    throw new Error('Not enough UTXOs to cover the required amount');
+  }
+
+  const fee = 0.00001; // Example static fee, adjust dynamically if needed
+  return { finalInputs, fee };
+};
+
+async buildSignSendTxGrabUTXO(
+    buildTxConfig: IBuildTxConfig
+  ): Promise<{ txid?: string; commitUTXO?: IUTXO; error?: string }> {
+    try {
+      this.loadingService.isLoading = true;
+    const UTXOs = this.balanceService.allBalances[buildTxConfig.fromKeyPair.address]?.coinBalance?.utxos;
+
+      const biggestInput = this.getEnoughInputs2(UTXOs,0.0000546)
+      buildTxConfig.inputs=biggestInput.finalInputs
+
+      // Sign transaction using wallet
+      const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: buildTxConfig, network: this.balanceService.NETWORK });
+      if (!signResponse || !signResponse.success) {
+        return { error: signResponse?.error || "Failed to sign transaction." };
+      }
+      console.log('sign response '+JSON.stringify(signResponse))
+      const signedTx = signResponse.data.rawTx;
+      console.log('signed tx'+signedTx)
+      // Broadcast signed transaction
+     const sendResponse = await this.sendTx(signedTx);
+    if (sendResponse.error) {
+      return { error: sendResponse.error };
+    }
+    console.log('Transaction ID:', sendResponse.data);
+    
+    return { txid: sendResponse.data, commitUTXO: biggestInput.finalInputs[0] };
+    } catch (error: any) {
+      console.error("Error in buildSignSendTx:", error.message);
+      return { error: error.message };
+    } finally {
+      this.loadingService.isLoading = false;
     }
   }
 
