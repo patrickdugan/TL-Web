@@ -71,7 +71,7 @@ export class SellSwapper extends Swap {
             console.log('showing pubkeys before adding multisig '+JSON.stringify(pubKeys))
             const amaRes = await this.walletService.addMultisig(2, pubKeys)
             this.multySigChannelData = amaRes as IMSChannelData;
-            
+            console.log('multisig object '+this.multySigChannelData)
             const swapEvent = new SwapEvent(`SELLER:STEP1`, this.myInfo.socketId, this.multySigChannelData);
             this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (error: any) {
@@ -160,7 +160,7 @@ export class SellSwapper extends Swap {
     private async onStep4(cpId: string, psbtHex: string) {
             this.logTime('Step 4 Start');
        try{
-            const signRes = await this.txsService.signPsbt(psbtHex);
+            const signRes = await this.txsService.signPsbt(psbtHex, true);
 
             if (signRes.error || !signRes.data?.finalHex) return console.log(`Sign Tx: ${signRes.error}`);
             console.log('sign res '+JSON.stringify(signRes))

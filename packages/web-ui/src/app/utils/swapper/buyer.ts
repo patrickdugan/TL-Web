@@ -321,7 +321,7 @@ export class BuySwapper extends Swap {
         if (!psbtHex) return this.terminateTrade('Step 5: PsbtHex Not Provided');
         
         
-        const signRes = await this.txsService.signPsbt(psbtHex);
+        const signRes = await this.txsService.signPsbt(psbtHex,false);
         console.log('sign res in step 5 '+JSON.stringify(signRes))
         if (!signRes.data?.finalHex) return this.terminateTrade(`Step 5: Transaction not Fully Synced`);
          const currentTime = Date.now();

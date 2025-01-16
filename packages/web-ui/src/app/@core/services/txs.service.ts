@@ -280,7 +280,7 @@ async buildSignSendTxGrabUTXO(
     }
   }
 
-  async signPsbt(psbtHex: string): Promise<{
+  async signPsbt(psbtHex: string, sellerFlag: boolean): Promise<{
     data?: {
       psbtHex: string;
       isValid: boolean;
@@ -298,6 +298,7 @@ async buildSignSendTxGrabUTXO(
       const response = await window.myWallet.sendRequest("signPsbt", {
         psbtHex: psbtHex,
         network: this.balanceService.NETWORK,
+        sellerFlag: sellerFlag,
       });
       console.log('response in sign PSBT '+JSON.stringify(response))
       if (!response || !response.success) {
