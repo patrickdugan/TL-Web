@@ -68,7 +68,8 @@ export class BuySwapper extends Swap {
             const amaRes = await this.walletService.addMultisig(2, pubKeys);
             console.log('adding multisig from wallet '+JSON.stringify(amaRes))
             console.log('matching redeem keys '+amaRes.redeemScript + ' '+msData.redeemScript)
-            if (amaRes.redeemScript !== msData.redeemScript) throw new Error(`redeemScript of Multysig is not matching`);
+                if (amaRes.redeemScript !== msData.redeemScript) throw new Error(`redeemScript of Multysig is not matching`);
+            
             this.multySigChannelData = msData;
             const swapEvent = new SwapEvent('BUYER:STEP2', this.myInfo.socketId);
             console.log('swap event in step 1 '+swapEvent)

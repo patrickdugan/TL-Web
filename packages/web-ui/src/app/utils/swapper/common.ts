@@ -36,6 +36,7 @@ export interface IFuturesTradeProps {
 export interface IMSChannelData {
     address: string;
     redeemScript: string;
+    witnessScript?: string;
     scriptPubKey?: string;
 };
 
