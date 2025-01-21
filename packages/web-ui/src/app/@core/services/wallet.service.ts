@@ -22,10 +22,10 @@ export class WalletService {
     return !!window.myWallet;
   }
 
-async requestAccounts(): Promise<{ address: string; pubkey?: string }[]> {
+async requestAccounts(network?:string): Promise<{ address: string; pubkey?: string }[]> {
   this.ensureWalletAvailable();
   try {
-    const accounts = await window.myWallet!.sendRequest('requestAccounts', {});
+    const accounts = await window.myWallet!.sendRequest('requestAccounts', {network:network});
     if (!accounts || accounts.length === 0) {
       throw new Error('No accounts returned by the wallet');
     }

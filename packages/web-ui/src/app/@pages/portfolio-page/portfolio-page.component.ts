@@ -141,7 +141,7 @@ export class PortfolioPageComponent implements OnInit {
 
       console.log('attest payload '+attestationPayload+' '+_address)
 
-       const accounts = await this.walletService.requestAccounts();
+       const accounts = await this.walletService.requestAccounts(this.balanceService.NETWORK);
         console.log("Accounts with pubkeys:", accounts);
         let _pubkey = ''
         for (const account of accounts) {

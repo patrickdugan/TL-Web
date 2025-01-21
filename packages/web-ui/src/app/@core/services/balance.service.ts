@@ -85,7 +85,7 @@ export class BalanceService {
     }
 
     try {
-        const accounts = await this.walletService.requestAccounts();
+        const accounts = await this.walletService.requestAccounts(this._NETWORK);
         console.log("Accounts with pubkeys:", accounts);
 
         // Store accounts for synchronous access

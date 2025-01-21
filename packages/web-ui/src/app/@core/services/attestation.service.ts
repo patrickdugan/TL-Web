@@ -4,6 +4,7 @@ import { AuthService } from "./auth.service";
 import { RpcService } from "./rpc.service";
 import { ApiService } from "./api.service";
 import {WalletService} from "./wallet.service"
+import {BalanceService} from "./balance.service"
 import axios from 'axios'
 
 @Injectable({
@@ -24,7 +25,8 @@ export class AttestationService {
         private rpcService: RpcService,
         private apiService: ApiService,
         private walletService: WalletService,
-        private toastrService: ToastrService
+        private toastrService: ToastrService,
+        private balanceService: BalanceService
     ) { }
 
     private readonly CRIMINAL_IP_API_KEY = "RKohp7pZw3LsXBtbmU3vcaBByraHPzDGrDnE0w1vI0qTEredJnMPfXMRS7Rk";
@@ -55,7 +57,7 @@ export class AttestationService {
 
     private async checkAllAtt() {
         try {
-            const accounts = await this.walletService.requestAccounts();
+            const accounts = await this.walletService.requestAccounts(this.balanceService.NETWORK);
             const addresses = accounts.map((account) => account.address);
             console.log('Addresses fetched from wallet: ', addresses);
 

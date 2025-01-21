@@ -145,7 +145,7 @@ export class WithdrawDialog {
             if (!this.amount || !this.fromAddress || !this.toAddress || !this.propId) throw new Error('Fill all required data');
             
             const txOptionsRes = await this.getTxOptions(this.fromAddress, this.toAddress, this.amount, this.propId);
-            if (txOptionsRes.error || !txOptionsRes.data)  {
+            if (txOptionsRes.error || !txOptionsRes.data){
                 this.toastrService.error(txOptionsRes.error, 'Transaction Options Error');
                 return;
             }
