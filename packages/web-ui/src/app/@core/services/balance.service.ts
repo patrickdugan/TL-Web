@@ -136,7 +136,7 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
 
     try {
       const payload = { pubkey };
-      console.log('balance utxo query '+`${this.url}/address/utxo/${address}`)
+      console.log('balance utxo query '+`${this.url}/address/utxo/${address}` +JSON.stringify(payload))
       const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${address}`, payload);
 
 
