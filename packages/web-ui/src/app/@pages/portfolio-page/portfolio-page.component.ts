@@ -169,7 +169,6 @@ export class PortfolioPageComponent implements OnInit {
         fromKeyPair: { address: _address },
         toKeyPair:   { address: _address }, // e.g. same address if needed
         amount:      0.0000564,
-        network:     'LTCTEST',
         payload:     attestationPayload,
         inputs:      unspentUtxos,  // pass your newly-fetched UTXOs
       });

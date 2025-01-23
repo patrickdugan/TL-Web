@@ -38,7 +38,6 @@ export interface IBuildTxConfig {
   amount?: number;
   payload?: string;
   addPsbt?: boolean;
-  network?: TNETWORK;
 }
 
 export interface IBuildTradeConfig {
