@@ -57,7 +57,8 @@ async requestAccounts(network?:string): Promise<{ address: string; pubkey?: stri
   this.ensureWalletAvailable();
 
   console.log('showing network in walletService '+this.balanceService.NETWORK)
-
+  let network = this.balanceService.NETWORK || "LTC"
+  if(!network){network = "LTC"}
   const payload = { m, pubkeys, network: this.balanceService.NETWORK};
 
     console.log('about to call window with multisig params '+JSON.stringify(payload))
