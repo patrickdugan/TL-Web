@@ -49,6 +49,7 @@ export class BalanceService {
   }
 
   set NETWORK(network: string) {
+    console.log('setting network '+network)
     this._NETWORK = network; // Assign to the backing field
   }
 
