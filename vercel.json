@@ -8,17 +8,7 @@
   ],
   "redirects": [
     {
-      "source": "/404",
-      "destination": "/",
-      "statusCode": 307
-    },
-    {
-      "source": "/portfolio",
-      "destination": "/",
-      "statusCode": 307
-    },
-    {
-      "source": "/:path*",
+      "source": "/*",
       "destination": "/",
       "statusCode": 307
     }
