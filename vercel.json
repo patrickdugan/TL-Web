@@ -16,7 +16,23 @@
       "source": "/:path*",
       "destination": "/",
       "statusCode": 307
+    },
+	{
+      "source": "/portfolio",
+      "destination": "/",
+      "statusCode": 307
+    },
+	{
+      "source": "/spot",
+      "destination": "/",
+      "statusCode": 307
+    },
+	{
+      "source": "/futures",
+      "destination": "/",
+      "statusCode": 307
     }
+
 
   ]
 }
