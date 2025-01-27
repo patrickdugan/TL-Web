@@ -8,8 +8,16 @@
   ],
   "redirects": [
     {
-      "source": "/:path*", 
+      "source": "/404", 
       "destination": "/", 
+      "statusCode": 307
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        { "type": "header", "key": "x-missing-path" }
+      ],
+      "destination": "/",
       "statusCode": 307
     }
   ],
