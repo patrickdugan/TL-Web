@@ -6,6 +6,13 @@
       "use": "@vercel/static"
     }
   ],
+"redirects": [
+    {
+      "source": "/:path*", // Matches all paths
+      "destination": "/", // Redirect to the homepage
+      "statusCode": 307
+    }
+  ]
   "routes": [
     {
       "src": "/(.*)",

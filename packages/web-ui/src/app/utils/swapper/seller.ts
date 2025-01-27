@@ -69,7 +69,10 @@ export class SellSwapper extends Swap {
             }
         }
             console.log('showing pubkeys before adding multisig '+JSON.stringify(pubKeys))
-            const amaRes = await this.walletService.addMultisig(2, pubKeys)
+            let amaRes = await this.walletService.addMultisig(2, pubKeys)
+            if(!amaRes||amaRes==undefined){
+                amaRes = await this.walletService.addMultisig(2, pubKeys)
+            }
             this.multySigChannelData = amaRes as IMSChannelData;
             console.log('amaRes '+JSON.stringify(amaRes))
             console.log('multisig object '+JSON.stringify(this.multySigChannelData))
