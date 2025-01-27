@@ -18,12 +18,5 @@
       "statusCode": 307
     }
 
-  ],
-
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/packages/web-ui/dist/index.html"
-    }
   ]
 }
