@@ -8,20 +8,17 @@
   ],
   "redirects": [
     {
-      "source": "/404", 
-      "destination": "/", 
+      "source": "/404",
+      "destination": "/",
       "statusCode": 307
     },
-  {
-    "source": "/portfolio",
-    "destination": "/",
-    "statusCode": 307
-  }
+    {
+      "source": "/portfolio",
+      "destination": "/",
+      "statusCode": 307
+    },
     {
       "source": "/:path*",
-      "has": [
-        { "type": "header", "key": "x-missing-path" }
-      ],
       "destination": "/",
       "statusCode": 307
     }
