@@ -1,0 +1,10 @@
+{
+    "redirects": [
+      {
+        "source": "/404",
+        "destination": "/",
+        "statusCode": 307
+      }
+    ]
+  }
+  
