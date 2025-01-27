@@ -12,6 +12,11 @@
       "destination": "/", 
       "statusCode": 307
     },
+  {
+    "source": "/portfolio",
+    "destination": "/",
+    "statusCode": 307
+  }
     {
       "source": "/:path*",
       "has": [
