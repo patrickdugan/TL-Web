@@ -6,17 +6,17 @@
       "use": "@vercel/static"
     }
   ],
-"redirects": [
+  "redirects": [
     {
-      "source": "/:path*", // Matches all paths
-      "destination": "/", // Redirect to the homepage
+      "source": "/:path*", 
+      "destination": "/", 
       "statusCode": 307
     }
-  ]
-  "routes": [
+  ],
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/packages/web-ui/dist/index.html"
+      "source": "/(.*)",
+      "destination": "/packages/web-ui/dist/index.html"
     }
   ]
 }
