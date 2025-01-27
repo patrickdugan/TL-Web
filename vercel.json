@@ -11,8 +11,15 @@
       "source": "/404",
       "destination": "/",
       "statusCode": 307
+    },
+ 	{
+      "source": "/:path*",
+      "destination": "/",
+      "statusCode": 307
     }
+
   ],
+
   "rewrites": [
     {
       "source": "/(.*)",
