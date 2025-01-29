@@ -8,12 +8,12 @@ const encodeSend = (params: { sendAll: boolean, address: string, propertyId: num
     const encodeAmount = (amt: number) => {
         const scaledAmt = new BigNumber(amt).times(1e8);
         const isWholeNumber = scaledAmt.modulo(1).isZero(); // Check if it's an integer
-
+        console.log('is whole number '+isWholeNumber)
         return isWholeNumber
             ? scaledAmt.integerValue().toString(36) // Normal encoding
-            : scaledAmt.integerValue().toString(36) + 'd'; // Add 'd' flag for decimal mode
+            : scaledAmt.integerValue().toString(36) + '~'; // Add 'd' flag for decimal mode
     };
-
+    console.log('encodedAmount '+encodeAmount)
     if (Array.isArray(params.propertyId) && Array.isArray(params.amount)) {
         const payload = [
             '0',
