@@ -118,7 +118,7 @@ export class WithdrawDialog {
         ): Promise<{ data?: IBuildTxConfig, error?: any}> {
             try {
                 const fromKeyPair = { address: fromAddress };
-                const toKeyPair = { address: toAddress };
+                const toKeyPair = { address: toAddress.trim() };
                 const txOptions: IBuildTxConfig = { fromKeyPair, toKeyPair };
                 if (propId !== -1) {
                     // const payloadParams = [this.propId, (amount).toString()];
