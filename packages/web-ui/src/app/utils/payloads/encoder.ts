@@ -5,9 +5,10 @@ const marker = 'tl';
 const encodeSend = (params: { sendAll: boolean, address: string, propertyId: number | number[], amount: number | number[] }) => {
     if (params.sendAll) return `1;${params.address}`;
 
+ 
     const encodeAmount = (amt: number) => {
         const scaledAmt = new BigNumber(amt).times(1e8);
-        const isWholeNumber = scaledAmt.modulo(1).isZero(); // Check if it's an integer
+        const isWholeNumber = Boolean(amt%1==0); // Check if it's an integer
         console.log('is whole number '+isWholeNumber)
         return isWholeNumber
             ? scaledAmt.integerValue().toString(36) // Normal encoding
