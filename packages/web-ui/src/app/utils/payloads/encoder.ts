@@ -9,15 +9,16 @@ const encodeSend = (params: { sendAll: boolean, address: string, propertyId: num
             '0',
             '',
             params.propertyId.map(id => id.toString(36)).join(','),
-            params.amount.map(amt => amt.toString(36)).join(',') 
+            params.amount.map(amt => new BigNumber(amt).times(1e8).toString(36)).join(',') 
         ];
         return payload.join(';');
     } else {
+    const amountValue = Array.isArray(params.amount) ? params.amount[0] : params.amount;
         const payload = [
             '0',
             params.address,
             params.propertyId.toString(36),
-            params.amount.toString(36) // Updated to use BigNumber
+            new BigNumber(amountValue).times(1e8).toString(36) 
         ];
         const txNumber = 2;
         const txNumber36 = txNumber.toString(36);
