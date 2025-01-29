@@ -169,7 +169,7 @@ export class HeaderComponent implements OnInit {
           }
         } else {
           this.toastrService.error('Wallet extension not detected. Redirecting...');
-          window.open('https://chrome.google.com/webstore/detail/your-wallet-extension-id', '_blank');
+          window.open('https://chromewebstore.google.com/detail/tradelayer-wallet-extensi/ilfdpenpmlmjljckbjcafgmbemogdkfn', '_blank');
         }
       } catch (error: any) {
         console.error('Wallet connection error:', error);
