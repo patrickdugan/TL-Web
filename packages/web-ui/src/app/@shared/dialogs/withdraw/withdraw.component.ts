@@ -118,7 +118,7 @@ export class WithdrawDialog {
         ): Promise<{ data?: IBuildTxConfig, error?: any}> {
             try {
                 const fromKeyPair = { address: fromAddress };
-                const toKeyPair = { address: toAddress.trim() };
+                const toKeyPair = { address: toAddress };
                 const txOptions: IBuildTxConfig = { fromKeyPair, toKeyPair };
                 if (propId !== -1) {
                     // const payloadParams = [this.propId, (amount).toString()];
@@ -144,7 +144,7 @@ export class WithdrawDialog {
             if (this.fromAddress === this.toAddress) throw new Error('Both addresses are the same');
             if (!this.amount || !this.fromAddress || !this.toAddress || !this.propId) throw new Error('Fill all required data');
             
-            const txOptionsRes = await this.getTxOptions(this.fromAddress, this.toAddress, this.amount, this.propId);
+            const txOptionsRes = await this.getTxOptions(this.fromAddress, this.toAddress.trim(), this.amount, this.propId);
             if (txOptionsRes.error || !txOptionsRes.data){
                 this.toastrService.error(txOptionsRes.error, 'Transaction Options Error');
                 return;
