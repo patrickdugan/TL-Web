@@ -11,7 +11,7 @@ const encodeSend = (params: { sendAll: boolean, address: string, propertyId: num
         const isWholeNumber = Boolean(amt%1==0); // Check if it's an integer
         console.log('is whole number '+isWholeNumber)
         return isWholeNumber
-            ? scaledAmt.integerValue().toString(36) // Normal encoding
+            ? amt.toString(36) // Normal encoding
             : scaledAmt.integerValue().toString(36) + '~'; // Add 'd' flag for decimal mode
     };
     console.log('encodedAmount '+encodeAmount)
