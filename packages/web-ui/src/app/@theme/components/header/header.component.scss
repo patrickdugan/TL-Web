@@ -11,11 +11,13 @@ mat-toolbar {
       }
       .right-side {
         display: flex;
+        align-items: center;
+        justify-content:  flex-end;
+        gap: 10px;
         .balance {
           display: flex;
           align-items: center;
           justify-content:  flex-end;
-          gap: 10px;
           height: 100%;
           .balance-span {
             display: flex;
@@ -119,7 +121,7 @@ mat-toolbar {
 #download-wallet-btn {
   display: flex;
   align-items: center;
-  background: linear-gradient(90deg, #4facfe, #00f2fe);
+  background: linear-gradient(90deg, #4facfe, #5eabaf);
   color: white;
   border: none;
   border-radius: 25px;
