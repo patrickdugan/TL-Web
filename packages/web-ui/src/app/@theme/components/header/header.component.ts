@@ -140,49 +140,50 @@ export class HeaderComponent implements OnInit {
   }
 
 async connectWallet() {
-    try {
-      console.log("Checking for wallet...");
+  try {
+    console.log("Checking for wallet...");
 
-      if (typeof window.myWallet !== "undefined") {
-        console.log("Wallet detected.");
+    if (typeof window.myWallet !== "undefined") {
+      console.log("Wallet detected.");
 
-        const accounts = await window.myWallet.sendRequest("requestAccounts", {});
-        if (accounts && accounts.length > 0) {
-          this.walletAddress = accounts[0]?.address || accounts[0];
-          this.balanceVisible = true;
-          console.log("Connected Wallet Address:", this.walletAddress);
-          this.toastrService.success("Wallet connected successfully!");
-        }
-
-        // Listen for account changes
-        if (typeof window.myWallet.on === "function") {
-          window.myWallet.on("accountsChanged", (newAccounts: string[]) => {
-            console.log("Accounts changed:", newAccounts);
-            this.walletAddress = newAccounts[0] || null;
-            this.toastrService.info("Account switched.");
-          });
-
-          window.myWallet.on("networkChanged", (network: string) => {
-            console.log("Network changed:", network);
-            this.toastrService.info(`Network changed to ${network}.`);
-          });
-        } else {
-          console.warn("Wallet does not support event listeners.");
-        }
-      } else {
-        console.warn("Wallet extension not detected.");
-        this.toastrService.error("Wallet extension not detected.");
+      const accounts = await window.myWallet.sendRequest("requestAccounts", {});
+      if (accounts && accounts.length > 0) {
+        this.walletAddress = accounts[0]?.address || accounts[0];
+        this.balanceVisible = true;
+        console.log("Connected Wallet Address:", this.walletAddress);
+        this.toastrService.success("Wallet connected successfully!");
       }
-    } catch (error: any) {
-      console.error("Wallet connection error:", error);
-      this.toastrService.error("Failed to connect wallet.");
-    }
-  }
 
-  openWalletDownload() {
-    window.open(
-      "https://chromewebstore.google.com/detail/tradelayer-wallet-extensi/ilfdpenpmlmjljckbjcafgmbemogdkfn",
-      "_blank"
-    );
+      // Listen for account changes
+      if (typeof window.myWallet.on === "function") {
+        window.myWallet.on("accountsChanged", (newAccounts: string[]) => {
+          console.log("Accounts changed:", newAccounts);
+          this.walletAddress = newAccounts[0] || null;
+          this.toastrService.info("Account switched.");
+        });
+
+        window.myWallet.on("networkChanged", (network: string) => {
+          console.log("Network changed:", network);
+          this.toastrService.info(`Network changed to ${network}.`);
+        });
+      } else {
+        console.warn("Wallet does not support event listeners.");
+      }
+    } else {
+      console.warn("Wallet extension not detected.");
+      this.toastrService.error("Wallet extension not detected.");
+    }
+  } catch (error: any) {
+    console.error("Wallet connection error:", error);
+    this.toastrService.error("Failed to connect wallet.");
   }
+}
+
+openWalletDownload() {
+  window.open(
+    "https://chromewebstore.google.com/detail/tradelayer-wallet-extensi/ilfdpenpmlmjljckbjcafgmbemogdkfn",
+    "_blank"
+  );
+}
+
 }

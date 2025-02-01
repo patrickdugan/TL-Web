@@ -1,58 +1,58 @@
 <mat-toolbar>
-    <mat-toolbar-row>
-        <!-- Left Side: Logo -->
-        <div class="left-side">
-            <button mat-icon-button (click)="toggleSideBar()">
-                <mat-icon>menu</mat-icon>
-                <img src="./assets/tl-logo.svg" alt="TL Logo">
-            </button>
+  <mat-toolbar-row>
+    <!-- Left Side: Logo -->
+    <div class="left-side">
+      <button mat-icon-button (click)="toggleSideBar()">
+        <mat-icon>menu</mat-icon>
+        <img src="./assets/tl-logo.svg" alt="TL Logo">
+      </button>
+    </div>
+
+    <span class="spacer"></span>
+
+    <!-- Right Side: Wallet and Balance Information -->
+    <div class="right-side">
+      <!-- Balance Display -->
+      <div class="balance" *ngIf="isLoggedIn" (click)="updateBalance()">
+        <span>Balance: </span>
+        <span class="balance-span" *ngIf="!balanceLoading">
+          {{ availableBalance }} LTC
+        </span>
+        <span class="balance-span" *ngIf="balanceLoading">
+          <mat-spinner diameter="25"></mat-spinner>
+        </span>
+      </div>
+
+      <!-- Wallet Connect and Download -->
+      <div id="wallet-ui">
+        <!-- Connect Wallet Button -->
+        <button
+          id="connectWalletButton"
+          class="connect-button"
+          *ngIf="!walletAddress"
+          (click)="connectWallet()"
+        >
+          Connect Wallet
+        </button>
+
+        <!-- Wallet Info Display -->
+        <div id="wallet-info" *ngIf="walletAddress" class="wallet-address-display">
+          Connected: <span id="connectedAddress">{{ walletAddress | slice: 0:6 }}...{{ walletAddress | slice: -6 }}</span>
         </div>
 
-        <span class="spacer"></span>
-
-        <!-- Right Side: Wallet and Balance Information -->
-        <div class="right-side">
-            <!-- Balance Display -->
-            <div class="balance" *ngIf="isLoggedIn" (click)="updateBalance()">
-                <span>Balance: </span>
-                <span class="balance-span" *ngIf="!balanceLoading">
-                    {{ availableBalance }} LTC
-                </span>
-                <span class="balance-span" *ngIf="balanceLoading">
-                    <mat-spinner diameter="25"></mat-spinner>
-                </span>
-            </div>
-
-            <!-- Wallet Connect and Info -->
-            <div id="wallet-ui">
-                <!-- Connect Wallet Button -->
-                <button
-                    id="connectWalletButton"
-                    class="connect-button"
-                    *ngIf="!walletAddress"
-                    (click)="connectWallet()"
-                >
-                    Connect Wallet
-                </button>
-
-                <!-- Wallet Info Display -->
-                <div id="wallet-info" *ngIf="walletAddress" class="wallet-address-display">
-                    Connected: <span id="connectedAddress">{{ walletAddress | slice: 0:6 }}...{{ walletAddress | slice: -6 }}</span>
-                </div>
-
-                <!-- Download TL Wallet Button -->
-                <button
-                    id="download-wallet-btn"
-                    class="download-wallet-btn"
-                    *ngIf="!walletAddress"
-                    (click)="openWalletDownload()"
-                >
-                    <img src="/assets/tl-logo.png" alt="TL Logo" class="wallet-logo">
-                    Download TL Wallet
-                </button>
-            </div>
-        </div>
-    </mat-toolbar-row>
+        <!-- Download TL Wallet Button -->
+        <button
+          id="download-wallet-btn"
+          class="download-wallet-btn"
+          *ngIf="!walletAddress"
+          (click)="openWalletDownload()"
+        >
+          <img src="/assets/tl-logo.png" alt="TL Logo" class="wallet-logo">
+          Download TL Wallet
+        </button>
+      </div>
+    </div>
+  </mat-toolbar-row>
 </mat-toolbar>
 
 <div class="nav-container">

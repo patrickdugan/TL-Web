@@ -134,22 +134,33 @@ mat-toolbar {
   transform: scale(0.95);
 }
 
-.download-wallet-btn {
+
+#download-wallet-btn {
   display: flex;
   align-items: center;
   background: linear-gradient(90deg, #4facfe, #00f2fe);
-  color: #fff;
+  color: white;
   border: none;
   border-radius: 25px;
-  padding: 10px 20px;
+  padding: 10px 15px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 6px #0003;
-  text-transform: none;
+  margin-left: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  img {
+    height: 20px;
+    margin-right: 10px;
+  }
+  &:hover {
+    background: linear-gradient(90deg, #2364aa, #1d3557);
+    transform: scale(1.05);
+  }
+  &:active {
+    transform: scale(0.95);
+  }
 }
-
 .download-wallet-btn img {
   height: 20px;
   margin-right: 10px;
