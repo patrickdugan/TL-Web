@@ -109,3 +109,58 @@ mat-toolbar {
     transform: rotate(0deg);
   }
 }
+
+.connect-button {
+  background: linear-gradient(90deg, #2364aa, #1d3557);
+  color: #fff;
+  border: none;
+  border-radius: 25px;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px #0003;
+}
+
+.connect-button:hover {
+  background: linear-gradient(90deg, #00f2fe, #4facfe);
+  transform: scale(1.05);
+  box-shadow: 0 6px 8px #0000004d;
+}
+
+.connect-button:active {
+  transform: scale(0.95);
+}
+
+.download-wallet-btn {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, #4facfe, #00f2fe);
+  color: #fff;
+  border: none;
+  border-radius: 25px;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px #0003;
+  text-transform: none;
+}
+
+.download-wallet-btn img {
+  height: 20px;
+  margin-right: 10px;
+}
+
+.download-wallet-btn:hover {
+  background: linear-gradient(90deg, #1d3557, #2364aa);
+  transform: scale(1.05);
+  box-shadow: 0 6px 8px #0000004d;
+}
+
+.download-wallet-btn:active {
+  transform: scale(0.95);
+}

@@ -1,14 +1,19 @@
 <mat-toolbar>
     <mat-toolbar-row>
+        <!-- Left Side: Logo -->
         <div class="left-side">
-            <button mat-icon-button (click)='toggleSideBar()'>
+            <button mat-icon-button (click)="toggleSideBar()">
                 <mat-icon>menu</mat-icon>
-                <img src='./assets/tl-logo.svg'>
+                <img src="./assets/tl-logo.svg" alt="TL Logo">
             </button>
         </div>
+
         <span class="spacer"></span>
-        <div class="right-side" *ngIf="isLoggedIn">
-            <div class="balance" (click)='updateBalance()'>
+
+        <!-- Right Side: Wallet and Balance Information -->
+        <div class="right-side">
+            <!-- Balance Display -->
+            <div class="balance" *ngIf="isLoggedIn" (click)="updateBalance()">
                 <span>Balance: </span>
                 <span class="balance-span" *ngIf="!balanceLoading">
                     {{ availableBalance }} LTC
@@ -17,64 +22,49 @@
                     <mat-spinner diameter="25"></mat-spinner>
                 </span>
             </div>
-        </div>
 
-        <div id="wallet-ui">
-            <button id="connect-wallet-btn">Connect Wallet</button>
+            <!-- Wallet Connect and Info -->
+            <div id="wallet-ui">
+                <!-- Connect Wallet Button -->
+                <button
+                    id="connectWalletButton"
+                    class="connect-button"
+                    *ngIf="!walletAddress"
+                    (click)="connectWallet()"
+                >
+                    Connect Wallet
+                </button>
 
-            <div id="wallet-info" style="display: none;">
-                Connected Wallet: <span id="wallet-address"></span>
+                <!-- Wallet Info Display -->
+                <div id="wallet-info" *ngIf="walletAddress" class="wallet-address-display">
+                    Connected: <span id="connectedAddress">{{ walletAddress | slice: 0:6 }}...{{ walletAddress | slice: -6 }}</span>
+                </div>
+
+                <!-- Download TL Wallet Button -->
+                <button
+                    id="download-wallet-btn"
+                    class="download-wallet-btn"
+                    *ngIf="!walletAddress"
+                    (click)="openWalletDownload()"
+                >
+                    <img src="/assets/tl-logo.png" alt="TL Logo" class="wallet-logo">
+                    Download TL Wallet
+                </button>
             </div>
-
-            <button id="download-wallet-btn" style="
-                display: flex;
-                align-items: center;
-                padding: 10px 15px;
-                background-color: #007bff;
-                color: white;
-                font-size: 16px;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                margin-top: 10px;">
-                <img src="/assets/tl-logo.png" alt="TL Logo" style="width: 24px; height: 24px; margin-right: 8px;">
-                Download TL Wallet
-            </button>
-
         </div>
-
-        
-       <div class="right-side">
-          <div class="connect">
-            <div>
-              <button 
-                id="connectWalletButton" 
-                class="connect-button" 
-                *ngIf="!walletAddress" 
-                (click)="connectWallet()">
-                Connect Wallet
-              </button>
-              <div *ngIf="walletAddress" class="wallet-address-display">
-                Connected: <span id="connectedAddress">{{ walletAddress | slice:0:6 }}...{{ walletAddress | slice:-6 }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- <button mat-icon-button (click)='isLoggedIn ? logOut() : navigateToLoginRoute()'>
-            <mat-icon>{{ isLoggedIn ? 'logout' : 'login' }}</mat-icon>
-        </button> -->
     </mat-toolbar-row>
 </mat-toolbar>
 
 <div class="nav-container">
     <nav mat-tab-nav-bar mat-align-tabs="center">
         <a
-            *ngFor='let route of mainRoutes'
+            *ngFor="let route of mainRoutes"
             mat-tab-link
-            (click)='navigateTo(route)'
-            [active]='selectedRoute === route'
-            [disabled]='route.disabled'
-        >{{ route.name }}</a>
-      </nav>
+            (click)="navigateTo(route)"
+            [active]="selectedRoute === route"
+            [disabled]="route.disabled"
+        >
+            {{ route.name }}
+        </a>
+    </nav>
 </div>
