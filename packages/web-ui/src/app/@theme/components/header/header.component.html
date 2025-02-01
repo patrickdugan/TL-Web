@@ -12,46 +12,34 @@
 
     <!-- Right Side: Wallet and Balance Information -->
     <div class="right-side">
-      <!-- Balance Display -->
-      <div class="balance" *ngIf="isLoggedIn" (click)="updateBalance()">
-        <span>Balance: </span>
-        <span class="balance-span" *ngIf="!balanceLoading">
-          {{ availableBalance }} LTC
-        </span>
-        <span class="balance-span" *ngIf="balanceLoading">
-          <mat-spinner diameter="25"></mat-spinner>
-        </span>
-      </div>
+    <div id="wallet-ui">
+        <!-- Download TL Wallet Button -->
+        <button
+            id="download-wallet-btn"
+            class="download-wallet-btn"
+            *ngIf="!walletAddress"
+            (click)="openWalletDownload()"
+        >
+            Download TL Wallet
+        </button>
 
-      <!-- Wallet Connect and Download -->
-      <div id="wallet-ui">
         <!-- Connect Wallet Button -->
         <button
-          id="connectWalletButton"
-          class="connect-button"
-          *ngIf="!walletAddress"
-          (click)="connectWallet()"
+            id="connectWalletButton"
+            class="connect-button"
+            *ngIf="!walletAddress"
+            (click)="connectWallet()"
         >
-          Connect Wallet
+            Connect Wallet
         </button>
 
         <!-- Wallet Info Display -->
         <div id="wallet-info" *ngIf="walletAddress" class="wallet-address-display">
-          Connected: <span id="connectedAddress">{{ walletAddress | slice: 0:6 }}...{{ walletAddress | slice: -6 }}</span>
+            Connected: <span id="connectedAddress">{{ walletAddress | slice: 0:6 }}...{{ walletAddress | slice: -6 }}</span>
         </div>
-
-        <!-- Download TL Wallet Button -->
-        <button
-          id="download-wallet-btn"
-          class="download-wallet-btn"
-          *ngIf="!walletAddress"
-          (click)="openWalletDownload()"
-        >
-          <img src="/assets/tl-logo.png" alt="TL Logo" class="wallet-logo">
-          Download TL Wallet
-        </button>
-      </div>
     </div>
+</div>
+
   </mat-toolbar-row>
 </mat-toolbar>
 
