@@ -1,87 +1,89 @@
 mat-toolbar {
   z-index: 5;
+
   .left-side {
     img {
       max-height: 70%;
       margin-left: 2rem;
     }
   }
-    .spacer {
-        flex: 1 1 auto;
-      }
-      .right-side {
+
+  .spacer {
+    flex: 1 1 auto;
+  }
+
+  .right-side {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+
+    .balance {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      height: 100%;
+
+      .balance-span {
         display: flex;
+        justify-content: center;
         align-items: center;
-        justify-content:  flex-end;
-        gap: 10px;
-        .balance {
-          display: flex;
-          align-items: center;
-          justify-content:  flex-end;
-          height: 100%;
-          .balance-span {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-width: 2rem;
-            margin: 0 0.25rem;
-          }
-          cursor: pointer;
-          margin: 0 0.25rem;
-          transition: color 0.25s;
-          font-size: 0.8rem;
-          &:hover {
-            color: orange;
-          }
-        }
+        min-width: 2rem;
+        margin: 0 0.25rem;
       }
 
-      .connect-button {
-        background: linear-gradient(90deg, #2364AA, #1D3557); /* Darker gradient background */
-        color: white; /* Button text color */
-        border: none; /* Remove default border */
-        border-radius: 25px; /* Rounded corners */
-        padding: 10px 20px; /* Spacing inside the button */
-        font-size: 16px; /* Button text size */
-        font-weight: bold; /* Bold text */
-        text-transform: uppercase; /* Make text uppercase */
-        cursor: pointer; /* Pointer cursor on hover */
-        transition: all 0.3s ease; /* Smooth transition for hover effects */
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Subtle shadow */
-      }.connect-button:hover {
-        background: linear-gradient(90deg, #00f2fe, #4facfe); /* Reverse gradient */
-        transform: scale(1.05); /* Slightly enlarge on hover */
-        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3); /* Darker shadow */
-      }.connect-button:active {
-        transform: scale(0.95); /* Slightly shrink when clicked */
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Reduce shadow */
-      }
+      cursor: pointer;
+      margin: 0 0.25rem;
+      transition: color 0.25s;
+      font-size: 0.8rem;
 
-      .connect-button:hover {
-        background: linear-gradient(90deg, #1D3557, #2364AA); /* Reverse darker gradient */
-        transform: scale(1.05);
-        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+      &:hover {
+        color: orange;
+      }
     }
-    
-    .wallet-address-display {
-      font-size: 0.9rem; /* Adjust font size */
-      color: #ddd; /* Subtle text color */
-      max-width: 200px; /* Control truncation width */
-      overflow: hidden; /* Ensure the text doesn't overflow */
-      text-overflow: ellipsis; /* Add ellipsis for truncated text */
-      white-space: nowrap; /* Prevent text wrapping */
-      display: inline-block; /* Inline block display */
-      background: #2c2c2c; /* Slightly darker background */
-      padding: 4px 8px; /* Padding for spacing */
-      border-radius: 4px; /* Rounded corners */
-      position: absolute; /* Position relative to parent/container */
-      top: 10px; /* Distance from top of the parent */
-      right: 10px; /* Distance from right of the parent */
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Add shadow */
-   }
-   
-  
+  }
 
+  .connect-button {
+    background: linear-gradient(90deg, #2364aa, #1d3557);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+
+    &:hover {
+      background: linear-gradient(90deg, #00f2fe, #4facfe);
+      transform: scale(1.05);
+      box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    &:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  .wallet-address-display {
+    font-size: 0.9rem;
+    color: #ddd;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    background: #2c2c2c;
+    padding: 4px 8px;
+    border-radius: 4px;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
 }
 
 .mat-toolbar {
@@ -95,6 +97,7 @@ mat-toolbar {
   padding-top: 2rem;
   margin-top: -2rem;
   user-select: none;
+
   a {
     color: var(--white);
   }
@@ -113,15 +116,10 @@ mat-toolbar {
   }
 }
 
-.connect-button:active {
-  transform: scale(0.95);
-}
-
-
 #download-wallet-btn {
   display: flex;
   align-items: center;
-  background: linear-gradient(90deg, #4facfe, #5eabaf);
+  background: linear-gradient(90deg, #798b9a, #586e6f); /* Softer gradient */
   color: white;
   border: none;
   border-radius: 25px;
@@ -130,31 +128,21 @@ mat-toolbar {
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-left: 10px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+
   img {
     height: 20px;
     margin-right: 10px;
   }
+
   &:hover {
-    background: linear-gradient(90deg, #2364aa, #1d3557);
+    background: linear-gradient(90deg, #2364aa, #1d3557); /* Darker gradient on hover */
     transform: scale(1.05);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
   }
+
   &:active {
     transform: scale(0.95);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
-}
-.download-wallet-btn img {
-  height: 20px;
-  margin-right: 10px;
-}
-
-.download-wallet-btn:hover {
-  background: linear-gradient(90deg, #1d3557, #2364aa);
-  transform: scale(1.05);
-  box-shadow: 0 6px 8px #0000004d;
-}
-
-.download-wallet-btn:active {
-  transform: scale(0.95);
 }
