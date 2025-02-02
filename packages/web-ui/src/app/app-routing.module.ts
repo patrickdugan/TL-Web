@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
+import { RouterModule,Router, Routes, NavigationEnd } from '@angular/router';
 import { AuthGuard } from './@core/guards/auth.guard';
 import { RPCGuard } from './@core/guards/rpc.guard';
 import { SyncedGuard } from './@core/guards/sync.guard';
@@ -58,21 +58,21 @@ export const routes: Routes = [
   },
 ];
 
-const imports = [ RouterModule.forRoot(routes) ];
-const exports = [ RouterModule ];
 
-@NgModule({ imports, exports })
+  @NgModule({
+    imports: [RouterModule.forRoot(routes)], // Ensure `RouterModule` is properly imported
+    exports: [RouterModule],
+  })
   export class AppRoutingModule {
     constructor(private router: Router) {
-      // Listen for navigation events
-      this.router.events.subscribe((event) => {
+      // Listen for router events
+      this.router.events.subscribe((event: any) => {
         if (event instanceof NavigationEnd) {
-          // Send page_view event to Google Analytics
           gtag('config', 'G-EFYGCSNN2S', {
             page_path: event.urlAfterRedirects,
           });
           console.log('Tracked page view for:', event.urlAfterRedirects);
         }
       });
-    } 
+    }
 }
