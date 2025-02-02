@@ -11,6 +11,8 @@ import { PortfolioPageComponent } from './@pages/portfolio-page/portfolio-page.c
 import { SpotPageComponent } from './@pages/spot-page/spot-page.component';
 import { TxBuilderPageComponent } from './@pages/tx-builder-page/tx-builder-page.component';
 
+declare const gtag: Function; // Declare gtag globally
+
 export const routes: Routes = [
   {
     path: '',
@@ -60,4 +62,17 @@ const imports = [ RouterModule.forRoot(routes) ];
 const exports = [ RouterModule ];
 
 @NgModule({ imports, exports })
-export class AppRoutingModule { }
+  export class AppRoutingModule {
+    constructor(private router: Router) {
+      // Listen for navigation events
+      this.router.events.subscribe((event) => {
+        if (event instanceof NavigationEnd) {
+          // Send page_view event to Google Analytics
+          gtag('config', 'G-EFYGCSNN2S', {
+            page_path: event.urlAfterRedirects,
+          });
+          console.log('Tracked page view for:', event.urlAfterRedirects);
+        }
+      });
+    } 
+}
