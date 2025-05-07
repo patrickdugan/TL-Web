@@ -19,6 +19,7 @@ export interface IFuturesTradeConf extends ITradeConf {
         contract_id: number,
         amount: number,
         price: number,
+        margin?: number,
         levarage: number;
         collateral: number;
         transfer: boolean;
