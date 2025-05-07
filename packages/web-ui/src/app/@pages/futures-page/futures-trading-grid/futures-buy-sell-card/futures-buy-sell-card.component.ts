@@ -81,10 +81,21 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       return this.apiService.tlApi;
     }
 
-    ngOnInit() {
-      this.buildForms();
-      this.trackPriceHandler();
-    }
+      ngOnInit() {
+        this.buildForms();
+        this.trackPriceHandler();
+
+        this.buySellGroup.valueChanges.pipe(takeUntil(this.destroyed$)).subscribe(() => {
+          this.maxBuyAmount = this.getMaxAmount();
+          this.maxSellAmount = this.getMaxAmount();
+          this.buyFee = this.calculateFee();
+          this.sellFee = this.calculateFee();
+        });
+
+        this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
+        this.attestationStatus = this.getAttestationStatus(this.futureAddress);
+      }
+
 
     private buildForms() {
       this.buySellGroup = this.fb.group({
@@ -101,37 +112,27 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       this.buySellGroup?.controls?.['amount'].setValue(value2);
     }
 
-    getMaxAmount(isBuy: boolean) {
+    getMaxAmount(isBuy: boolean): number {
       if (!this.futureAddress) return 0;
-      if (!this.buySellGroup?.controls?.['price']?.value && this.isLimitSelected) return 0;
-
-      const _price = this.isLimitSelected 
-        ? this.buySellGroup.value['price'] 
-        : this.currentPrice;
+      const _price = this.isLimitSelected ? this.buySellGroup.value['price'] : this.currentPrice;
       const price = safeNumber(_price);
-
-      const propId = this.selectedMarket.collateral.propertyId;
-
-      let tokenBalanceObj = this.balanceService.getTokensBalancesByAddress(this.futureAddress)
-        ?.find((t: any) => t.propertyid === propId);
-
+      if (!price || price <= 0) return 0;
+      const market = this.selectedMarket;
+      const propId = market?.collateral?.propertyId;
+      if (!propId) return 0;
+      const tokenBalanceObj = this.balanceService.getTokensBalancesByAddress(this.futureAddress)?.find((t: any) => t.propertyid === propId);
       let availableBalance = 0;
       let channelBalance = 0;
-
       if (tokenBalanceObj) {
         availableBalance = safeNumber(tokenBalanceObj.available || 0);
         channelBalance = safeNumber(tokenBalanceObj.channel || 0);
       }
-
-      const tokenBalance = safeNumber(Math.max(availableBalance, channelBalance));
-      const inOrderBalance = this.getInOrderAmount(propId);
-      const available = safeNumber((tokenBalance || 0) - inOrderBalance);
-
-      if (!available || ((available / price) <= 0)) return 0;
-
-      const _max = isBuy ? (available / price) : available;
-      return safeNumber(_max);
+      const tokenBalance = Math.max(availableBalance, channelBalance);
+      const leverage = market.leverage || 10;
+      const notional = market.notional || 1;
+      return safeNumber((tokenBalance * leverage) / (price * notional));
     }
+
 
     async handleBuySell(isBuy: boolean) {
     const fee = this.getFees(isBuy);
