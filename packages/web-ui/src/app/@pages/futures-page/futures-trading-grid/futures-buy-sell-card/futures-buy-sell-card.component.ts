@@ -26,10 +26,18 @@ const minVOutAmount = 0.000036;
   templateUrl: './futures-buy-sell-card.component.html',
   styleUrls: ['../../../spot-page/spot-trading-grid/spot-buy-sell-card/spot-buy-sell-card.component.scss'],
 })
+
 export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
     private destroyed$: ReplaySubject<boolean> = new ReplaySubject(1);
     private _isLimitSelected: boolean = true;
     public buySellGroup: FormGroup = new FormGroup({});
+    maxBuyAmount: number = 0;
+    maxSellAmount: number = 0;
+    buyFee: number = 0;
+    sellFee: number = 0;
+    nameBalanceInfo: any;
+    attestationStatus: any;
+
 
     constructor(
       private futuresMarketService: FuturesMarketService,
@@ -86,14 +94,13 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
         this.trackPriceHandler();
 
         this.buySellGroup.valueChanges.pipe(takeUntil(this.destroyed$)).subscribe(() => {
-          this.maxBuyAmount = this.getMaxAmount();
-          this.maxSellAmount = this.getMaxAmount();
-          this.buyFee = this.calculateFee();
-          this.sellFee = this.calculateFee();
+          this.maxBuyAmount = this.getMaxAmount(true);
+          this.maxSellAmount = this.getMaxAmount(false);
+          this.buyFee = this.getFees(true);
+          this.sellFee = this.getFees(false);
         });
 
         this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
-        this.attestationStatus = this.getAttestationStatus(this.futureAddress);
       }
 
 
@@ -341,10 +348,9 @@ isFutureAddressSelfAtt() {
       const _allAmounts = this.balanceService.getCoinBalancesByAddress(this.futureAddress).utxos
         .map(r => r.amount)
         .sort((a, b) => b - a);
-      const allAmounts = [minVOutAmount, ..._allAmounts]
+      const allAmounts = [minVOutAmount, ..._allAmounts];
       allAmounts.forEach(u => {
-        const _amountSum: number = finalInputs.reduce((a, b) => a + b, 0);
-        const amountSum = safeNumber(_amountSum);
+        const amountSum = safeNumber(finalInputs.reduce((a, b) => a + b, 0));
         const _fee = safeNumber((0.3 * minFeeLtcPerKb) * (finalInputs.length + 1));
         if (amountSum < safeNumber(_amount + _fee)) finalInputs.push(u);
       });

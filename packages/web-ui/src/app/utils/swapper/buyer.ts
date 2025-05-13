@@ -8,6 +8,7 @@ import { ENCODER } from '../payloads/encoder';
 import { ToastrService } from "ngx-toastr";
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import BigNumber from 'bignumber.js';
+import axios from 'axios';
 
 export class BuySwapper extends Swap {
     private tradeStartTime: number;
@@ -98,8 +99,9 @@ export class BuySwapper extends Swap {
                 const isA = column === 'A' ? 1 : 0;
                 const initMargin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
 
-                const ctcpRes = await this.txsService.simpleGet(`/contracts/${contract_id}`);
+                const ctcpRes = await axios.get(`https://api.layerwallet.com/contracts/${contract_id}`);
                 const collateralPropId = ctcpRes?.data?.collateral;
+                
                 if (!collateralPropId) throw new Error('Collateral property ID missing');
 
                 const payload = transfer
@@ -138,20 +140,23 @@ export class BuySwapper extends Swap {
                 const utxoData: IUTXO = {
                     amount: vout.value,
                     vout: vout.n,
+                    confirmations: 0,
                     txid: commitTxSendRes.data,
                     scriptPubKey: this.multySigChannelData.scriptPubKey,
                     redeemScript: this.multySigChannelData.redeemScript
                 };
 
                 const cpcitOptions = {
-                    contract_id,
+                    contractId:contract_id,
                     amount,
                     expiryBlock: bbData,
                     price,
                     action: 1,
-                    leverage: levarage
+                    columnAIsSeller: column === 'A',
+                    leverage: levarage,
+                    insurance:false
                 };
-                const payload2 = ENCODER.encodeContractInstantTrade(cpcitOptions);
+                const payload2 = ENCODER.encodeTradeContractChannel(cpcitOptions);
                 const buildOptions: IBuildLTCITTxConfig = {
                     buyerKeyPair: this.myInfo.keypair,
                     sellerKeyPair: this.cpInfo.keypair,
@@ -160,7 +165,7 @@ export class BuySwapper extends Swap {
                     amount: 0
                 };
 
-                const rawHexRes = await this.txsService.buildLTCITTx(buildOptions);
+                const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
                 if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
                 const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
@@ -248,6 +253,7 @@ export class BuySwapper extends Swap {
                     const utxoData: IUTXO = {
                         amount: vout.value,
                         vout: vout.n,
+                        confirmations: 0,
                         txid: commitTxSendRes.data,
                         scriptPubKey: this.multySigChannelData.scriptPubKey,
                         redeemScript: this.multySigChannelData.redeemScript

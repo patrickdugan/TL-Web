@@ -6,6 +6,7 @@ import { ENCODER } from '../payloads/encoder';
 import { ToastrService } from "ngx-toastr";
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import BigNumber from 'bignumber.js';
+import axios from 'axios';
 
 export class SellSwapper extends Swap {
     private tradeStartTime: number;
@@ -67,7 +68,7 @@ export class SellSwapper extends Swap {
             }
             const ms = await this.walletService.addMultisig(2, pubKeys);
             if (!ms || !ms.address || !ms.redeemScript) throw new Error('Multisig setup failed');
-            this.multySigChannelData = ms;
+this.multySigChannelData = ms as IMSChannelData;
             const swapEvent = new SwapEvent('SELLER:STEP1', this.myInfo.socketId, this.multySigChannelData);
             this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (err: any) {
@@ -93,12 +94,12 @@ export class SellSwapper extends Swap {
                 payload = transfer
                     ? ENCODER.encodeTransfer({ propertyId: propIdDesired, amount: amountDesired, isColumnA: isA, destinationAddr: toKeyPair.address })
                     : ENCODER.encodeCommit({ propertyId: propIdDesired, amount: amountDesired, channelAddress: toKeyPair.address });
-            }
-            else if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
+            }else if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
                 const { contract_id, amount, price, levarage, transfer = false } = this.tradeInfo;
                 const isA = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
                 const margin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
-                const ctr = await this.txsService.simpleGet(`/contracts/${contract_id}`);
+
+                const ctr = await axios.get(`https://api.layerwallet.com/contracts/${contract_id}`);
                 const collateral = ctr?.data?.collateral;
                 if (!collateral) throw new Error('No collateral propertyId in contract');
 
@@ -132,16 +133,13 @@ export class SellSwapper extends Swap {
             if (!psbtHex) throw new Error('Step 4: missing PSBT');
 
             if (commitTxId) {
-                const txRes = await this.txsService.simpleGet(`/tx/${commitTxId}?verbose=true`);
+                const txRes = await axios.get(`https://api.layerwallet.com/tx/${commitTxId}?verbose=true`);
                 const vins = txRes?.data?.vin || [];
                 const isRbf = vins.some((vin: any) => vin.sequence < 0xfffffffe);
                 if (isRbf) throw new Error('RBF-enabled commit tx detected');
             }
 
-            const wifRes = await this.txsService.getWifByAddress(this.myInfo.keypair.address);
-            if (wifRes.error || !wifRes.data) throw new Error(`WIF fetch failed: ${wifRes.error}`);
-
-            const signRes = await this.txsService.signPsbt({ wif: wifRes.data, psbtHex });
+            const signRes = await this.txsService.signPsbt(psbtHex,true);
             if (signRes.error || !signRes.data?.psbtHex) throw new Error(`PSBT sign failed: ${signRes.error}`);
 
             this.socket.emit(`${this.myInfo.socketId}::swap`, new SwapEvent('SELLER:STEP5', this.myInfo.socketId, signRes.data.psbtHex));

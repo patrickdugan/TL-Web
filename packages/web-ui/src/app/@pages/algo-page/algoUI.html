@@ -1,0 +1,38 @@
+<div class="p-4 bg-black text-green-400 font-mono tracking-wide border-4 border-green-500 rounded-xl shadow-xl animate-flicker">
+  <h1 class="text-2xl mb-4 border-b border-green-600 pb-2">
+    ▶ STRATEGY CONSOLE
+  </h1>
+
+  <label class="block mb-2 uppercase text-sm">Select Strategy</label>
+  <select [(ngModel)]="selectedStrategy" class="w-full bg-black border border-green-400 p-2 mb-4">
+    <option *ngFor="let strat of strategies" [value]="strat">{{ strat }}</option>
+  </select>
+
+  <label class="block mb-2 uppercase text-sm">Quote Amount</label>
+  <input [(ngModel)]="params.quote_amount" type="number" class="w-full bg-black border border-green-400 p-2 mb-4" />
+
+  <label class="block mb-2 uppercase text-sm">BB Sigma</label>
+  <input [(ngModel)]="params.bb_sigma" type="number" step="0.1" class="w-full bg-black border border-green-400 p-2 mb-4" />
+
+  <label class="block mb-2 uppercase text-sm">Diagnostics Mode</label>
+  <select [(ngModel)]="liveDiagnostics" class="w-full bg-black border border-green-400 p-2 mb-4">
+    <option [value]="true">Live</option>
+    <option [value]="false">Test (Random)</option>
+  </select>
+
+  <button (click)="startBot()" class="bg-green-600 hover:bg-green-700 text-black font-bold py-2 px-4 rounded">
+    ENGAGE STRATEGY
+  </button>
+
+  <div class="mt-6 text-sm text-green-300">
+    <div *ngIf="botStatus">STATUS: {{ botStatus }}</div>
+    <div *ngIf="lastSignal">SIGNAL: {{ lastSignal }}</div>
+  </div>
+
+  <div class="mt-6 border-t border-green-700 pt-4">
+    <h2 class="text-lg mb-2">▶ ENTRY PLUG DIAGNOSTICS</h2>
+    <div class="grid grid-cols-5 gap-1 items-end h-32">
+      <div *ngFor="let val of histoValues" class="bg-green-500 w-full transition-all duration-300 ease-in-out" [style.height.%]="val"></div>
+    </div>
+  </div>
+</div>

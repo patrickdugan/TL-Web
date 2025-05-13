@@ -48,7 +48,7 @@ export class FuturesMarketService {
     ) {}
 
     get socket() {
-        return this.socketService.obSocket || this.socketService.socket;
+        return this.socketService.obSocket
     }
 
     get futuresMarketsTypes(): IFuturesMarketType[] {

@@ -4,6 +4,7 @@ import { AuthService } from "../auth.service";
 import { RpcService } from "../rpc.service";
 import { ApiService } from "../api.service";
 import { Subscription } from 'rxjs';
+import axios from 'axios';
 
 export interface IPosition {
     "entry_price": string;
@@ -62,34 +63,32 @@ export class FuturesPositionsService {
         });
     }
 
-    async updatePositions() {
-        if (!this.activeFutureAddress || !this.selectedContractId) return;
+async updatePositions() {
+  if (!this.activeFutureAddress || !this.selectedContractId) return;
 
-        const params = {
-            address: this.activeFutureAddress,
-            contractId: this.selectedContractId
-        };
+  const address = this.activeFutureAddress;
+  const contractId = this.selectedContractId;
 
-        try {
-            const res = await this.tlApi.rpc('contractPosition', params).toPromise();
-            console.log('position update ' + JSON.stringify(res.data));
+  try {
+    const res = await axios.post('https://api.layerwallet.com/rpc/tl_getContractPosition', {
+      params: [address, contractId]
+    });
 
-            if (res.error || !res.data) {
-                this.toastrService.error(res.error || 'Error getting opened position', 'Error');
-                this.openedPosition = null;
-                return;
-            }
+    console.log('position update ' + JSON.stringify(res.data));
 
-            const positionValue = parseFloat(res.data?.['position'] || "0");
-
-            if (positionValue) {
-                this.openedPosition = res.data;
-            } else {
-                this.openedPosition = null;
-            }
-        } catch (err) {
-            console.error('❌ RPC error in updatePositions:', err);
-            this.toastrService.error('Network error fetching position', 'Error');
-        }
+    if (res.data?.error || !res.data?.data) {
+      this.toastrService.error(res.data?.error || 'Error getting opened position', 'Error');
+      this.openedPosition = null;
+      return;
     }
+
+    const positionValue = parseFloat(res.data.data['position'] || "0");
+    this.openedPosition = positionValue ? res.data.data : null;
+
+  } catch (err) {
+    console.error('❌ RPC error in updatePositions:', err);
+    this.toastrService.error('Network error fetching position', 'Error');
+  }
+}
+
 }
