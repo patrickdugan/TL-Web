@@ -103,23 +103,21 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
         this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
       }*/
 
-      ngOnInit() {
-      this.buildForms();
-      this.trackPriceHandler();
+  ngOnInit() {
+  this.buildForms();
+  this.trackPriceHandler();
 
-      this.buySellGroup.valueChanges.pipe(takeUntil(this.destroyed$)).subscribe(() => {
-          this.maxBuyAmount = this.getMaxAmount(true);
-          this.maxSellAmount = this.getMaxAmount(false);
-          this.buyFee = this.getFees(true);
-          this.sellFee = this.getFees(false);
-        });
+  const handle = setInterval(() => {
+    const addr      = this.futureAddress;
+    const balances  = this.balanceService.getTokensBalancesByAddress(addr);
 
-      setTimeout(() => {
-        console.log('🧪 futureAddress:', this.futureAddress);
-        console.log('📦 balances:', this.balanceService.getTokensBalancesByAddress(this.futureAddress));
-        this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
-      }, 300); // allow auth/wallet to sync
+    if (addr && balances.length > 0) {
+      console.log('✅ balances ready:', balances);
+      this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
+      clearInterval(handle);
     }
+  }, 200);
+}
 
 
 
