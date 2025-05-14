@@ -88,7 +88,6 @@ export class HeaderComponent implements OnInit {
   get mainRoutes(){
     return this._mainRoutes
       .filter(e => e.needAuthToShow ? this.isLoggedIn : true)
-      .filter(e => e.needFullSynced ? this.isSynced : true);
   }
 
   get availableBalance() {
