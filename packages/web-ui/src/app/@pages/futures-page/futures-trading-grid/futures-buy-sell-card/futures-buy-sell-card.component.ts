@@ -89,7 +89,7 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       return this.apiService.tlApi;
     }
 
-      ngOnInit() {
+      /*ngOnInit() {
         this.buildForms();
         this.trackPriceHandler();
 
@@ -101,7 +101,26 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
         });
 
         this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
-      }
+      }*/
+
+      ngOnInit() {
+      this.buildForms();
+      this.trackPriceHandler();
+
+      this.buySellGroup.valueChanges.pipe(takeUntil(this.destroyed$)).subscribe(() => {
+          this.maxBuyAmount = this.getMaxAmount(true);
+          this.maxSellAmount = this.getMaxAmount(false);
+          this.buyFee = this.getFees(true);
+          this.sellFee = this.getFees(false);
+        });
+
+      setTimeout(() => {
+        console.log('🧪 futureAddress:', this.futureAddress);
+        console.log('📦 balances:', this.balanceService.getTokensBalancesByAddress(this.futureAddress));
+        this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
+      }, 300); // allow auth/wallet to sync
+    }
+
 
 
     private buildForms() {
@@ -225,7 +244,6 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
         this.toastrService.error('An error occurred during the trade.');
     }  // This is the missing closing brace for the try block
 }
-
 
     stopLiquidity() {
       console.log(`Stop Liquidity`);
