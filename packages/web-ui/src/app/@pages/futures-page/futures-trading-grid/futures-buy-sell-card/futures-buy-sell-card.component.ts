@@ -150,15 +150,16 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
     getMaxAmount(): number {
       if (!this.futureAddress) return 0;
 
-      // === guard against null price on limit orders ===
-      const priceControl = this.buySellGroup.controls.price.value;
-      if (this.isLimitSelected && !priceControl) {
-        return 0;
-      }
+      // grab whatever price we're using
+      const limitPrice = this.buySellGroup.controls.price.value;
+      const marketPrice = this.currentPrice;
 
-      // pick the right price
-      const _price = this.isLimitSelected ? priceControl : this.currentPrice;
-      const price = safeNumber(_price);
+      // both of these could be null at first—so bail if so
+      const raw = this.isLimitSelected ? limitPrice : marketPrice;
+      if (raw == null) return 0;
+
+      // now safe to coerce
+      const price = safeNumber(raw);
       if (!price || price <= 0) return 0;
 
       const market = this.selectedMarket;
@@ -167,19 +168,19 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
 
       const tokenBalanceObj = this.balanceService
         .getTokensBalancesByAddress(this.futureAddress)
-        ?.find((t: any) => t.propertyid === propId);
+        .find((t: any) => t.propertyid === propId);
 
-      let availableBalance = 0, channelBalance = 0;
+      let available = 0, channel = 0;
       if (tokenBalanceObj) {
-        availableBalance = safeNumber(tokenBalanceObj.available  || 0);
-        channelBalance   = safeNumber(tokenBalanceObj.channel    || 0);
+        available = safeNumber(tokenBalanceObj.available);
+        channel   = safeNumber(tokenBalanceObj.channel);
       }
 
-      const tokenBalance = Math.max(availableBalance, channelBalance);
-      const leverage     = market.leverage || 10;
-      const notional     = market.notional || 1;
+      const collateralBalance = Math.max(available, channel);
+      const leverage = market.leverage || 10;
+      const notional = market.notional || 1;
 
-      return safeNumber((tokenBalance * leverage) / (price * notional));
+      return safeNumber((collateralBalance * leverage) / (price * notional));
     }
 
     async handleBuySell(isBuy: boolean) {
@@ -327,7 +328,7 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
 
     async getContractInfo(contractId: number): Promise<any> {
       try {
-        const response = await axios.get(`http://localhost:port/tl_listContractSeries?contractId=${contractId}`);
+        const response = await axios.get(`https://api.layerwallet.com/tl_listContractSeries?contractId=${contractId}`);
         return response.data;
       } catch (error) {
         console.error('Failed to fetch contract info:', error);
