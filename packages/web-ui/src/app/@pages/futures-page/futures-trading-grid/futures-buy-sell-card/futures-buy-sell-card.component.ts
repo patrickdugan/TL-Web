@@ -103,23 +103,22 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
         this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
       }*/
 
-  ngOnInit() {
-  this.buildForms();
-  this.trackPriceHandler();
+    ngOnInit() {
+        this.buildForms();
+        this.trackPriceHandler();
 
-  const handle = setInterval(() => {
-    const addr      = this.futureAddress;
-    const balances  = this.balanceService.getTokensBalancesByAddress(addr);
+        this.buySellGroup.valueChanges
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe(() => {
+            this.maxBuyAmount = this.getMaxAmount();
+            this.maxSellAmount = this.getMaxAmount();
+            this.buyFee        = this.getFees(true);   // was calculateFee()
+            this.sellFee       = this.getFees(false);  // was calculateFee()
+          });
 
-    if (addr && balances.length > 0) {
-      console.log('✅ balances ready:', balances);
-      this.nameBalanceInfo = this.getNameBalanceInfo(this.selectedMarket.collateral);
-      clearInterval(handle);
-    }
-  }, 200);
-}
-
-
+        this.nameBalanceInfo   = this.getNameBalanceInfo(this.selectedMarket.collateral);
+        this.attestationStatus = this.isFutureAddressSelfAtt();  // was getAttestationStatus()
+      }
 
     private buildForms() {
       this.buySellGroup = this.fb.group({
@@ -128,35 +127,60 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       })
     }
 
+    /** Trigger a BUY (Long) order */
+      public handleBuySellBuy(): void {
+        this.handleBuySell(true);
+      }
+
+      /** Trigger a SELL (Short) order */
+      public handleBuySellSell(): void {
+        this.handleBuySell(false);
+      }
+
+
     fillMax(isBuy: boolean) {
-      const value = this.getMaxAmount(isBuy);
-      this.buySellGroup?.controls?.['amount'].setValue(value);
-      // tricky update the Max Amount 
-      const value2 = this.getMaxAmount(isBuy);
-      this.buySellGroup?.controls?.['amount'].setValue(value2);
+      const value  = this.getMaxAmount();
+      this.buySellGroup.controls['amount'].setValue(value);
+
+      // Update twice to recalc properly
+      const value2 = this.getMaxAmount();
+      this.buySellGroup.controls['amount'].setValue(value2);
     }
 
-    getMaxAmount(isBuy: boolean): number {
+    getMaxAmount(): number {
       if (!this.futureAddress) return 0;
-      const _price = this.isLimitSelected ? this.buySellGroup.value['price'] : this.currentPrice;
+
+      // === guard against null price on limit orders ===
+      const priceControl = this.buySellGroup.controls.price.value;
+      if (this.isLimitSelected && !priceControl) {
+        return 0;
+      }
+
+      // pick the right price
+      const _price = this.isLimitSelected ? priceControl : this.currentPrice;
       const price = safeNumber(_price);
       if (!price || price <= 0) return 0;
+
       const market = this.selectedMarket;
       const propId = market?.collateral?.propertyId;
       if (!propId) return 0;
-      const tokenBalanceObj = this.balanceService.getTokensBalancesByAddress(this.futureAddress)?.find((t: any) => t.propertyid === propId);
-      let availableBalance = 0;
-      let channelBalance = 0;
+
+      const tokenBalanceObj = this.balanceService
+        .getTokensBalancesByAddress(this.futureAddress)
+        ?.find((t: any) => t.propertyid === propId);
+
+      let availableBalance = 0, channelBalance = 0;
       if (tokenBalanceObj) {
-        availableBalance = safeNumber(tokenBalanceObj.available || 0);
-        channelBalance = safeNumber(tokenBalanceObj.channel || 0);
+        availableBalance = safeNumber(tokenBalanceObj.available  || 0);
+        channelBalance   = safeNumber(tokenBalanceObj.channel    || 0);
       }
+
       const tokenBalance = Math.max(availableBalance, channelBalance);
-      const leverage = market.leverage || 10;
-      const notional = market.notional || 1;
+      const leverage     = market.leverage || 10;
+      const notional     = market.notional || 1;
+
       return safeNumber((tokenBalance * leverage) / (price * notional));
     }
-
 
     async handleBuySell(isBuy: boolean) {
     const fee = this.getFees(isBuy);
@@ -255,9 +279,9 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       return;
     }*/
 
-    getButtonDisabled(isBuy: boolean) {
-      const v = this.buySellGroup.value.amount <= this.getMaxAmount(isBuy);
-      return !this.buySellGroup.valid || !v;
+    getButtonDisabled(): boolean {
+      return !this.buySellGroup.valid
+          || this.buySellGroup.value.amount > this.getMaxAmount();
     }
 
     private trackPriceHandler() {
@@ -349,7 +373,6 @@ isFutureAddressSelfAtt() {
             return "NO";
     }
 }
-
 
     ngOnDestroy() {
       this.destroyed$.next(true);
