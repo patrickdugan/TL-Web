@@ -2,6 +2,7 @@ import { Injectable } from "@angular/core";
 import { ApiService } from "../api.service";
 import { SocketService } from "../socket.service";
 import { FuturesPositionsService } from "./futures-positions.service";
+import { RpcService } from 'src/app/@core/services/rpc.service';
 import axios from 'axios';
 
 export interface IFuturesMarketType {
@@ -45,6 +46,7 @@ export class FuturesMarketService {
         private apiService: ApiService,
         private socketService: SocketService,
         private futuresPositionsService: FuturesPositionsService,
+        private rpcService: RpcService,
     ) {}
 
     get socket() {
@@ -58,6 +60,19 @@ export class FuturesMarketService {
     get selectedMarketType(): IFuturesMarketType {
         return this._selectedMarketType;
     }
+	
+	get relayerUrl(): string {
+	  const networkKey = this.rpcService.NETWORK || 'LTC';
+
+	  if (networkKey === 'LTC') {
+	    return 'https://api.layerwallet.com'; // mainnet relayer URL
+	  } else if (networkKey === 'LTCTEST') {
+	    return 'https://testnet-api.layerwallet.com'; // testnet relayer URL
+	  } else {
+	    // Fallback
+	    return 'https://api.layerwallet.com';
+	  }
+	}
 
     set selectedMarketType(value: IFuturesMarketType) {
         if (!this.futuresMarketsTypes.length) return;
@@ -120,22 +135,23 @@ export class FuturesMarketService {
     }
 
     private async enrichWithContractInfo() {
-        const allMarkets = this._futuresMarketsTypes
-            .map((type: IFuturesMarketType) => type.markets)
-            .reduce((acc, val) => acc.concat(val), []);
+    const allMarkets = this._futuresMarketsTypes
+        .map((type: IFuturesMarketType) => type.markets)
+        .reduce((acc, val) => acc.concat(val), []);
 
-        for (const market of allMarkets) {
-            try {
-                const res = await axios.post('http://localhost:3000/tl_listContractSeries', { contractId: market.contract_id });
-                const info = res.data;
-                market.leverage = info?.leverage ?? undefined;
-                market.notional = info?.notional ?? undefined;
-                market.inverse = info?.inverse ?? undefined;
-            } catch (err) {
-                console.warn(`Failed to load contract info for contract_id ${market.contract_id}`, err);
-            }
+    for (const market of allMarkets) {
+        try {
+            const res = await axios.post(`${this.relayerUrl}/tl_listContractSeries`, { contractId: market.contract_id });
+            const info = res.data;
+            market.leverage = info?.leverage ?? undefined;
+            market.notional = info?.notional ?? undefined;
+            market.inverse = info?.inverse ?? undefined;
+        } catch (err) {
+            console.warn(`Failed to load contract info for contract_id ${market.contract_id}`, err);
         }
     }
+}
+
 
     getMarketByContractId(contractId: number): IFutureMarket | null {
         const allMarkets = this._futuresMarketsTypes

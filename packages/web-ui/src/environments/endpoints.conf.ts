@@ -1,17 +1,17 @@
-type TEnpoint = {
+export type TEndpoint = {
     [k: string]: {
         orderbookApiUrl: string,
         relayerUrl: string,
     } 
 };
 
-export const ENDPOINTS: TEnpoint = {
+export const ENDPOINTS: TEndpoint = {
     LTC: {
-        orderbookApiUrl: "https://ws.layerwallet.com:443", // Use wss for secure communication
-        relayerUrl: "http://172.81.181.19:9191",   // Ensure the relayer URL uses https if applicable
+        orderbookApiUrl: "https://ws.layerwallet.com:443",
+        relayerUrl: "https://api.layerwallet.com", // Use the masked HTTPS domain for production
     },
     LTCTEST: {
-        orderbookApiUrl: "https://ws.layerwallet.com:443", // Use wss for secure communication
-        relayerUrl: "http://172.81.181.19:8191",   // Ensure the relayer URL uses https if applicable
+        orderbookApiUrl: "https://ws.layerwallet.com:443",
+        relayerUrl: "https://testnet-api.layerwallet.com", // Use the masked HTTPS domain for production
     },
 };
