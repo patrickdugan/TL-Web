@@ -63,7 +63,7 @@ export class FuturesMarketService {
 	
 	get relayerUrl(): string {
 	  const networkKey = this.rpcService.NETWORK || 'LTC';
-
+    console.log('[FMS] relayerUrl getter – networkKey:', networkKey);
 	  if (networkKey === 'LTC') {
 	    return 'https://api.layerwallet.com'; // mainnet relayer URL
 	  } else if (networkKey === 'LTCTEST') {
