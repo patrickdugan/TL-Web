@@ -2,7 +2,8 @@ import { Injectable } from "@angular/core";
 import { ApiService } from "../api.service";
 import { SocketService } from "../socket.service";
 import { FuturesPositionsService } from "./futures-positions.service";
-import { RpcService } from 'src/app/@core/services/rpc.service';
+import { RpcService, ENetwork } from 'src/app/@core/services/rpc.service';
+import { ENDPOINTS } from 'src/environments/endpoints.conf';
 import axios from 'axios';
 
 export interface IFuturesMarketType {
@@ -62,17 +63,35 @@ export class FuturesMarketService {
     }
 	
 	get relayerUrl(): string {
-	  const networkKey = this.rpcService.NETWORK || 'LTC';
-    console.log('[FMS] relayerUrl getter – networkKey:', networkKey);
-	  if (networkKey === 'LTC') {
-	    return 'https://api.layerwallet.com'; // mainnet relayer URL
-	  } else if (networkKey === 'LTCTEST') {
-	    return 'https://testnet-api.layerwallet.com'; // testnet relayer URL
-	  } else {
-	    // Fallback
-	    return 'https://api.layerwallet.com';
+	    const net = this.rpcService.NETWORK;
+	    console.log('[FMS] rpcService.NETWORK =', net, 'typeof →', typeof net);
+
+	    // 1) If they in fact passed you an object that _already_ has
+	    //    a relayerUrl field (e.g. ENDPOINTS.LTCTEST itself),
+	    //    just use that directly:
+	    if (net && typeof net === 'object' && 'relayerUrl' in net) {
+	      // @ts-ignore – we know it has relayerUrl
+	      const urlFromObj = (net as any).relayerUrl;
+	      console.log('[FMS] using relayerUrl on NETWORK object →', urlFromObj);
+	      return urlFromObj;
+	    }
+
+	    // 2) Otherwise stringify it (in case it's a number, enum, etc.)
+	    const key = String(net) as ENetwork;
+	    console.log('[FMS] coerced network key →', key);
+
+	    // 3) Compare against your enum
+	    if (key === ENetwork.LTCTEST) {
+	      const u = ENDPOINTS.LTCTEST.relayerUrl;
+	      console.log('[FMS] matched LTCTEST →', u);
+	      return u;
+	    }
+
+	    // 4) Default to mainnet
+	    const fallback = ENDPOINTS.LTC.relayerUrl;
+	    console.log('[FMS] defaulting to LTC →', fallback);
+	    return fallback;
 	  }
-	}
 
     set selectedMarketType(value: IFuturesMarketType) {
         if (!this.futuresMarketsTypes.length) return;
