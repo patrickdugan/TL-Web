@@ -16,7 +16,6 @@ import { LoadingService } from 'src/app/@core/services/loading.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { PasswordDialog } from 'src/app/@shared/dialogs/password/password.component';
 import { safeNumber } from 'src/app/utils/common.util';
-import axios from 'axios';
 
 const minFeeLtcPerKb = 0.002;
 const minVOutAmount = 0.000036;
@@ -194,23 +193,15 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
     const amount = this.buySellGroup.value.amount;
     const _price = this.buySellGroup.value.price;
     const price = this.isLimitSelected ? _price : this.currentPrice;
-    const leverage = 10;
-    const market = this.selectedMarket;
-    const collateral = market.collateral.propertyId;
-    const contract_id = market.contract_id;
+
+const market      = this.selectedMarket;
+const collateral  = market.collateral.propertyId;
+const contract_id = market.contract_id;
+const isInverse = market.inverse  ?? false;
+const notional  = market.notional ?? 1;
+const leverage  = market.leverage ?? 10;
 
     try {
-        // Fetch contract information
-        const contractInfo = await this.getContractInfo(contract_id);
-
-        if (!contractInfo) {
-          this.toastrService.error('Contract information could not be retrieved.');
-          return;
-        }
-
-        const isInverse = contractInfo.inverse || false; // Assuming the contractInfo has an "inverse" property
-        const notional = contractInfo.notional || 1;
-        const leverage = contractInfo.leverage || 10; // Fetch leverage from contractInfo, default to 10 if not provided
         const initialMargin = this.calculateInitialMargin(isInverse, amount, price, leverage, notional);
 
 
@@ -324,17 +315,6 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       const inOrderBalance = this.getInOrderAmount(token.propertyId);
       const balance = safeNumber((_balance  || 0) - inOrderBalance);
       return [token.fullName, `${ balance > 0 ? balance : 0 } ${token.shortName}`];
-    }
-
-    async getContractInfo(contractId: number): Promise<any> {
-      try {
-        const response = await axios.get(`https://api.layerwallet.com/tl_listContractSeries?contractId=${contractId}`);
-        return response.data;
-      } catch (error) {
-        console.error('Failed to fetch contract info:', error);
-        this.toastrService.error('Error fetching contract information.');
-        return null;
-      }
     }
 
     // Example of initial margin calculation based on inverse contract type
