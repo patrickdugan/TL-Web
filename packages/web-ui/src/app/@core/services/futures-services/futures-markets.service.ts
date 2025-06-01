@@ -160,11 +160,13 @@ export class FuturesMarketService {
 
     for (const market of allMarkets) {
         try {
-            const res = await axios.post(this.relayerUrl, {
+            const rpcUrl = this.relayerUrl.replace(/\/+$/, '') + '/rpc';
+
+			const res = await axios.post(rpcUrl, {
 			  jsonrpc: "2.0",
 			  id: 1,
-			  method: "tl_listContractSeries", // or "tl_listcontractseries" (match backend case!)
-			  params: [market.contract_id] // or [] if no param required
+			  method: "tl_listContractSeries", // match backend case
+			  params: [market.contract_id]
 			});
 
             const info = res.data;
