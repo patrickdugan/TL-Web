@@ -322,6 +322,7 @@ export class BuySwapper extends Swap {
                 throw new Error('SPOT trade logic not inserted yet.');
             }
         } catch (error: any) {
+            console.log('step 3 err '+error)
             this.terminateTrade(`Step 3: ${error.message || 'Unknown Error'}`);
         }
     }
