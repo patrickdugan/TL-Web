@@ -7,6 +7,8 @@ import { Swap } from "./swap";
 import { ENCODER } from '../payloads/encoder';
 import { ToastrService } from "ngx-toastr";
 import { WalletService } from 'src/app/@core/services/wallet.service';
+import { RpcService, ENetwork } from 'src/app/@core/services/rpc.service'
+import { ENDPOINTS } from 'src/environments/endpoints.conf';
 import BigNumber from 'bignumber.js';
 import axios from 'axios';
 
@@ -21,7 +23,8 @@ export class BuySwapper extends Swap {
         socket: SocketClient,
         txsService: TxsService,
         private toastrService: ToastrService,
-        private walletService: WalletService
+        private walletService: WalletService,
+        private rpcService: RpcService
     ) {
         super(typeTrade, tradeInfo, buyerInfo, sellerInfo, socket, txsService);
         this.handleOnEvents();
@@ -33,6 +36,37 @@ export class BuySwapper extends Swap {
         const currentTime = Date.now();
         console.log(`Time taken for ${stage}: ${currentTime - this.tradeStartTime} ms`);
     }
+
+    get relayerUrl(): string {
+        const net = this.rpcService.NETWORK;
+        console.log('[FMS] rpcService.NETWORK =', net, 'typeof →', typeof net);
+
+        // 1) If they in fact passed you an object that _already_ has
+        //    a relayerUrl field (e.g. ENDPOINTS.LTCTEST itself),
+        //    just use that directly:
+        if (net && typeof net === 'object' && 'relayerUrl' in net) {
+          // @ts-ignore – we know it has relayerUrl
+          const urlFromObj = (net as any).relayerUrl;
+          console.log('[FMS] using relayerUrl on NETWORK object →', urlFromObj);
+          return urlFromObj;
+        }
+
+        // 2) Otherwise stringify it (in case it's a number, enum, etc.)
+        const key = String(net) as ENetwork;
+        console.log('[FMS] coerced network key →', key);
+
+        // 3) Compare against your enum
+        if (key === ENetwork.LTCTEST) {
+          const u = ENDPOINTS.LTCTEST.relayerUrl;
+          console.log('[FMS] matched LTCTEST →', u);
+          return u;
+        }
+
+        // 4) Default to mainnet
+        const fallback = ENDPOINTS.LTC.relayerUrl;
+        console.log('[FMS] defaulting to LTC →', fallback);
+        return fallback;
+      }
 
     private handleOnEvents() {
         this.removePreviuesListeners();
@@ -99,7 +133,7 @@ export class BuySwapper extends Swap {
                 const isA = column === 'A' ? 1 : 0;
                 const initMargin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
 
-                const ctcpRes = await axios.get(`https://api.layerwallet.com/contracts/${contract_id}`);
+                const ctcpRes = await axios.post(`${this.relayerUrl}/tl_listContractSeries`, { contractId: contract_id });
                 const collateralPropId = ctcpRes?.data?.collateral;
                 
                 if (!collateralPropId) throw new Error('Collateral property ID missing');
