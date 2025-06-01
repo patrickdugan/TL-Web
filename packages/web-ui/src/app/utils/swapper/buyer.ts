@@ -133,7 +133,12 @@ export class BuySwapper extends Swap {
                 const isA = column === 'A' ? 1 : 0;
                 const initMargin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
 
-                const ctcpRes = await axios.post(`${this.relayerUrl}/tl_listContractSeries`, { contractId: contract_id });
+                const ctcpRes = await axios.post(this.relayerUrl, {
+                      jsonrpc: "2.0",
+                      id: 1,
+                      method: "tl_listContractSeries", // or "tl_listcontractseries" (match backend case!)
+                      params: [contract_id] // or [] if no param required
+                    });
                 const collateralPropId = ctcpRes?.data?.collateral;
                 
                 if (!collateralPropId) throw new Error('Collateral property ID missing');

@@ -160,7 +160,13 @@ export class FuturesMarketService {
 
     for (const market of allMarkets) {
         try {
-            const res = await axios.post(`${this.relayerUrl}/tl_listContractSeries`, { contractId: market.contract_id });
+            const res = await axios.post(this.relayerUrl, {
+			  jsonrpc: "2.0",
+			  id: 1,
+			  method: "tl_listContractSeries", // or "tl_listcontractseries" (match backend case!)
+			  params: [market.contract_id] // or [] if no param required
+			});
+
             const info = res.data;
             market.leverage = info?.leverage ?? undefined;
             market.notional = info?.notional ?? undefined;
