@@ -133,12 +133,11 @@ this.multySigChannelData = ms as IMSChannelData;
                 const isA = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
                 const margin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
 
-                const rpcUrl = this.relayerUrl.replace(/\/+$/, '') + '/rpc';
+                const rpcUrl = this.relayerUrl.replace(/\/+$/, '') + '/rpc/tl_listContractSeries';
 
                 const ctr= await axios.post(rpcUrl, {
                       jsonrpc: "2.0",
                       id: 1,
-                      method: "tl_listContractSeries", // or "tl_listcontractseries" (match backend case!)
                       params: [contract_id] // or [] if no param required
                     });
                 const collateral = ctr?.data?.collateral;
