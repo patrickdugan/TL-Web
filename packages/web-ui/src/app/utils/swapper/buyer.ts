@@ -133,6 +133,10 @@ export class BuySwapper extends Swap {
                 const isA = column === 'A' ? 1 : 0;
                 const initMargin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
 
+            console.log('collat in futures buy step 3 '+collateral)
+            console.log('initMargin calc '+initMargin+' '+price+' '+levarage)
+
+
                 const payload = transfer
                     ? ENCODER.encodeTransfer({
                         propertyId: collateral,
