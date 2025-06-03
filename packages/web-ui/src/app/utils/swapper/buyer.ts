@@ -155,7 +155,7 @@ export class BuySwapper extends Swap {
                     toKeyPair: { address: this.multySigChannelData.address },
                     payload
                 });
-
+                console.log('commit Res '+JSON.stringify(commitRes))
                 if (commitRes.error || !commitRes.data?.rawtx) throw new Error(`Build Commit TX: ${commitRes.error}`);
 
                 const { rawtx } = commitRes.data;

@@ -218,13 +218,13 @@ getEnoughInputs2(
 async buildSignSendTxGrabUTXO(
     buildTxConfig: IBuildTxConfig
   ): Promise<{ txid?: string; commitUTXO?: IUTXO; error?: string }> {
-    try {
+    //try {
       this.loadingService.isLoading = true;
     const UTXOs = this.balanceService.allBalances[buildTxConfig.fromKeyPair.address]?.coinBalance?.utxos;
 
       const biggestInput = this.getEnoughInputs2(UTXOs,0.0000546)
       buildTxConfig.inputs=biggestInput.finalInputs
-
+      console.log('buildTxConfig '+JSON.stringify(buildTxConfig))
       // Sign transaction using wallet
       const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: buildTxConfig, network: this.balanceService.NETWORK });
       if (!signResponse || !signResponse.success) {
@@ -244,12 +244,12 @@ async buildSignSendTxGrabUTXO(
     console.log('Transaction ID:', sendResponse.data);
     
     return { txid: sendResponse.data, commitUTXO: commitUTXO };
-    } catch (error: any) {
+    /*} catch (error: any) {
       console.error("Error in buildSignSendTx:", error.message);
       return { error: error.message };
     } finally {
       this.loadingService.isLoading = false;
-    }
+    }*/
   }
 
   async buildSignSendTx(
