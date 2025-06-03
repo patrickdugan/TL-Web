@@ -168,7 +168,7 @@ export class BuySwapper extends Swap {
                     amount: vout.value,
                     vout: vout.n,
                     confirmations: 0,
-                    txid: commitRes.data,
+                    txid: commitRes.txid||"",
                     scriptPubKey: this.multySigChannelData.scriptPubKey,
                     redeemScript: this.multySigChannelData.redeemScript
                 };
@@ -191,7 +191,7 @@ export class BuySwapper extends Swap {
                     payload: payload2,
                     amount: 0
                 };
-
+                console.log('about to build trade tx in step 3 '+JSON.stringify(buildOptions))
                 const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
                 if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
