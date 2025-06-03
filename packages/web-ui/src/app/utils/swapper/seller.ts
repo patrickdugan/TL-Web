@@ -129,20 +129,10 @@ this.multySigChannelData = ms as IMSChannelData;
                     ? ENCODER.encodeTransfer({ propertyId: propIdDesired, amount: amountDesired, isColumnA: isA, destinationAddr: toKeyPair.address })
                     : ENCODER.encodeCommit({ propertyId: propIdDesired, amount: amountDesired, channelAddress: toKeyPair.address });
             }else if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
-                const { contract_id, amount, price, levarage, transfer = false } = this.tradeInfo;
+                const { contract_id, amount, price, levarage, collateral, transfer = false } = this.tradeInfo;
                 const isA = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
                 const margin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
-
-                const rpcUrl = this.relayerUrl.replace(/\/+$/, '') + '/rpc/tl_listContractSeries';
-
-                const ctr= await axios.post(rpcUrl, {
-                      jsonrpc: "2.0",
-                      id: 1,
-                      params: [contract_id] // or [] if no param required
-                    });
-                const collateral = ctr?.data?.collateral;
-                if (!collateral) throw new Error('No collateral propertyId in contract');
-
+    
                 payload = transfer
                     ? ENCODER.encodeTransfer({ propertyId: collateral, amount: margin, isColumnA: isA, destinationAddr: toKeyPair.address })
                     : ENCODER.encodeCommit({ propertyId: collateral, amount: margin, channelAddress: toKeyPair.address });

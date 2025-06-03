@@ -128,33 +128,20 @@ export class BuySwapper extends Swap {
             const bbData = parseFloat(chainInfo.blocks) + 10;
 
             if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
-                const { contract_id, amount, price, levarage, transfer = false } = this.tradeInfo;
+                const { contract_id, amount, price, levarage,collateral, transfer = false } = this.tradeInfo;
                 const column = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address);
                 const isA = column === 'A' ? 1 : 0;
                 const initMargin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
 
-                const rpcUrl = this.relayerUrl.replace(/\/+$/, '') + '/rpc/tl_listContractSeries';
-
-                const ctcpRes = await axios.post(rpcUrl, {
-                  jsonrpc: "2.0",
-                  id: 1,
-                  //method: "tl_listContractSeries", // match backend case
-                  params: [contract_id]
-                });
-
-                const collateralPropId = ctcpRes?.data?.collateral;
-                
-                if (!collateralPropId) throw new Error('Collateral property ID missing');
-
                 const payload = transfer
                     ? ENCODER.encodeTransfer({
-                        propertyId: collateralPropId,
+                        propertyId: collateral,
                         amount: initMargin,
                         isColumnA: isA === 1,
                         destinationAddr: this.multySigChannelData.address
                     })
                     : ENCODER.encodeCommit({
-                        propertyId: collateralPropId,
+                        propertyId: collateral,
                         amount: initMargin,
                         channelAddress: this.multySigChannelData.address
                     });
