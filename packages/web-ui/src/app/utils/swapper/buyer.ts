@@ -159,13 +159,6 @@ export class BuySwapper extends Swap {
                 if (commitRes.error || !commitRes.data?.rawtx) throw new Error(`Build Commit TX: ${commitRes.error}`);
 
                 const { rawtx } = commitRes.data;
-                const commitTxSignRes = await this.txsService.signRawTxWithWallet(rawtx);
-                if (commitTxSignRes.error || !commitTxSignRes.data?.signedHex) throw new Error(`Sign Commit TX: ${commitTxSignRes.error}`);
-
-                const signedHex = commitTxSignRes.data.signedHex;
-                const commitTxSendRes = await this.txsService.sendTx(signedHex);
-                if (commitTxSendRes.error || !commitTxSendRes.data) throw new Error(`Send Commit TX: ${commitTxSendRes.error}`);
-
                 const drtRes = await this.txsService.decode(rawtx);
                 const decodedData = typeof drtRes.data === 'string' ? JSON.parse(drtRes.data) : drtRes.data;
                 const vout = decodedData.vout.find((o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address);
@@ -175,7 +168,7 @@ export class BuySwapper extends Swap {
                     amount: vout.value,
                     vout: vout.n,
                     confirmations: 0,
-                    txid: commitTxSendRes.data,
+                    txid: commitRes.data,
                     scriptPubKey: this.multySigChannelData.scriptPubKey,
                     redeemScript: this.multySigChannelData.redeemScript
                 };
@@ -204,8 +197,8 @@ export class BuySwapper extends Swap {
 
                 const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
                     psbtHex: rawHexRes.data.psbtHex,
-                    commitHex: signedHex,
-                    commitTxId: commitTxSendRes.data
+                    commitHex: rawtx,
+                    commitTxId: commitRes.data
                 });
                 this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
             } else {
