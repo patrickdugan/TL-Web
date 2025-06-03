@@ -134,7 +134,7 @@ export class BuySwapper extends Swap {
                 const initMargin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
 
             console.log('collat in futures buy step 3 '+collateral)
-            console.log('initMargin calc '+initMargin+' '+price+' '+levarage)
+            console.log('initMargin calc '+initMargin+' '+price+' '+levarage+' '+isA)
 
 
                 const payload = transfer
@@ -149,12 +149,13 @@ export class BuySwapper extends Swap {
                         amount: initMargin,
                         channelAddress: this.multySigChannelData.address
                     });
-
+                    console.log('about to build commit tx '+this.myInfo.keypair.address+' '+this.multySigChannelData.address+' '+payload)
                 const commitRes = await this.txsService.buildTx({
                     fromKeyPair: { address: this.myInfo.keypair.address },
                     toKeyPair: { address: this.multySigChannelData.address },
                     payload
                 });
+
                 if (commitRes.error || !commitRes.data?.rawtx) throw new Error(`Build Commit TX: ${commitRes.error}`);
 
                 const { rawtx } = commitRes.data;
