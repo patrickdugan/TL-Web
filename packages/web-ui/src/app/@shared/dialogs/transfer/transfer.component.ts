@@ -115,21 +115,11 @@ export class TransferDialog {
               payload: payload
           };
 
-          const commitTxRes = await this.txsService.buildTx(commitTxConfig);
+          const commitTxRes = await this.txsService.buildSignSendTxGrabUTXO(commitTxConfig);
 
           if (!commitTxRes.data) return console.log('Failed to build transaction.');
 
-          const { rawtx } = commitTxRes.data;
-
-          const commitTxSignRes = await this.txsService.signRawTxWithWallet(rawtx);
-          const { isValid, signedHex } = commitTxSignRes.data;
-
-          if (!isValid || !signedHex) return console.log(`Sign Commit TX (2): ${commitTxSignRes.error}`);
-
-          const commitTxSendRes = await this.txsService.sendTx(signedHex);
-          if (commitTxSendRes.error || !commitTxSendRes.data) return console.log(`Send Commit TX: ${commitTxSendRes.error}`);
-
-          this.toastrService.success(`Tokens moving to trade channel!`, 'Success: '+JSON.stringify(commitTxSendRes));
+          this.toastrService.success(`Tokens moving to trade channel!`, 'Success: '+JSON.stringify(commitTxRes));
       } catch (error: any) {
           this.toastrService.error(error.message || `Error with Withdraw`, 'Error');
       } finally {

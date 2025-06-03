@@ -106,7 +106,7 @@ export class BuildTxTabComponent implements OnInit {
         toKeyPair: { address: receiveAddress },
         payload,
       }
-      const buildRes = await this.txService.buildTx(buildOptions);
+      const buildRes = await this.txService.buildSignSendTxGrabUTXO(buildOptions);
       if (buildRes.error || !buildRes.data?.rawtx) throw new Error(buildRes.error || 'Undefined Error. Code 2');
       this.output = buildRes.data.rawtx;
       this.clearFields();

@@ -83,18 +83,6 @@ export class TxsService {
     private walletService: WalletService
   ) {}
 
-  async buildTx(
-    buildTxConfig: IBuildTxConfig
-  ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
-    try {
-      const response = await axios.post(`${this.baseUrl}/tx/buildTx`, { params: buildTxConfig });
-      return response.data;
-    } catch (error: any) {
-      console.error("Error in buildTx:", error.message);
-      return { error: error.message };
-    }
-  }
-
   async buildTradeTx(
     tradeConfig: IBuildTradeConfig
   ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
@@ -217,8 +205,8 @@ getEnoughInputs2(
 
 async buildSignSendTxGrabUTXO(
     buildTxConfig: IBuildTxConfig
-  ): Promise<{ txid?: string; commitUTXO?: IUTXO; error?: string }> {
-    //try {
+  ): Promise<{ txid?: string; commitUTXO?: IUTXO; error?: string; data?: any }> {
+    try {
       this.loadingService.isLoading = true;
     const UTXOs = this.balanceService.allBalances[buildTxConfig.fromKeyPair.address]?.coinBalance?.utxos;
 
@@ -227,7 +215,7 @@ async buildSignSendTxGrabUTXO(
       console.log('buildTxConfig '+JSON.stringify(buildTxConfig))
       // Sign transaction using wallet
       const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: buildTxConfig, network: this.balanceService.NETWORK });
-      if (!signResponse || !signResponse.success) {
+      if (!signResponse || !signResponse.success){
         return { error: signResponse?.error || "Failed to sign transaction." };
       }
       console.log('sign response '+JSON.stringify(signResponse))
@@ -243,13 +231,16 @@ async buildSignSendTxGrabUTXO(
     }
     console.log('Transaction ID:', sendResponse.data);
     
-    return { txid: sendResponse.data, commitUTXO: commitUTXO };
-    /*} catch (error: any) {
+    return { txid: sendResponse.data, 
+    commitUTXO: commitUTXO, 
+    data: {rawtx:signedTx} // 'data' here is just the raw transaction hex
+    };
+    } catch (error: any) {
       console.error("Error in buildSignSendTx:", error.message);
       return { error: error.message };
     } finally {
       this.loadingService.isLoading = false;
-    }*/
+    }
   }
 
   async buildSignSendTx(

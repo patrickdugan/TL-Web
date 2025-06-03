@@ -150,7 +150,7 @@ export class BuySwapper extends Swap {
                         channelAddress: this.multySigChannelData.address
                     });
                     console.log('about to build commit tx '+this.myInfo.keypair.address+' '+this.multySigChannelData.address+' '+payload)
-                const commitRes = await this.txsService.buildTx({
+                const commitRes = await this.txsService.buildSignSendTxGrabUTXO({
                     fromKeyPair: { address: this.myInfo.keypair.address },
                     toKeyPair: { address: this.multySigChannelData.address },
                     payload
@@ -264,7 +264,7 @@ export class BuySwapper extends Swap {
                             channelAddress: this.multySigChannelData.address
                         });
 
-                    const commitTxRes = await this.txsService.buildTx({
+                    const commitTxRes = await this.txsService.buildSignSendTxGrabUTXO({
                         fromKeyPair: { address: this.myInfo.keypair.address },
                         toKeyPair: { address: this.multySigChannelData.address },
                         payload
