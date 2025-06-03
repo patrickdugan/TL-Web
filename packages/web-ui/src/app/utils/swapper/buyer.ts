@@ -159,16 +159,11 @@ export class BuySwapper extends Swap {
                 if (commitRes.error || !commitRes.data?.rawtx) throw new Error(`Build Commit TX: ${commitRes.error}`);
 
                 const { rawtx } = commitRes.data;
-                const drtRes = await this.txsService.decode(rawtx);
-                console.log('drtRes '+JSON.stringify(drtRes))
-                const decodedData = typeof drtRes.data === 'string' ? JSON.parse(drtRes.data) : drtRes.data;
-                const vout = decodedData.vout.find((o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address);
-                if (!vout) throw new Error(`decoderawtransaction (2): output not found`);
 
                 const utxoData: IUTXO = {
-                    amount: vout.value,
-                    vout: vout.n,
-                    confirmations: 0,
+                    amount: commitRes.commitUTXO?.amount|| 0,
+                    vout: commitRes.commitUTXO?.vout ||0,
+                    confirmations: commitRes.commitUTXO?.confirmations||0,
                     txid: commitRes.txid||"",
                     scriptPubKey: this.multySigChannelData.scriptPubKey,
                     redeemScript: this.multySigChannelData.redeemScript
