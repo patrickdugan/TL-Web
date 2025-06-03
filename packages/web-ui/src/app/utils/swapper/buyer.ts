@@ -160,6 +160,7 @@ export class BuySwapper extends Swap {
 
                 const { rawtx } = commitRes.data;
                 const drtRes = await this.txsService.decode(rawtx);
+                console.log('drtRes '+JSON.stringify(drtRes))
                 const decodedData = typeof drtRes.data === 'string' ? JSON.parse(drtRes.data) : drtRes.data;
                 const vout = decodedData.vout.find((o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address);
                 if (!vout) throw new Error(`decoderawtransaction (2): output not found`);
