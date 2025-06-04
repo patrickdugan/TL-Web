@@ -180,19 +180,13 @@ export class BuySwapper extends Swap {
                     insurance:false
                 };
                 const payload2 = ENCODER.encodeTradeContractChannel(cpcitOptions);
-                const commitUTXOsArray = [commitUTXO, utxoData];
-                const totalCommitAmountSats = commitUTXOsArray
-                  .map(u => Math.round(u.amount * 1e8))
-                  .reduce((a, b) => a + b, 0);
-
-                 const buildOptions: IBuildTradeConfig = {
-                        buyerKeyPair: this.myInfo.keypair,
-                        sellerKeyPair: this.cpInfo.keypair,
-                        commitUTXOs: [commitUTXO, utxoData],
-                        payload: payload2,
-                        amount: totalCommitAmountSats
-                    };
-
+                const buildOptions: IBuildLTCITTxConfig = {
+                    buyerKeyPair: this.myInfo.keypair,
+                    sellerKeyPair: this.cpInfo.keypair,
+                    commitUTXOs: [commitUTXO, utxoData],
+                    payload: payload2,
+                    amount: 0
+                };
                 console.log('about to build trade tx in step 3 '+JSON.stringify(buildOptions))
                 const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
                 if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
@@ -300,17 +294,12 @@ export class BuySwapper extends Swap {
                     const cpitRes = { data: ENCODER.encodeTradeTokensChannel(cpitLTCOptions), error: null };
                     if (cpitRes.error || !cpitRes.data) throw new Error(`tl_createpayload_instant_trade: ${cpitRes.error}`);
 
-                    const commitUTXOsArray = [commitUTXO, utxoData];
-                    const totalCommitAmountSats = commitUTXOsArray
-                      .map(u => Math.round(u.amount * 1e8))
-                      .reduce((a, b) => a + b, 0);
-
                     const buildOptions: IBuildTradeConfig = {
                         buyerKeyPair: this.myInfo.keypair,
                         sellerKeyPair: this.cpInfo.keypair,
                         commitUTXOs: [commitUTXO, utxoData],
                         payload: cpitRes.data,
-                        amount: totalCommitAmountSats
+                        amount: 0
                     };
 
                     const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
