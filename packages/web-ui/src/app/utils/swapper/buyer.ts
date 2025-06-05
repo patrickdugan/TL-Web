@@ -205,8 +205,7 @@ export class BuySwapper extends Swap {
 
                 const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
                     psbtHex: rawHexRes.data.rawtx,
-                    commitHex: rawtx,
-                    commitTxId: commitRes.data
+                    commitTxId: rawtx
                 });
                 this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
             } else {
@@ -322,10 +321,11 @@ export class BuySwapper extends Swap {
                     const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
                     if (rawHexRes.error || !rawHexRes.data?.rawtx) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
-                    const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, rawHexRes.data.rawtx);
+                    const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
+                    psbtHex: rawHexRes.data.rawtx,
+                    commitTxId: rawtx});
                     this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
                 }
-                throw new Error('SPOT trade logic not inserted yet.');
             }
         } catch (error: any) {
             console.log('step 3 err '+error)
