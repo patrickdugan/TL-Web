@@ -193,11 +193,12 @@ export class BuySwapper extends Swap {
                     payload: payload2,
                     amount: 0
                 };
-                console.log('about to build trade tx in step 3 '+JSON.stringify(buildOptions))
+                
                 buildOptions.commitUTXOs = buildOptions.commitUTXOs?.map(u => ({
                   ...u,
                   amount: u.amount < 1 ? this.toSats(u.amount) : Math.round(u.amount)
                 }));
+                console.log('about to build trade tx in step 3 '+JSON.stringify(buildOptions))
                 const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
                 if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
