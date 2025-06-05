@@ -161,7 +161,8 @@ export class BuySwapper extends Swap {
                 const { rawtx } = commitRes.data;
 
                 const utxoData: IUTXO = {
-                    amount: commitRes.commitUTXO?.amount|| 0,
+                   amount: commitRes.commitUTXO?.amount
+                    ? new BigNumber(commitRes.commitUTXO.amount).times(1e8).integerValue(BigNumber.ROUND_DOWN).toNumber(): 0,
                     vout: commitRes.commitUTXO?.vout ||0,
                     confirmations: commitRes.commitUTXO?.confirmations||0,
                     txid: commitRes.txid||"",
@@ -274,7 +275,8 @@ export class BuySwapper extends Swap {
                     if (!vout) throw new Error(`decoderawtransaction (2): output not found`);
 
                     const utxoData: IUTXO = {
-                        amount: vout.value,
+                        amount: commitTxRes.commitUTXO?.amount
+                          ? new BigNumber(commitTxRes.commitUTXO.amount).times(1e8).integerValue(BigNumber.ROUND_DOWN).toNumber(): 0,
                         vout: vout.n,
                         confirmations: 0,
                         txid: commitTxSendRes.data,
