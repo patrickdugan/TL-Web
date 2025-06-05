@@ -184,7 +184,7 @@ export class BuySwapper extends Swap {
                 const buildOptions: IBuildLTCITTxConfig = {
                     buyerKeyPair: this.myInfo.keypair,
                     sellerKeyPair: this.cpInfo.keypair,
-                    commitUTXOs: [commitUTXO, utxoData],
+                    commitUTXOs: [utxoData],
                     payload: payload2,
                     amount: 0
                 };
@@ -299,7 +299,7 @@ export class BuySwapper extends Swap {
                     const buildOptions: IBuildTradeConfig = {
                         buyerKeyPair: this.myInfo.keypair,
                         sellerKeyPair: this.cpInfo.keypair,
-                        commitUTXOs: [commitUTXO, utxoData],
+                        commitUTXOs: [utxoData],
                         payload: cpitRes.data,
                         amount: 0
                     };
