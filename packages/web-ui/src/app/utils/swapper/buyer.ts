@@ -37,6 +37,11 @@ export class BuySwapper extends Swap {
         console.log(`Time taken for ${stage}: ${currentTime - this.tradeStartTime} ms`);
     }
 
+    private toSats(val: number) {
+      if (typeof val !== 'number') return 0;
+      return val < 1 ? new BigNumber(val).times(1e8).integerValue(BigNumber.ROUND_DOWN).toNumber() : Math.round(val);
+    }
+
     get relayerUrl(): string {
         const net = this.rpcService.NETWORK;
         console.log('[FMS] rpcService.NETWORK =', net, 'typeof →', typeof net);
@@ -181,7 +186,7 @@ export class BuySwapper extends Swap {
                     insurance:false
                 };
                 const payload2 = ENCODER.encodeTradeContractChannel(cpcitOptions);
-                const buildOptions: IBuildLTCITTxConfig = {
+                let buildOptions: IBuildLTCITTxConfig = {
                     buyerKeyPair: this.myInfo.keypair,
                     sellerKeyPair: this.cpInfo.keypair,
                     commitUTXOs: [utxoData],
@@ -189,6 +194,10 @@ export class BuySwapper extends Swap {
                     amount: 0
                 };
                 console.log('about to build trade tx in step 3 '+JSON.stringify(buildOptions))
+                buildOptions.commitUTXOs = buildOptions.commitUTXOs?.map(u => ({
+                  ...u,
+                  amount: u.amount < 1 ? this.toSats(u.amount) : Math.round(u.amount)
+                }));
                 const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
                 if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
@@ -296,13 +305,17 @@ export class BuySwapper extends Swap {
                     const cpitRes = { data: ENCODER.encodeTradeTokensChannel(cpitLTCOptions), error: null };
                     if (cpitRes.error || !cpitRes.data) throw new Error(`tl_createpayload_instant_trade: ${cpitRes.error}`);
 
-                    const buildOptions: IBuildTradeConfig = {
+                    let buildOptions: IBuildTradeConfig = {
                         buyerKeyPair: this.myInfo.keypair,
                         sellerKeyPair: this.cpInfo.keypair,
                         commitUTXOs: [utxoData],
                         payload: cpitRes.data,
                         amount: 0
                     };
+                    buildOptions.commitUTXOs = buildOptions.commitUTXOs?.map(u => ({
+                      ...u,
+                      amount: u.amount < 1 ? this.toSats(u.amount) : Math.round(u.amount)
+                    }));
 
                     const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
                     if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
