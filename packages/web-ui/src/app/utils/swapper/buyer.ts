@@ -248,7 +248,7 @@ export class BuySwapper extends Swap {
                     const rawHexRes = await this.txsService.buildLTCITTx(buildOptions, satsPaid);
                     if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
-                    const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, rawHexRes.data.psbtHex);
+                    const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {psbtHex: rawHexRes.data.data.psbtHex});
                     this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
                 } else {
                     const payload = transfer
@@ -323,7 +323,7 @@ export class BuySwapper extends Swap {
 
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
                     psbtHex: rawHexRes.data.rawtx,
-                    commitTxId: rawtx});
+                    commitHex: rawtx, commitTxId: commitTxSendRes.data});
                     this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
                 }
             }

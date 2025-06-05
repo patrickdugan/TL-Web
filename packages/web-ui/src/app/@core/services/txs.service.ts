@@ -88,6 +88,8 @@ export class TxsService {
   ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
     try {
       const response = await axios.post(`${this.baseUrl}/tx/buildTradeTx`, tradeConfig );
+      console.log('trade build response '+JSON.stringify(response))
+
       return response.data;
     } catch (error: any) {
       console.error("Error in buildTradeTx:", error.message);
