@@ -200,6 +200,7 @@ export class BuySwapper extends Swap {
                 }));
                 console.log('about to build trade tx in step 3 '+JSON.stringify(buildOptions))
                 const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
+                console.log('bleh'+JSON.stringify(rawHexRes))
                 if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
                 const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
