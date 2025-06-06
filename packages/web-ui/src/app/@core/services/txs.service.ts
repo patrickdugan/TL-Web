@@ -112,8 +112,7 @@ export class TxsService {
     // Use the pubkey from the matched account or fallback to the one in the config
     const pubkey = matchingAccount?.pubkey || buildLTCITTxConfig.buyerKeyPair.pubkey || '';
     console.log('about to call for utxo in build ltc trade '+buildLTCITTxConfig.buyerKeyPair.address+' '+pubkey )
-    // Fetch UTXOs
-    //const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address, pubkey);
+   
 
     if(this.balanceService.NETWORK=="LTCTEST"){
           this.baseUrl = 'https://testnet-api.layerwallet.com'
