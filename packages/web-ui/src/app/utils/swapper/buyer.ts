@@ -167,12 +167,7 @@ export class BuySwapper extends Swap {
 
 
                 const utxoData: IUTXO = {
-                      amount: (() => {
-                        const amt = commitRes.commitUTXO?.amount ?? 0;
-                        // If integer and > 100, probably already in sats (not LTC)
-                        return Number.isInteger(amt) && amt > 100 ? amt
-                            : new BigNumber(amt).times(1e8).integerValue(BigNumber.ROUND_DOWN).toNumber();
-                    })(),
+                    amount: commitRes.commitUTXO?.amount ?? 0,
                     vout: commitRes.commitUTXO?.vout ||0,
                     confirmations: commitRes.commitUTXO?.confirmations||0,
                     txid: commitRes.txid||"",
@@ -290,12 +285,7 @@ export class BuySwapper extends Swap {
                     if (!vout) throw new Error(`decoderawtransaction (2): output not found`);
 
                     const utxoData: IUTXO = {
-                        amount: (() => {
-                        const amt = commitTxRes.commitUTXO?.amount ?? 0;
-                        // If integer and > 100, probably already in sats (not LTC)
-                        return Number.isInteger(amt) && amt > 100 ? amt
-                            : new BigNumber(amt).times(1e8).integerValue(BigNumber.ROUND_DOWN).toNumber();
-                    })(),
+                        amount: commitTxRes.commitUTXO?.amount ?? 0,
                         vout: vout.n,
                         confirmations: 0,
                         txid: commitTxSendRes.data,
