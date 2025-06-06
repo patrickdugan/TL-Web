@@ -115,14 +115,6 @@ export class TxsService {
     // Fetch UTXOs
     //const utxos = await this.fetchUTXOs(buildLTCITTxConfig.buyerKeyPair.address, pubkey);
 
-    // Send the buildUTXOTrade request
-    /*const response = await window.myWallet?.sendRequest("buildUTXOTrade", {
-      config: buildLTCITTxConfig,
-      outputs: utxos,
-      network: this.balanceService.NETWORK,
-      satsPaid: satsPaid
-    });*/
-
     if(this.balanceService.NETWORK=="LTCTEST"){
           this.baseUrl = 'https://testnet-api.layerwallet.com'
           console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)

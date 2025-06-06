@@ -193,13 +193,9 @@ export class BuySwapper extends Swap {
                     payload: payload2,
                     amount: 0
                 };
-                
-                buildOptions.commitUTXOs = buildOptions.commitUTXOs?.map(u => ({
-                  ...u,
-                  amount: u.amount < 1 ? this.toSats(u.amount) : Math.round(u.amount)
-                }));
+            
                 console.log('about to build trade tx in step 3 '+JSON.stringify(buildOptions))
-                const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
+                const rawHexRes = await this.txsService.buildLTCITTx(buildOptions,0);
                 console.log('bleh'+JSON.stringify(rawHexRes))
                 if (rawHexRes.error || !rawHexRes.data?.rawtx) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
@@ -305,19 +301,15 @@ export class BuySwapper extends Swap {
                     const cpitRes = { data: ENCODER.encodeTradeTokensChannel(cpitLTCOptions), error: null };
                     if (cpitRes.error || !cpitRes.data) throw new Error(`tl_createpayload_instant_trade: ${cpitRes.error}`);
 
-                    let buildOptions: IBuildTradeConfig = {
+                    let buildOptions: IBuildLTCITTxConfig = {
                         buyerKeyPair: this.myInfo.keypair,
                         sellerKeyPair: this.cpInfo.keypair,
                         commitUTXOs: [utxoData],
                         payload: cpitRes.data,
                         amount: 0
                     };
-                    buildOptions.commitUTXOs = buildOptions.commitUTXOs?.map(u => ({
-                      ...u,
-                      amount: u.amount < 1 ? this.toSats(u.amount) : Math.round(u.amount)
-                    }));
 
-                    const rawHexRes = await this.txsService.buildTradeTx(buildOptions);
+                    const rawHexRes = await this.txsService.buildLTCITTx(buildOptions,0);
                     if (rawHexRes.error || !rawHexRes.data?.rawtx) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
