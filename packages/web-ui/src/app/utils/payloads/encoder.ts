@@ -76,7 +76,7 @@ const encodeTradeContractChannel = (params: EncodeTradeContractParams): string =
     params.expiryBlock.toString(36),
     params.insurance ? '1' : '0',
   ];
-  return marker + '13' + payload.join(',');
+  return marker + '19' + payload.join(',');
 };
 
 type EncodeCommitParams = {
