@@ -55,7 +55,11 @@ const encodeTradeTokensChannel = (params: TradeTokensChannelParams): string => {
     params.columnAIsOfferer ? '1' : '0',
     params.expiryBlock.toString(36)
   ];
-  return marker + '14' + payload.join(',');
+  // After:
+const type = 20;
+const typeChar = type.toString(36);  
+return marker + typeChar + payload.join(',');
+
 };
 
 type EncodeTradeContractParams = {
@@ -76,7 +80,10 @@ const encodeTradeContractChannel = (params: EncodeTradeContractParams): string =
     params.expiryBlock.toString(36),
     params.insurance ? '1' : '0',
   ];
-  return marker + '19' + payload.join(',');
+  // After:
+const type = 19;
+const typeChar = type.toString(36);    // 'j'
+return marker + typeChar + payload.join(',');
 };
 
 type EncodeCommitParams = {
