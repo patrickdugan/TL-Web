@@ -171,7 +171,7 @@ export class FuturesMarketService {
 
             const info = res.data;
             market.leverage = info?.leverage ?? undefined;
-            market.notional = info?.notional ?? undefined;
+            market.notional = info?.notionalValue ?? undefined;
             market.inverse = info?.inverse ?? undefined;
         } catch (err) {
             console.warn(`Failed to load contract info for contract_id ${market.contract_id}`, err);

@@ -177,7 +177,7 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
 
       const collateralBalance = Math.max(available, channel);
       const leverage = market.leverage || 10;
-      const notional = market.notional || 1;
+      const notional = 1;
 
       return safeNumber((collateralBalance * leverage) / (price * notional));
     }
@@ -233,6 +233,10 @@ const leverage  = market.leverage ?? 10;
         if (!contract_id || (!price && this.isLimitSelected) || !amount) return;
         if (!this.futureKeyPair) return;
 
+
+      const sterilizedNotional = market.notional || 1
+      const adjustedAmount = Math.floor(amount/sterilizedNotional)
+
         const order: IFuturesTradeConf = { 
           keypair: {
             address: this.futureKeyPair.address,
@@ -242,7 +246,7 @@ const leverage  = market.leverage ?? 10;
           type: "FUTURES",
           props: {
             contract_id: contract_id,
-            amount: amount,
+            amount: adjustedAmount,
             price: price,
             collateral: collateral,
             levarage: leverage,
