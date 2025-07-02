@@ -17,6 +17,7 @@ export interface IPosition {
 @Injectable({
     providedIn: 'root',
 })
+
 export class FuturesPositionsService {
     private _openedPosition: IPosition | null = null;
     private _selectedContractId: string | null = null;
@@ -38,7 +39,7 @@ export class FuturesPositionsService {
     }
 
     get activeFutureAddress(): string | undefined {
-        return this.authService.activeFuturesKey?.address;
+                return this.authService.walletAddresses[0];
     }
 
     get tlApi() {
@@ -57,7 +58,6 @@ export class FuturesPositionsService {
         if (this.subs$) return;
 
         this.subs$ = this.rpcService.blockSubs$.subscribe(block => {
-            if (block.type === "LOCAL") return;
             if (!this.activeFutureAddress || !this.selectedContractId) return;
             this.updatePositions();
         });
@@ -82,9 +82,20 @@ async updatePositions() {
       return;
     }
 
-    const positionValue = parseFloat(res.data.data['position'] || "0");
-    this.openedPosition = positionValue ? res.data.data : null;
+    const raw = res.data;
 
+    const positionValue = parseFloat(raw.contracts || "0");
+            if (positionValue){
+                this.openedPosition = {
+                    position: raw.contracts,
+                    entry_price: raw.avgPrice,
+                    BANKRUPTCY_PRICE: raw.bankruptcyPrice,
+                    position_margin: raw.margin,
+                    upnl: raw.unrealizedPNL,
+                };
+            }else {
+                this.openedPosition = null;
+            }
   } catch (err) {
     console.error('❌ RPC error in updatePositions:', err);
     this.toastrService.error('Network error fetching position', 'Error');
