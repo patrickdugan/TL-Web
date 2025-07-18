@@ -16,6 +16,7 @@ import { LoadingService } from 'src/app/@core/services/loading.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { PasswordDialog } from 'src/app/@shared/dialogs/password/password.component';
 import { safeNumber } from 'src/app/utils/common.util';
+import BigNumber from 'bignumber.js';
 
 const minFeeLtcPerKb = 0.002;
 const minVOutAmount = 0.000036;
@@ -119,6 +120,25 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
         this.attestationStatus = this.isFutureAddressSelfAtt();  // was getAttestationStatus()
       }
 
+      private contractsFromAmount(
+          isInverse: boolean,
+          notional: number,   // Per-contract notional in base (LTC per contract for inverse, TL per contract for linear)
+          price: number,      // TL/LTC (or quote/base)
+          amount: number      // User's input (TL for inverse, base asset for linear)
+      ): number {
+          if (isInverse) {
+              // User input: TL; need contracts to reach amount TL exposure at price
+              // contracts = (amount TL / price TL/LTC) / notional (LTC/contract)
+              const ltc = new BigNumber(amount).dividedBy(price); // TL / (TL/LTC) = LTC
+              return Math.floor(ltc.dividedBy(notional).toNumber());
+          } else {
+              // User input: BASE asset (e.g., LTC)
+              // contracts = amount BASE / notional (BASE/contract)
+              return Math.floor(new BigNumber(amount).dividedBy(notional).toNumber());
+          }
+      }
+
+
     private buildForms() {
       this.buySellGroup = this.fb.group({
         price: [null, [Validators.required, Validators.min(0.01)]],
@@ -202,7 +222,8 @@ const notional  = market.notional ?? 1;
 const leverage  = market.leverage ?? 10;
 
     try {
-        const initialMargin = this.calculateInitialMargin(isInverse, amount, price, leverage, notional);
+    const contracts = this.contractsFromAmount(isInverse, notional, price, amount);
+        const initialMargin = this.calculateInitialMargin(isInverse, contracts, price, leverage, notional);
 
 
         const pubkey = this.futureKeyPair.pubkey
@@ -233,10 +254,6 @@ const leverage  = market.leverage ?? 10;
         if (!contract_id || (!price && this.isLimitSelected) || !amount) return;
         if (!this.futureKeyPair) return;
 
-
-      const sterilizedNotional = market.notional || 1
-      const adjustedAmount = Math.floor(amount/sterilizedNotional)
-
         const order: IFuturesTradeConf = { 
           keypair: {
             address: this.futureKeyPair.address,
@@ -246,7 +263,7 @@ const leverage  = market.leverage ?? 10;
           type: "FUTURES",
           props: {
             contract_id: contract_id,
-            amount: adjustedAmount,
+            amount: contracts,
             price: price,
             collateral: collateral,
             levarage: leverage,
@@ -322,19 +339,26 @@ const leverage  = market.leverage ?? 10;
     }
 
     // Example of initial margin calculation based on inverse contract type
-    calculateInitialMargin(isInverse: boolean, amount: number, price: number, leverage: number, notional:number){
-      let margin = 0;
+    calculateInitialMargin(
+  isInverse: boolean,
+  contracts: number,
+  price: number,
+  leverage: number,
+  notional: number
+) {
+  let margin = 0;
 
-      if (isInverse) {
-        // Logic for inverse margin calculation
-        margin = safeNumber(((amount / price)/leverage)*notional);  // Simplified example for inverse
-      } else {
-        // Logic for standard margin calculation
-        margin = safeNumber(((amount * price)/leverage)*notional);  // Simplified example for standard
-      }
+  if (isInverse) {
+    // Margin for inverse contract: (contracts * notional) / price / leverage
+    margin = safeNumber((contracts * notional) / price / leverage);
+  } else {
+    // Margin for linear contract: (contracts * notional * price) / leverage
+    margin = safeNumber((contracts * notional * price) / leverage);
+  }
 
-      return safeNumber(margin);
-    }
+  return safeNumber(margin);
+}
+
 
     private getInOrderAmount(propertyId: number) {
       const num = this.futuresOrdersService.openedOrders.map(o => {
