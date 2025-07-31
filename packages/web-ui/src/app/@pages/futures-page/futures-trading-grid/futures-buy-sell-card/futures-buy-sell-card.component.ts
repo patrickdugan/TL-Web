@@ -266,7 +266,7 @@ const leverage  = market.leverage ?? 10;
             amount: contracts,
             price: price,
             collateral: collateral,
-            levarage: leverage,
+            margin: initialMargin,
             transfer: transfer
           },
           isLimitOrder: this.isLimitSelected,

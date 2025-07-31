@@ -28,7 +28,7 @@ export interface IFuturesTradeProps {
     amount: number;
     contract_id: number;
     price: number;
-    levarage: number;
+    margin: number;
     collateral: number;
     transfer?: boolean;
 };
@@ -48,6 +48,7 @@ export interface IBuyerSellerKeyPair {
 export interface IBuyerSellerInfo {
     keypair: IBuyerSellerKeyPair;
     socketId: string;
+    uuid?: string;
 };
 
 export interface ITradeInfo<IProps = IFuturesTradeProps | ISpotTradeProps> {
