@@ -133,25 +133,24 @@ export class BuySwapper extends Swap {
             const bbData = parseFloat(chainInfo.blocks) + 10;
 
             if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
-                const { contract_id, amount, price, levarage,collateral, transfer = false } = this.tradeInfo;
-                const column = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address);
+                const { contract_id, amount, price, margin,collateral, transfer = false } = this.tradeInfo;
+                const column = await this.txsService.predictColumn(this.multySigChannelData.address, this.myInfo.keypair.address, this.cpInfo.keypair.address);
                 const isA = column === 'A' ? 1 : 0;
-                const initMargin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
 
             console.log('collat in futures buy step 3 '+collateral)
-            console.log('initMargin calc '+initMargin+' '+price+' '+levarage+' '+isA)
+            console.log('initMargin calc '+margin+' '+price+' '+isA)
 
 
                 const payload = transfer
                     ? ENCODER.encodeTransfer({
                         propertyId: collateral,
-                        amount: initMargin,
+                        amount: margin,
                         isColumnA: isA === 1,
                         destinationAddr: this.multySigChannelData.address
                     })
                     : ENCODER.encodeCommit({
                         propertyId: collateral,
-                        amount: initMargin,
+                        amount: margin,
                         channelAddress: this.multySigChannelData.address
                     });
                     console.log('about to build commit tx '+this.myInfo.keypair.address+' '+this.multySigChannelData.address+' '+payload)
@@ -182,7 +181,6 @@ export class BuySwapper extends Swap {
                     price,
                     action: 1,
                     columnAIsSeller: column === 'A',
-                    leverage: levarage,
                     insurance:false
                 };
                 const payload2 = ENCODER.encodeTradeContractChannel(cpcitOptions);
@@ -207,7 +205,7 @@ export class BuySwapper extends Swap {
             } else {
                 // Full SPOT logic begins here
                 const { propIdDesired, amountDesired, amountForSale, propIdForSale, transfer } = this.tradeInfo as ISpotTradeProps;
-                const column = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address);
+                const column = await this.txsService.predictColumn(this.multySigChannelData.address,this.myInfo.keypair.address, this.cpInfo.keypair.address);
                 const isA = column === 'A' ? 1 : 0;
 
                 let ltcTrade = false;

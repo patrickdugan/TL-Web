@@ -358,13 +358,13 @@ async getChainInfo(): Promise<{ data?: string; error?: string }>{
 }
 
 
-    async predictColumn(myAddress: string, cpAddress: string): Promise<{ data?: string; error?: string }>{
+    async predictColumn(channelAddress: string, myAddress: string, cpAddress: string): Promise<{ data?: string; error?: string }>{
       if(this.balanceService.NETWORK=="LTCTEST"){
         this.baseUrl = 'https://testnet-api.layerwallet.com'
         console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
       }
       try {
-        const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannelColumn`, { myAddress, cpAddress });
+        const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannelColumn`, {channelAddress, myAddress, cpAddress });
         return response.data;
       } catch (error: any) {
         console.error('Error in predictColumn:', error.message);

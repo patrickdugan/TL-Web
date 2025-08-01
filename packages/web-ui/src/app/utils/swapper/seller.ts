@@ -123,15 +123,14 @@ this.multySigChannelData = ms as IMSChannelData;
 
             if (this.typeTrade === ETradeType.SPOT && 'propIdDesired' in this.tradeInfo) {
                 const { propIdDesired, amountDesired, transfer = false } = this.tradeInfo;
-                const isA = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
+                const isA = await this.txsService.predictColumn(this.multySigChannelData.address,this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
 
                 payload = transfer
                     ? ENCODER.encodeTransfer({ propertyId: propIdDesired, amount: amountDesired, isColumnA: isA, destinationAddr: toKeyPair.address })
                     : ENCODER.encodeCommit({ propertyId: propIdDesired, amount: amountDesired, channelAddress: toKeyPair.address });
             }else if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
-                const { contract_id, amount, price, levarage, collateral, transfer = false } = this.tradeInfo;
-                const isA = await this.txsService.predictColumn(this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
-                const margin = new BigNumber(amount).times(price).dividedBy(levarage).decimalPlaces(8).toNumber();
+                const { contract_id, amount, price, margin, collateral, transfer = false } = this.tradeInfo;
+                const isA = await this.txsService.predictColumn(this.multySigChannelData.address,this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
     
                 payload = transfer
                     ? ENCODER.encodeTransfer({ propertyId: collateral, amount: margin, isColumnA: isA, destinationAddr: toKeyPair.address })

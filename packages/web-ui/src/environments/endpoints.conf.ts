@@ -7,11 +7,11 @@ export type TEndpoint = {
 
 export const ENDPOINTS: TEndpoint = {
     LTC: {
-        orderbookApiUrl: "https://ws.layerwallet.com:443",
+        orderbookApiUrl: "wss://ws.layerwallet.com:443",
         relayerUrl: "https://api.layerwallet.com", // Use the masked HTTPS domain for production
     },
     LTCTEST: {
-        orderbookApiUrl: "https://ws.layerwallet.com:443",
+        orderbookApiUrl: "wss://ws.layerwallet.com:443",
         relayerUrl: "https://testnet-api.layerwallet.com", // Use the masked HTTPS domain for production
     },
 };

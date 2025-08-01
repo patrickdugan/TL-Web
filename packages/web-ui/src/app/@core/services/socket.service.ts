@@ -1,19 +1,19 @@
 import { Injectable } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
-import { io, Socket } from 'socket.io-client';
-import { environment } from '../../../environments/environment';
 import { Subject } from 'rxjs';
 import { SwapService } from './swap.service';
 import { ESounds, SoundsService } from "./sound.service";
 import { LoadingService } from "./loading.service";
+import { io, Socket } from 'socket.io-client';
 
 @Injectable({
   providedIn: 'root',
 })
 export class SocketService {
-  private _obSocket: Socket | null = null;
-  private _obSocketConnected: boolean = false;
-
+  public ws: WebSocket | null = null;
+  public obSocket: Socket | null = null;
+  private wsConnected = false;
+  private clientId = '';
   private eventSubject = new Subject<{ event: string; data: any }>();
 
   constructor(
@@ -23,85 +23,97 @@ export class SocketService {
     private loadingService: LoadingService
   ) {}
 
-  // ----------------------------
-  //  Socket Connection Methods
-  // ----------------------------
+  // Setup bridge from Socket.IO to WebSocket
+  private setupWalletBridge() {
+    if (!this.obSocket || (this.obSocket as any)._obBridgeInstalled) return;
+    (this.obSocket as any)._obBridgeInstalled = true;
+
+    // List of events to forward
+    ['update-orderbook', 'new-order', 'close-order', 'many-orders'].forEach(ev => {
+      this.obSocket!.on(ev, (data: any) => {
+        this.emitToServer(ev, data); // Pipe to WebSocket server
+      });
+    });
+
+    // Pass new‑channel events upstream (if needed)
+    this.obSocket!.on('OB_SOCKET::new-channel', (data: any) => {
+      this.emitToServer('new-channel', data);
+    });
+
+    // Forward any swap event
+    this.obSocket!.onAny((event: string, data: any) => {
+      if (event.endsWith('::swap')) {
+        this.emitToServer(event, data);
+      }
+    });
+  }
+
+  // Actually send to server (WebSocket)
+  private emitToServer(event: string, payload: any = {}) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ event, ...payload }));
+    }
+  }
 
   public obSocketConnect(url: string): void {
-    if (this._obSocket?.connected) {
-      console.log('obSocket is already connected.');
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      console.log('WebSocket is already connected or connecting.');
       return;
     }
+    this.ws = new WebSocket(url);
+     this.setupWalletBridge();
 
-    console.log('Connecting obSocket to', url);
-    this._obSocket = io(url, {
-      reconnection: true, // Allow automatic reconnection
-      transports: ['websocket'], // Use WebSocket transport
-      secure: true, // Use secure connection if needed
-    });
+    this.ws.onopen = () => {
+      this.wsConnected = true;
+      this.toasterService.success('OB Socket Connected', 'Socket');
+      console.log('OB WebSocket connected');
+      // Setup wallet bridge after connect (if you use obSocket)
+      // this.setupWalletBridge(); // Uncomment if needed
+    };
 
-    this._obSocket.on('connect', () => {
-      this._obSocketConnected = true;
-    if (this._obSocket && this._obSocket.id) {
-            console.log('OB socket connected:', this._obSocket.id);
-        } else {
-            console.warn('OB socket is null or does not have an ID.');
+    this.ws.onclose = (event) => {
+      this.wsConnected = false;
+      this.toasterService.error('Socket Disconnected', 'Socket');
+      console.error('OB WebSocket disconnected:', event.reason);
+    };
+
+    this.ws.onerror = (err) => {
+      this.wsConnected = false;
+      this.toasterService.error('Socket Connection Error', 'Socket');
+      console.error('OB WebSocket connection error:', err);
+    };
+
+    this.ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        const eventName = data.event || data.type || 'unknown';
+        
+        if (eventName === 'connected' && data.id) {
+          this.clientId = data.id; // Assign to a property on the class
+          console.log('[OB WS] Assigned client id:', data.id);
         }
 
-      this.toasterService.success('OB Socket Connected', 'Socket');
+        if (eventName === 'new-channel') {
+          this.swapService.onInit(data, this.ws as any); // You may adapt this as needed!
+        }
 
-      // Initialize SwapService after socket connection
+        // Optionally relay to socket.io if needed
+        this.obSocket?.emit(eventName, data);
 
-      // Register event listeners
-      this.handleObSocketEvents();
-    });
-
-    this._obSocket.on('disconnect', (reason) => {
-      this._obSocketConnected = false;
-      console.error('OB socket disconnected:', reason);
-      this.toasterService.error('Socket Disconnected', 'Socket');
-    });
-
-    this._obSocket.on('connect_error', (err) => {
-      this._obSocketConnected = false;
-      console.error('OB socket connection error:', err);
-      this.toasterService.error('Socket Connection Error', 'Socket');
-    });
+        // Notify any subscribers
+        this.emitEvent(eventName, data);
+      } catch (e) {
+        console.error('WebSocket message parse error:', e, msg.data);
+      }
+    };
   }
 
   public obSocketDisconnect(): void {
-    if (this._obSocket) {
-      console.log('Disconnecting obSocket');
-      this._obSocket.disconnect();
-      this._obSocket = null;
-      this._obSocketConnected = false;
+    if (this.ws) {
+      this.ws.close(1000, 'client-close');
+      this.ws = null;
+      this.wsConnected = false;
     }
-  }
-
-  // ----------------------------
-  //  Event Handling
-  // ----------------------------
-
-  private handleObSocketEvents(): void {
-    const events = [
-      'order:error',
-      'order:saved',
-      'placed-orders',
-      'orderbook-data',
-      'update-orders-request',
-      'new-channel',
-    ];
-
-    events.forEach((eventName) => {
-      this._obSocket?.on(eventName, (data: any) => {
-        console.log(`Event received: ${eventName}`, data);
-        if(eventName=='new-channel'&& this._obSocket){
-            const res = this.swapService.onInit(data,this._obSocket);
-        }
-        // Emit the event via RxJS Subject
-        this.emitEvent(eventName, data);
-      });
-    });
   }
 
   private emitEvent(event: string, data: any): void {
@@ -112,23 +124,16 @@ export class SocketService {
     return this.eventSubject.asObservable();
   }
 
-  // ----------------------------
-  //  Socket Interaction Methods
-  // ----------------------------
-
   public send(event: string, data: any): void {
-    if (!this._obSocket || !this._obSocketConnected) {
-      console.error('Socket is not connected; cannot send message');
+    if (!this.ws || !this.wsConnected || this.ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not connected; cannot send message');
       return;
     }
-    this._obSocket.emit(event, data);
-  }
-
-  get obSocket(): Socket | null {
-    return this._obSocket;
+    const msg = JSON.stringify({ event, ...data });
+    this.ws.send(msg);
   }
 
   get obSocketConnected(): boolean {
-    return this._obSocketConnected;
+    return this.wsConnected;
   }
 }
