@@ -214,12 +214,12 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
     const _price = this.buySellGroup.value.price;
     const price = this.isLimitSelected ? _price : this.currentPrice;
 
-const market      = this.selectedMarket;
-const collateral  = market.collateral.propertyId;
-const contract_id = market.contract_id;
-const isInverse = market.inverse  ?? false;
-const notional  = market.notional ?? 1;
-const leverage  = market.leverage ?? 10;
+	const market      = this.selectedMarket;
+	const collateral  = market.collateral.propertyId;
+	const contract_id = market.contract_id;
+	const isInverse = market.inverse  ?? false;
+	const notional  = market.notional ?? 1;
+	const leverage  = market.leverage ?? 10;
 
     try {
     const contracts = this.contractsFromAmount(isInverse, notional, price, amount);
