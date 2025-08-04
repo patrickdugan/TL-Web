@@ -31,30 +31,24 @@ export class SocketService {
     // List of events to forward
     ['update-orderbook', 'new-order', 'close-order', 'many-orders'].forEach(ev => {
       this.obSocket!.on(ev, (data: any) => {
-        this.emit(ev, data); // Pipe to WebSocket server
+        this.send(ev, data); // Pipe to WebSocket server
       });
     });
 
     // Pass new‑channel events upstream (if needed)
     this.obSocket!.on('OB_SOCKET::new-channel', (data: any) => {
-      this.emit('new-channel', data);
+      this.send('new-channel', data);
     });
 
     // Forward any swap event
     this.obSocket!.onAny((event: string, data: any) => {
       if (event.endsWith('::swap')) {
-        this.emit(event, data);
+        this.send(event, data);
       }
     });
   }
 
-  // Actually send to server (WebSocket)
-  public emit(event: string, payload: any = {}) {
-    console.log('[SocketService.emit] called:', {event, payload, ws: this.ws, ready: this.ws?.readyState});
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ event, ...payload }));
-    }
-  }
+
 
   public obSocketConnect(url: string): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -131,6 +125,7 @@ export class SocketService {
       return;
     }
     const msg = JSON.stringify({ event, ...data });
+      console.log('[SocketService.send] sending:', msg);
     this.ws.send(msg);
   }
 
