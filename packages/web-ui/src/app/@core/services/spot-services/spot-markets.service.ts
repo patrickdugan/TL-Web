@@ -73,10 +73,6 @@ export class SpotMarketsService {
     get selectedMarketIndex() {
         return this.marketsFromSelectedMarketType.indexOf(this.selectedMarket);
     }
-
-    get socket() {
-        return this.socketService.obSocket;
-    }
     
     get marketFilter() {
         return {
@@ -95,6 +91,6 @@ export class SpotMarketsService {
     }
 
     private changeOrderbookMarketFilter() {
-        this.socketService.obSocket?.emit('update-orderbook', this.marketFilter);
+        this.socketService.send('update-orderbook', this.marketFilter);
     }
 }

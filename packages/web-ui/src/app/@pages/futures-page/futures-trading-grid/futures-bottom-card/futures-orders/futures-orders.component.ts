@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { /*obEventPrefix,*/ SocketService } from 'src/app/@core/services/socket.service';
 import { Subscription } from 'rxjs';
+import { filter } from "rxjs/operators";
 import { FuturesOrdersService } from 'src/app/@core/services/futures-services/futures-orders.service';
 import { IFuturesOrder } from 'src/app/@core/services/futures-services/futures-orderbook.service';
 
@@ -13,6 +14,7 @@ import { IFuturesOrder } from 'src/app/@core/services/futures-services/futures-o
 
 export class FuturesOrdersComponent implements OnInit, OnDestroy {
     private subsArray: Subscription[] = [];
+    private socketSubscriptions: Subscription[] = [];
 
     displayedColumns: string[] = ['date', 'market', 'amount', 'price', 'isBuy', 'close'];
 
@@ -35,17 +37,32 @@ export class FuturesOrdersComponent implements OnInit, OnDestroy {
     }
 
      private subscribe() {
-       this.socketService.obSocket?.on('placed-orders', (orders: { openedOrders: IFuturesOrder[], orderHistory: IFuturesOrder[] }) => {
-         const { openedOrders, orderHistory } = orders;
+       this.socketSubscriptions.push(
+    this.socketService.events$
+      .pipe(filter(({ event }) => event === 'placed-orders'))
+      .subscribe(({ data }) => {
+        const { openedOrders, orderHistory }: { openedOrders: IFuturesOrder[], orderHistory: IFuturesOrder[] } = data;
+        this.futuresOrdersService.orderHistory = orderHistory
+          .filter(q =>
+            q.type === "FUTURES" &&
+            q.keypair.pubkey === this.authService.activeFuturesKey?.pubkey &&
+            q.state
+          );
+        this.futuresOrdersService.openedOrders = openedOrders.filter(q => q.type === "FUTURES");
+      })
+  );
 
-         this.futuresOrdersService.orderHistory = orderHistory
-           .filter(q => q.type === "FUTURES" && q.keypair.pubkey === this.authService.activeFuturesKey?.pubkey && q.state);
-         this.futuresOrdersService.openedOrders = openedOrders.filter(q => q.type === "FUTURES");
-       });
-       this.futuresOrdersService.closeOpenedOrder('test-for-update');
-       this.socketService.obSocket?.on('disconnect', () => {
-         this.futuresOrdersService.openedOrders = [];
-       });
+  this.socketSubscriptions.push(
+    this.socketService.events$
+      .pipe(filter(({ event }) => event === 'disconnect'))
+      .subscribe(() => {
+        this.futuresOrdersService.orderHistory = [];
+        this.futuresOrdersService.openedOrders = [];
+      })
+  );
+
+      this.futuresOrdersService.closeOpenedOrder('test-for-update');
+
 
        const subs = this.authService.updateAddressesSubs$
          .subscribe(kp => {
@@ -54,7 +71,9 @@ export class FuturesOrdersComponent implements OnInit, OnDestroy {
        this.subsArray.push(subs);
      }
 
-    ngOnDestroy(): void {
-      this.subsArray.forEach(s => s.unsubscribe());
+    ngOnDestroy() {
+      this.socketSubscriptions.forEach(sub => sub.unsubscribe());
+      this.socketSubscriptions = [];
     }
+
 }

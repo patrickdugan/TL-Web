@@ -4,8 +4,10 @@ import { ApiService } from 'src/app/@core/services/api.service';
 import { ConnectionService } from 'src/app/@core/services/connections.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
-import { /*obEventPrefix,*/ SocketService } from 'src/app/@core/services/socket.service';
+import { SocketService } from 'src/app/@core/services/socket.service';
 import { environment } from 'src/environments/environment';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'servers-dialog',
@@ -21,6 +23,9 @@ export class ServersDialog implements OnInit, OnDestroy {
 
   selectedOrderbookServer: string = this.orderbookServers[0];
   selectedApiServer: string = this.apiServers[0];
+
+  // FIX: Declare the subscription array properly!
+  private socketSubscriptions: Subscription[] = [];
 
   constructor(
     private socketService: SocketService,
@@ -44,19 +49,30 @@ export class ServersDialog implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.socketService.obSocket?.on('connect', () => {
-      const orderbookUrl = this.selectedOrderbookServer === "@custom"
-        ? this.customOrderbookUrl
-        : this.selectedOrderbookServer;
-      this.apiService.orderbookUrl = orderbookUrl;
-    });
+    this.socketSubscriptions.push(
+      this.socketService.events$
+        .pipe(filter(({ event }) => event === 'connect'))
+        .subscribe(() => {
+          const orderbookUrl = this.selectedOrderbookServer === "@custom"
+            ? this.customOrderbookUrl
+            : this.selectedOrderbookServer;
+          this.apiService.orderbookUrl = orderbookUrl;
+        })
+    );
 
-    this.socketService.obSocket?.on('disconnect', () => {
-      this.apiService.orderbookUrl = null;
-    });
+    this.socketSubscriptions.push(
+      this.socketService.events$
+        .pipe(filter(({ event }) => event === 'disconnect'))
+        .subscribe(() => {
+          this.apiService.orderbookUrl = null;
+        })
+    );
   }
 
-  ngOnDestroy() { }
+  ngOnDestroy() {
+    this.socketSubscriptions.forEach((sub: Subscription) => sub.unsubscribe());
+    this.socketSubscriptions = [];
+  }
 
   selectOrderbookServer(url: string) {
     if (this.selectedOrderbookServer === url) return;

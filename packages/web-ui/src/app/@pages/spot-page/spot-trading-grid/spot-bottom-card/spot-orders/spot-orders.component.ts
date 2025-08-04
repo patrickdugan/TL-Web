@@ -3,6 +3,7 @@ import { AuthService } from 'src/app/@core/services/auth.service';
 import { /*obEventPrefix,*/ SocketService } from 'src/app/@core/services/socket.service';
 import { ISpotOrder } from 'src/app/@core/services/spot-services/spot-orderbook.service';
 import { Subscription } from 'rxjs';
+import { filter } from "rxjs/operators";
 import { SpotOrdersService } from 'src/app/@core/services/spot-services/spot-orders.service';
 
 @Component({
@@ -13,6 +14,7 @@ import { SpotOrdersService } from 'src/app/@core/services/spot-services/spot-ord
 
 export class SpotOrdersComponent implements OnInit, OnDestroy {
     private subsArray: Subscription[] = [];
+    private socketSubscriptions: Subscription[] = [];
 
     displayedColumns: string[] = ['date', 'market', 'amount', 'price', 'isBuy', 'close'];
 
@@ -35,19 +37,30 @@ export class SpotOrdersComponent implements OnInit, OnDestroy {
     }
 
     private subsribe() {
-       this.socketService.obSocket?.on('placed-orders', (orders: { openedOrders: ISpotOrder[], orderHistory: ISpotOrder[] }) => {
-          const { openedOrders, orderHistory } = orders;
-          console.log('orders '+JSON.stringify(openedOrders)+' '+JSON.stringify(orderHistory))
-          this.spotOrdersService.orderHistory = orderHistory
-            .filter(q => q.type === "SPOT" && q.keypair.pubkey === this.authService.activeSpotKey?.pubkey && q.state);
-          this.spotOrdersService.openedOrders = openedOrders.filter(q => q.type === "SPOT");
-        });
+      this.socketSubscriptions.push(
+        this.socketService.events$
+          .pipe(filter(({ event }) => event === 'placed-orders'))
+          .subscribe(({ data }) => {
+            const { openedOrders, orderHistory }: { openedOrders: ISpotOrder[], orderHistory: ISpotOrder[] } = data;
+            console.log('orders ' + JSON.stringify(openedOrders) + ' ' + JSON.stringify(orderHistory));
+            this.spotOrdersService.orderHistory = orderHistory
+              .filter(q =>
+                q.type === "SPOT" &&
+                q.keypair.pubkey === this.authService.activeSpotKey?.pubkey &&
+                q.state
+              );
+            this.spotOrdersService.openedOrders = openedOrders.filter(q => q.type === "SPOT");
+          })
+      );
 
-        //this.spotOrdersService.closeOpenedOrder('test-for-update');
-        this.socketService.obSocket?.on('disconnect', () => {
-          this.spotOrdersService.openedOrders = [];
-        });
-
+      this.socketSubscriptions.push(
+        this.socketService.events$
+          .pipe(filter(({ event }) => event === 'disconnect'))
+          .subscribe(() => {
+            this.spotOrdersService.openedOrders = [];
+          })
+      );
+  
         const subs = this.authService.updateAddressesSubs$
           .subscribe(kp => {
             if (!this.authService.activeSpotKey || !kp.length) this.spotOrdersService.closeAllOrders();

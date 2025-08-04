@@ -1,6 +1,7 @@
 import { Injectable } from "@angular/core";
-import { Subject } from "rxjs";
-import { SocketService } from "../socket.service"; // <-- Notice we removed `obEventPrefix`
+import { Subject, Subscription } from "rxjs";
+import { filter } from "rxjs/operators";
+import { SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
 import { LoadingService } from "../loading.service";
 import { AuthService } from "../auth.service";
@@ -51,6 +52,9 @@ export class FuturesOrderbookService {
   currentPrice: number = 1;
   lastPrice: number = 1;
 
+  // Subscriptions for RxJS event streams
+  private orderbookSubs: Subscription[] = [];
+
   constructor(
     private socketService: SocketService,
     private futuresMarketService: FuturesMarketService,
@@ -99,48 +103,55 @@ export class FuturesOrderbookService {
   }
 
   /**
-   *  Subscribe to raw events: "order:error", "order:saved", "update-orders-request", "orderbook-data"
+   *  Subscribe to orderbook-related events from the SocketService
    */
   subscribeForOrderbook() {
     this.endOrderbookSubscription();
 
-    // Listen for server events directly by their raw names
-    this.socketService.obSocket?.on("order:error", (message: string) => {
-      this.toastrService.error(message || `Undefined Error`, "Orderbook Error");
-      this.loadingService.tradesLoading = false;
-    });
+    this.orderbookSubs.push(
+      this.socketService.events$.pipe(
+        filter(({ event }) => event === "order:error")
+      ).subscribe(({ data: message }) => {
+        this.toastrService.error(message || `Undefined Error`, "Orderbook Error");
+        this.loadingService.tradesLoading = false;
+      }),
 
-    this.socketService.obSocket?.on("order:saved", (data: any) => {
-      //this.loadingService.tradesLoading = false;
-      this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
-    });
+      this.socketService.events$.pipe(
+        filter(({ event }) => event === "order:saved")
+      ).subscribe(({ data }) => {
+        this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
+      }),
 
-    this.socketService.obSocket?.on("update-orders-request", () => {
-      this.socketService.send("update-orderbook", this.marketFilter);
-    });
+      this.socketService.events$.pipe(
+        filter(({ event }) => event === "update-orders-request")
+      ).subscribe(() => {
+        this.socketService.send("update-orderbook", this.marketFilter);
+      }),
 
-    this.socketService.obSocket?.on("orderbook-data", (orderbookData: IFuturesOrderbookData) => {
-      this.rawOrderbookData = orderbookData.orders;
-      this.tradeHistory = orderbookData.history;
-      const lastTrade = this.tradeHistory[0];
-      if (!lastTrade) {
-        this.currentPrice = 1;
-        return;
-      }
-      this.currentPrice = lastTrade?.props?.price || 1;
-    });
+      this.socketService.events$.pipe(
+        filter(({ event }) => event === "orderbook-data")
+      ).subscribe(({ data: orderbookData }: { data: IFuturesOrderbookData }) => {
+        this.rawOrderbookData = orderbookData.orders;
+        this.tradeHistory = orderbookData.history;
+        const lastTrade = this.tradeHistory[0];
+        if (!lastTrade) {
+          this.currentPrice = 1;
+          return;
+        }
+        this.currentPrice = lastTrade?.props?.price || 1;
+      })
+    );
 
     // Manually request the latest orderbook
     this.socketService.send("update-orderbook", this.marketFilter);
   }
 
   /**
-   *  Unsubscribe from the raw events
+   *  Unsubscribe from all event streams
    */
   endOrderbookSubscription() {
-    ["update-orders-request", "orderbook-data", "order:error", "order:saved"].forEach((evt) =>
-      this.socketService.obSocket?.off(evt)
-    );
+    this.orderbookSubs.forEach(sub => sub.unsubscribe());
+    this.orderbookSubs = [];
   }
 
   /**

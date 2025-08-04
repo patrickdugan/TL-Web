@@ -50,9 +50,7 @@ export class FuturesMarketService {
         private rpcService: RpcService,
     ) {}
 
-    get socket() {
-        return this.socketService.obSocket
-    }
+    // --- Removed socket getter! ---
 
     get futuresMarketsTypes(): IFuturesMarketType[] {
         return this._futuresMarketsTypes;
@@ -66,9 +64,6 @@ export class FuturesMarketService {
 	    const net = this.rpcService.NETWORK;
 	    console.log('[FMS] rpcService.NETWORK =', net, 'typeof →', typeof net);
 
-	    // 1) If they in fact passed you an object that _already_ has
-	    //    a relayerUrl field (e.g. ENDPOINTS.LTCTEST itself),
-	    //    just use that directly:
 	    if (net && typeof net === 'object' && 'relayerUrl' in net) {
 	      // @ts-ignore – we know it has relayerUrl
 	      const urlFromObj = (net as any).relayerUrl;
@@ -76,18 +71,15 @@ export class FuturesMarketService {
 	      return urlFromObj;
 	    }
 
-	    // 2) Otherwise stringify it (in case it's a number, enum, etc.)
 	    const key = String(net) as ENetwork;
 	    console.log('[FMS] coerced network key →', key);
 
-	    // 3) Compare against your enum
 	    if (key === ENetwork.LTCTEST) {
 	      const u = ENDPOINTS.LTCTEST.relayerUrl;
 	      console.log('[FMS] matched LTCTEST →', u);
 	      return u;
 	    }
 
-	    // 4) Default to mainnet
 	    const fallback = ENDPOINTS.LTC.relayerUrl;
 	    console.log('[FMS] defaulting to LTC →', fallback);
 	    return fallback;
@@ -150,35 +142,34 @@ export class FuturesMarketService {
     }
 
     private changeOrderbookMarketFilter() {
-        this.socket?.emit('update-orderbook', this.marketFilter);
+        // Emit the event directly via SocketService
+        this.socketService.emitEvent('update-orderbook', this.marketFilter);
     }
 
     private async enrichWithContractInfo() {
-    const allMarkets = this._futuresMarketsTypes
-        .map((type: IFuturesMarketType) => type.markets)
-        .reduce((acc, val) => acc.concat(val), []);
+        const allMarkets = this._futuresMarketsTypes
+            .map((type: IFuturesMarketType) => type.markets)
+            .reduce((acc, val) => acc.concat(val), []);
 
-    for (const market of allMarkets) {
-        try {
-            const rpcUrl = this.relayerUrl.replace(/\/+$/, '') + '/rpc/tl_listContractSeries';
+        for (const market of allMarkets) {
+            try {
+                const rpcUrl = this.relayerUrl.replace(/\/+$/, '') + '/rpc/tl_listContractSeries';
 
-			const res = await axios.post(rpcUrl, {
-			  jsonrpc: "2.0",
-			  id: 1,
-			  //method: "tl_listContractSeries", // match backend case
-			  params: [market.contract_id]
-			});
+                const res = await axios.post(rpcUrl, {
+                  jsonrpc: "2.0",
+                  id: 1,
+                  params: [market.contract_id]
+                });
 
-            const info = res.data;
-            market.leverage = info?.leverage ?? undefined;
-            market.notional = info?.notionalValue ?? undefined;
-            market.inverse = info?.inverse ?? undefined;
-        } catch (err) {
-            console.warn(`Failed to load contract info for contract_id ${market.contract_id}`, err);
+                const info = res.data;
+                market.leverage = info?.leverage ?? undefined;
+                market.notional = info?.notionalValue ?? undefined;
+                market.inverse = info?.inverse ?? undefined;
+            } catch (err) {
+                console.warn(`Failed to load contract info for contract_id ${market.contract_id}`, err);
+            }
         }
     }
-}
-
 
     getMarketByContractId(contractId: number): IFutureMarket | null {
         const allMarkets = this._futuresMarketsTypes

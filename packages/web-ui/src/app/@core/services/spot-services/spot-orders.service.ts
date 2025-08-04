@@ -56,15 +56,15 @@ export class SpotOrdersService {
     newOrder(orderConf: ISpotTradeConf) {
         this.loadingService.tradesLoading = true;
         console.log('inside new order '+JSON.stringify(orderConf))
-        this.socketService.obSocket?.emit('new-order', orderConf);
+        this.socketService.send('new-order', orderConf);
     }
 
     addLiquidity(orders: ISpotTradeConf[]) {
-        this.socketService.obSocket?.emit('many-orders', orders);
+        this.socketService.send('many-orders', orders);
     }
 
     closeOpenedOrder(uuid: string) {
-        this.socketService.obSocket?.emit('close-order', uuid);
+        this.socketService.send('close-order', uuid);
     }
 
     closeAllOrders() {

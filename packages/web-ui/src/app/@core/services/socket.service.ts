@@ -4,14 +4,12 @@ import { Subject } from 'rxjs';
 import { SwapService } from './swap.service';
 import { ESounds, SoundsService } from "./sound.service";
 import { LoadingService } from "./loading.service";
-import { io, Socket } from 'socket.io-client';
 
 @Injectable({
   providedIn: 'root',
 })
 export class SocketService {
   public ws: WebSocket | null = null;
-  public obSocket: Socket | null = null;
   private wsConnected = false;
   private clientId = '';
   private eventSubject = new Subject<{ event: string; data: any }>();
@@ -23,50 +21,21 @@ export class SocketService {
     private loadingService: LoadingService
   ) {}
 
-  // Setup bridge from Socket.IO to WebSocket
-  private setupWalletBridge() {
-    if (!this.obSocket || (this.obSocket as any)._obBridgeInstalled) return;
-    (this.obSocket as any)._obBridgeInstalled = true;
-
-    // List of events to forward
-    ['update-orderbook', 'new-order', 'close-order', 'many-orders'].forEach(ev => {
-      this.obSocket!.on(ev, (data: any) => {
-        this.send(ev, data); // Pipe to WebSocket server
-      });
-    });
-
-    // Pass new‑channel events upstream (if needed)
-    this.obSocket!.on('OB_SOCKET::new-channel', (data: any) => {
-      this.send('new-channel', data);
-    });
-
-    // Forward any swap event
-    this.obSocket!.onAny((event: string, data: any) => {
-      if (event.endsWith('::swap')) {
-        this.send(event, data);
-      }
-    });
-  }
-
+  /**
+   * Connects to the backend WebSocket, if used.
+   * For in-app events only, call emitEvent instead.
+   */
   public obSocketConnect(url: string): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       console.log('WebSocket is already connected or connecting.');
       return;
     }
     this.ws = new WebSocket(url);
-     
-  if (!this.obSocket) {
-  console.log('socket bridge init')
-    this.obSocket = io(url, { transports: ['websocket'] });
-    this.setupWalletBridge();  // Now bridge can actually run
-  }
 
     this.ws.onopen = () => {
       this.wsConnected = true;
       this.toasterService.success('OB Socket Connected', 'Socket');
       console.log('OB WebSocket connected');
-      // Setup wallet bridge after connect (if you use obSocket)
-      // this.setupWalletBridge(); // Uncomment if needed
     };
 
     this.ws.onclose = (event) => {
@@ -85,20 +54,17 @@ export class SocketService {
       try {
         const data = JSON.parse(msg.data);
         const eventName = data.event || data.type || 'unknown';
-        
+
         if (eventName === 'connected' && data.id) {
-          this.clientId = data.id; // Assign to a property on the class
+          this.clientId = data.id;
           console.log('[OB WS] Assigned client id:', data.id);
         }
 
         if (eventName === 'new-channel') {
-          this.swapService.onInit(data, this.ws as any); // You may adapt this as needed!
+          this.swapService.onInit(data, this.ws as any);
         }
 
-        // Optionally relay to socket.io if needed
-        this.obSocket?.emit(eventName, data);
-
-        // Notify any subscribers
+        // Emit event for in-app subscribers
         this.emitEvent(eventName, data);
       } catch (e) {
         console.error('WebSocket message parse error:', e, msg.data);
@@ -114,21 +80,24 @@ export class SocketService {
     }
   }
 
-  private emitEvent(event: string, data: any): void {
+  /** Emits an event to in-app subscribers (no networking) */
+  public emitEvent(event: string, data: any): void {
     this.eventSubject.next({ event, data });
   }
 
+  /** Observable for event subscription */
   get events$() {
     return this.eventSubject.asObservable();
   }
 
+  /** Send a message over the backend WebSocket, if still needed */
   public send(event: string, data: any): void {
     if (!this.ws || !this.wsConnected || this.ws.readyState !== WebSocket.OPEN) {
       console.error('WebSocket is not connected; cannot send message');
       return;
     }
     const msg = JSON.stringify({ event, ...data });
-      console.log('[SocketService.send] sending:', msg);
+    console.log('[SocketService.send] sending:', msg);
     this.ws.send(msg);
   }
 
