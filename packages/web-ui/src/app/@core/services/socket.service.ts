@@ -49,7 +49,7 @@ export class SocketService {
   }
 
   // Actually send to server (WebSocket)
-  private emit(event: string, payload: any = {}) {
+  public emit(event: string, payload: any = {}) {
     console.log('[SocketService.emit] called:', {event, payload, ws: this.ws, ready: this.ws?.readyState});
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ event, ...payload }));
