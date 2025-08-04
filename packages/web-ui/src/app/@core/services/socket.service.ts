@@ -57,7 +57,7 @@ export class SocketService {
      
   if (!this.obSocket) {
   console.log('socket bridge init')
-    this.obSocket = io(ioUrl, { transports: ['websocket'] });
+    this.obSocket = io(url, { transports: ['websocket'] });
     this.setupWalletBridge();  // Now bridge can actually run
   }
 
