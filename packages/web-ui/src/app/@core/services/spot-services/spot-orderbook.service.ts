@@ -1,11 +1,11 @@
 import { Injectable } from "@angular/core";
 import { Subject, Subscription } from "rxjs";
 import { filter } from "rxjs/operators";
+import { SpotMarketsService } from "./spot-markets.service";
 import { SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
 import { LoadingService } from "../loading.service";
 import { AuthService } from "../auth.service";
-import { SpotMarketsService } from "./spot-markets.service";
 import { ITradeInfo } from "src/app/utils/swapper";
 import { ISpotTradeProps } from "src/app/utils/swapper/common";
 
@@ -28,15 +28,15 @@ export interface ISpotOrder {
   lock: boolean;
   props: {
     amount: number;
-    price: number;
     id_desired: number;
     id_for_sale: number;
+    price: number;
   };
   socket_id: string;
   timestamp: number;
   type: "SPOT";
   uuid: string;
-  state?: "CANCELED" | "FILLED";
+  state?: "CANCALED" | "FILLED";
 }
 
 @Injectable({
@@ -51,11 +51,12 @@ export class SpotOrderbookService {
   currentPrice: number = 1;
   lastPrice: number = 1;
 
-  private subscriptions: Subscription[] = [];
+  // ADD: For rxjs event subscriptions
+  private socketSubscriptions: Subscription[] = [];
 
   constructor(
     private socketService: SocketService,
-    private spotMarketService: SpotMarketsService,
+    private spotMarkertService: SpotMarketsService,
     private toastrService: ToastrService,
     private loadingService: LoadingService,
     private authService: AuthService
@@ -70,7 +71,7 @@ export class SpotOrderbookService {
   }
 
   get selectedMarket() {
-    return this.spotMarketService.selectedMarket;
+    return this.spotMarkertService.selectedMarket;
   }
 
   get rawOrderbookData() {
@@ -87,7 +88,10 @@ export class SpotOrderbookService {
       )
       .map((t) => ({
         ...t,
-        side: t.buyer.keypair.address === this.activeSpotAddress ? "BUY" : "SELL",
+        side:
+          t.buyer.keypair.address === this.activeSpotAddress
+            ? "BUY"
+            : "SELL",
       })) as ISpotHistoryTrade[];
   }
 
@@ -97,18 +101,18 @@ export class SpotOrderbookService {
   }
 
   get marketFilter() {
-    return this.spotMarketService.marketFilter;
+    return this.spotMarkertService.marketFilter;
   }
 
   /**
-   *  Subscribe to orderbook events
+   * Subscribe to raw events:
+   *  "order:error", "order:saved", "update-orders-request", "orderbook-data"
    */
   subscribeForOrderbook() {
     this.endOrderbookSubscription();
 
-    // --- Replace Socket.IO .on with RxJS subscriptions, keeping callback params! ---
-    // 1. order:error
-    this.subscriptions.push(
+    // RxJS: "order:error"
+    this.socketSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "order:error"))
         .subscribe(({ data }) => {
@@ -118,18 +122,18 @@ export class SpotOrderbookService {
         })
     );
 
-    // 2. order:saved
-    this.subscriptions.push(
+    // RxJS: "order:saved"
+    this.socketSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "order:saved"))
         .subscribe(({ data }) => {
-          // data: any
+          this.loadingService.tradesLoading = false;
           this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
         })
     );
 
-    // 3. update-orders-request
-    this.subscriptions.push(
+    // RxJS: "update-orders-request"
+    this.socketSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "update-orders-request"))
         .subscribe(() => {
@@ -137,8 +141,8 @@ export class SpotOrderbookService {
         })
     );
 
-    // 4. orderbook-data
-    this.subscriptions.push(
+    // RxJS: "orderbook-data"
+    this.socketSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "orderbook-data"))
         .subscribe(({ data }) => {
@@ -146,24 +150,30 @@ export class SpotOrderbookService {
           this.rawOrderbookData = orderbookData.orders;
           this.tradeHistory = orderbookData.history;
           const lastTrade = this.tradeHistory[0];
-          this.currentPrice = lastTrade?.props?.price || 1;
+          if (!lastTrade) {
+            this.currentPrice = 1;
+            return;
+          }
+          const { amountForSale, amountDesired } = lastTrade.props as any;
+          const price = parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
+          this.currentPrice = price;
         })
     );
 
-    // For manual requests (replace obSocket.emit with emitEvent)
+    // Finally, request the current orderbook
     this.socketService.emitEvent("update-orderbook", this.marketFilter);
   }
 
   /**
-   *  Unsubscribe from all orderbook events
+   * Unsubscribe from the raw events
    */
   endOrderbookSubscription() {
-    this.subscriptions.forEach(sub => sub.unsubscribe());
-    this.subscriptions = [];
+    this.socketSubscriptions.forEach(sub => sub.unsubscribe());
+    this.socketSubscriptions = [];
   }
 
   /**
-   *  Rebuild the local buy/sell arrays
+   * Rebuild local buy/sell arrays from raw orderbook data
    */
   private structureOrderBook() {
     this.buyOrderbooks = this._structureOrderbook(true);
@@ -171,14 +181,15 @@ export class SpotOrderbookService {
   }
 
   private _structureOrderbook(isBuy: boolean) {
-      const propIdDesired = isBuy
+    const propIdDesired = isBuy
       ? this.selectedMarket.first_token.propertyId
       : this.selectedMarket.second_token.propertyId;
     const propIdForSale = isBuy
       ? this.selectedMarket.second_token.propertyId
       : this.selectedMarket.first_token.propertyId;
     const filteredOrderbook = this._rawOrderbookData.filter(
-      (o) => o.props.id_desired === propIdDesired && o.props.id_for_sale === propIdForSale)
+      (o) => o.props.id_desired === propIdDesired && o.props.id_for_sale === propIdForSale
+    );
     const range = 1000;
     const result: { price: number; amount: number }[] = [];
     filteredOrderbook.forEach((o) => {
@@ -193,11 +204,15 @@ export class SpotOrderbookService {
         });
       }
     });
-    // Sort the result
+    // If it's a sell side, we keep track of 'lastPrice' from the sorted array
     if (!isBuy) {
-      this.lastPrice = result.sort((a, b) => b.price - a.price)?.[result.length - 1]?.price || this.currentPrice || 1;
+      this.lastPrice =
+        result.sort((a, b) => b.price - a.price)?.[result.length - 1]?.price ||
+        this.currentPrice ||
+        1;
     }
 
+    // Return either the top 9 buys or the bottom 9 sells
     return isBuy
       ? result.sort((a, b) => b.price - a.price).slice(0, 9)
       : result.sort((a, b) => b.price - a.price).slice(Math.max(result.length - 9, 0));
