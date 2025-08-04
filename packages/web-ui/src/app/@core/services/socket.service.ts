@@ -61,7 +61,7 @@ export class SocketService {
         }
 
         if (eventName === 'new-channel') {
-          this.swapService.onInit(data, this.ws as any);
+          this.swapService.onInit(data.data, this.ws as any);
         }
 
         // Emit event for in-app subscribers
