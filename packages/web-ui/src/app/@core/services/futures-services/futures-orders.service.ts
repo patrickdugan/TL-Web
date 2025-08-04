@@ -58,8 +58,8 @@ export class FuturesOrdersService {
     newOrder(orderConf: IFuturesTradeConf) {
         //this.loadingService.tradesLoading = true;
         console.log('inside newOrder '+JSON.stringify(orderConf))
-        this.socketService.obSocket?.emit('new-order', orderConf);
-    }
+        this.socketService.emit('new-order', orderConf);
+        }
 
     addLiquidity(orders: IFuturesTradeConf[]) {
         this.socketService.obSocket?.emit('many-orders', orders);
