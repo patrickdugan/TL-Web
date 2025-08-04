@@ -111,12 +111,12 @@ export class FuturesOrderbookService {
     });
 
     this.socketService.obSocket?.on("order:saved", (data: any) => {
-      this.loadingService.tradesLoading = false;
+      //this.loadingService.tradesLoading = false;
       this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
     });
 
     this.socketService.obSocket?.on("update-orders-request", () => {
-      this.socketService.obSocket?.emit("update-orderbook", this.marketFilter);
+      this.socketService.send("update-orderbook", this.marketFilter);
     });
 
     this.socketService.obSocket?.on("orderbook-data", (orderbookData: IFuturesOrderbookData) => {
@@ -131,7 +131,7 @@ export class FuturesOrderbookService {
     });
 
     // Manually request the latest orderbook
-    this.socketService.obSocket?.emit("update-orderbook", this.marketFilter);
+    this.socketService.send("update-orderbook", this.marketFilter);
   }
 
   /**

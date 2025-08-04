@@ -34,7 +34,7 @@ export class SwapService {
 
     public async onInit(swapConfig: IChannelSwapData, socket:Socket) {
                 console.log('new channel '+JSON.stringify(swapConfig))
-                this.loadingService.tradesLoading = false;
+                //this.loadingService.tradesLoading = false;
                 const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer, socket);
                 
                 if (!res || res.error || !res.data?.txid) {

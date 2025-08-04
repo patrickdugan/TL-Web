@@ -48,15 +48,18 @@ export class SocketService {
     });
   }
 
-
-
   public obSocketConnect(url: string): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       console.log('WebSocket is already connected or connecting.');
       return;
     }
     this.ws = new WebSocket(url);
-     this.setupWalletBridge();
+     
+  if (!this.obSocket) {
+  console.log('socket bridge init')
+    this.obSocket = io(ioUrl, { transports: ['websocket'] });
+    this.setupWalletBridge();  // Now bridge can actually run
+  }
 
     this.ws.onopen = () => {
       this.wsConnected = true;
