@@ -84,7 +84,9 @@ export class BuySwapper extends Swap {
         .pipe(filter(({ event }) => event === _eventName))
         .subscribe((payload) => {
             // payload: { event: string, data: SwapEvent }
+
             const eventData = payload.data;
+            console.log('inside rxjs listener '+JSON.stringify(eventData))
             this.eventSubs$.next(eventData);
 
             const { socketId, data } = eventData;

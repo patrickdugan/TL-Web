@@ -79,6 +79,7 @@ export class SellSwapper extends Swap {
                 .subscribe((payload: { event: string; data: SwapEvent }) => {
                     // The object RxJS emits looks like: { event: string, data: SwapEvent }
                     const eventData = payload.data;
+                    console.log('inside rxjs listener '+JSON.stringify(eventData))
                     this.eventSubs$.next(eventData);
 
                     const { socketId, data } = eventData;
