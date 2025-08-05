@@ -60,12 +60,15 @@ export class SocketService {
           console.log('[OB WS] Assigned client id:', data.id);
         }
 
+             // Emit event for in-app subscribers
+        this.emitEvent(eventName, data);
+
         if (eventName === 'new-channel') {
+          console.log("[Caller] About to call onInit, this.events$ =", this.events$);
           this.swapService.onInit(data.data, this.events$);
         }
 
-        // Emit event for in-app subscribers
-        this.emitEvent(eventName, data);
+   
       } catch (e) {
         console.error('WebSocket message parse error:', e, msg.data);
       }
