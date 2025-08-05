@@ -1,6 +1,5 @@
 // FULL BuySwapper FOR WEB (Futures + Spot, Step1 first, RBF safe)
 
-import { Socket as SocketClient } from 'socket.io-client';
 import { IBuildLTCITTxConfig, IBuildTxConfig, IBuildTradeConfig, IUTXO, TxsService } from "src/app/@core/services/txs.service";
 import { IMSChannelData, SwapEvent, IBuyerSellerInfo, TClient, IFuturesTradeProps, ISpotTradeProps, ETradeType } from "./common";
 import { Swap } from "./swap";
@@ -11,6 +10,9 @@ import { RpcService, ENetwork } from 'src/app/@core/services/rpc.service'
 import { ENDPOINTS } from 'src/environments/endpoints.conf';
 import BigNumber from 'bignumber.js';
 import axios from 'axios';
+import { Observable } from "rxjs";
+import { Subject, Subscription } from "rxjs";
+import { filter } from "rxjs/operators";
 
 export class BuySwapper extends Swap {
     private tradeStartTime: number;
@@ -20,7 +22,7 @@ export class BuySwapper extends Swap {
         tradeInfo: ISpotTradeProps | IFuturesTradeProps,
         buyerInfo: IBuyerSellerInfo,
         sellerInfo: IBuyerSellerInfo,
-        socket: SocketClient,
+        socket: Observable<any>,
         txsService: TxsService,
         private toastrService: ToastrService,
         private walletService: WalletService,
@@ -73,28 +75,36 @@ export class BuySwapper extends Swap {
         return fallback;
       }
 
-    private handleOnEvents() {
-        this.removePreviuesListeners();
-        const _eventName = `${this.cpInfo.socketId}::swap`;
-        this.socket.on(_eventName, (eventData: SwapEvent) => {
-            const { socketId, data } = eventData;
+             private handleOnEvents() {
+    this.removePreviuesListeners();
+    const _eventName = `${this.cpInfo.socketId}::swap`;
+
+    // If you can't annotate upstream, cast here:
+    (this.socket as Observable<{ event: string; data: SwapEvent }>)
+        .pipe(filter(({ event }) => event === _eventName))
+        .subscribe((payload) => {
+            // payload: { event: string, data: SwapEvent }
+            const eventData = payload.data;
             this.eventSubs$.next(eventData);
+
+            const { socketId, data } = eventData;
             switch (eventData.eventName) {
                 case 'TERMINATE_TRADE':
-                    this.onTerminateTrade?.bind(this)(socketId, data);
+                    this.onTerminateTrade?.(socketId, data);
                     break;
                 case 'SELLER:STEP1':
-                    this.onStep1?.bind(this)(socketId, data);
+                    this.onStep1?.(socketId, data);
                     break;
                 case 'SELLER:STEP3':
-                    this.onStep3?.bind(this)(socketId, data);
+                    this.onStep3?.(socketId, data);
                     break;
                 case 'SELLER:STEP5':
-                    this.onStep5?.bind(this)(socketId, data);
+                    this.onStep5?.(socketId, data);
                     break;
             }
         });
-    }
+}
+
 
     private async onStep1(cpId: string, msData: IMSChannelData) {
         try {
@@ -115,7 +125,7 @@ export class BuySwapper extends Swap {
             }
             this.multySigChannelData = msData;
             const swapEvent = new SwapEvent('BUYER:STEP2', this.myInfo.socketId);
-            this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
+            this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (error: any) {
             this.terminateTrade(`Step 1: ${error.message}`);
         }
@@ -201,7 +211,7 @@ export class BuySwapper extends Swap {
                     psbtHex: rawHexRes.data.psbtHex,
                     commitTxId: rawtx
                 });
-                this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
+                this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
             } else {
                 // Full SPOT logic begins here
                 const { propIdDesired, amountDesired, amountForSale, propIdForSale, transfer } = this.tradeInfo as ISpotTradeProps;
@@ -243,7 +253,7 @@ export class BuySwapper extends Swap {
                     if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {psbtHex: rawHexRes.data.psbtHex});
-                    this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
+                    this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
                 } else {
                     const payload = transfer
                         ? ENCODER.encodeTransfer({
@@ -313,7 +323,7 @@ export class BuySwapper extends Swap {
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
                     psbtHex: rawHexRes.data.rawtx,
                     commitHex: rawtx, commitTxId: commitTxSendRes.data});
-                    this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
+                    this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
                 }
             }
         } catch (error: any) {
@@ -334,7 +344,7 @@ export class BuySwapper extends Swap {
         if (this.readyRes) this.readyRes({ data: { txid: txidRes.data, seller: false, trade: this.tradeInfo } });
 
         const swapEvent = new SwapEvent('BUYER:STEP6', this.myInfo.socketId, txidRes.data);
-        this.socket.emit(`${this.myInfo.socketId}::swap`, swapEvent);
+        this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
         this.removePreviuesListeners();
     }
 }

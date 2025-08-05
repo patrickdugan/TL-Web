@@ -1,20 +1,27 @@
 import { TxsService } from "src/app/@core/services/txs.service";
 import { ETradeType, IBuyerSellerInfo, IFuturesTradeProps, IMSChannelData, ISpotTradeProps, SwapEvent, TClient } from "./common";
-import { Socket as SocketClient } from 'socket.io-client';
-import { Subject } from "rxjs";
+import { Subject, Subscription } from "rxjs";
+import { filter } from "rxjs/operators";
+import { Observable } from "rxjs";
+import { SocketService } from "../../@core/services/socket.service";
 
 export abstract class Swap {
     readyRes: (value: { data?: any, error?: any }) => void = () => {};
     eventSubs$: Subject<SwapEvent> = new Subject();
     multySigChannelData: IMSChannelData | null = null;
+    // ADD:
+    protected swapSub?: Subscription;
+    public socketService?: SocketService
+    protected socket!: Observable<any>;
+
     constructor(
         public typeTrade: ETradeType,
         public tradeInfo: ISpotTradeProps|IFuturesTradeProps, 
         public myInfo: IBuyerSellerInfo,
         public cpInfo: IBuyerSellerInfo,
-        public socket: SocketClient,
+        public events: Observable<any>,
         public txsService: TxsService,
-    ) { }
+    ) {}
 
     onReady() {
         return new Promise<{ data?: any, error?: any }>((res) => {
@@ -25,7 +32,7 @@ export abstract class Swap {
 
     terminateTrade(reason: string = 'No info'): void {
         const eventData = new SwapEvent('TERMINATE_TRADE', this.myInfo.socketId, reason);
-        this.socket.emit(`${this.myInfo.socketId}::swap`, eventData);
+        this.socketService?.send(`${this.myInfo.socketId}::swap`, eventData);
         this.onTerminateTrade('', reason);
     }
 
@@ -34,7 +41,11 @@ export abstract class Swap {
         this.removePreviuesListeners();
     }
 
+    // PATCH: Remove listener using RxJS pattern
     removePreviuesListeners() {
-        this.socket.off(`${this.cpInfo.socketId}::swap`);
+        if (this.swapSub) {
+            this.swapSub.unsubscribe();
+            this.swapSub = undefined;
+        }
     }
 }

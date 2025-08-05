@@ -2,7 +2,6 @@ import { Injectable } from "@angular/core";
 import { ToastrService } from "ngx-toastr";
 import { RpcService } from "./rpc.service";
 import { SocketService } from "./socket.service";
-import { Socket } from 'socket.io-client';
 import { TxsService } from "./txs.service";
 import { LoadingService } from "./loading.service";
 import { BuySwapper, SellSwapper, ITradeInfo } from "src/app/utils/swapper/"; 
@@ -11,6 +10,7 @@ import { ISpotOrder } from "./spot-services/spot-orderbook.service";
 import { IFuturesOrder } from "./futures-services/futures-orderbook.service";
 import { ESounds, SoundsService } from "./sound.service";
 import { WalletService } from 'src/app/@core/services/wallet.service';
+import { Observable } from "rxjs";
 
 interface IChannelSwapData {
     tradeInfo: ITradeInfo<any>; 
@@ -32,8 +32,7 @@ export class SwapService {
         private walletService: WalletService
     ) {}
 
-    public async onInit(swapConfig: IChannelSwapData, socket:Socket) {
-                console.log('new channel '+JSON.stringify(swapConfig))
+    public async onInit(swapConfig: IChannelSwapData, socket: Observable<any>) {           console.log('new channel '+JSON.stringify(swapConfig))
                 //this.loadingService.tradesLoading = false;
                 const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer, socket);
                 
@@ -45,7 +44,7 @@ export class SwapService {
                 }
     }
 
-    private async channelSwap(tradeInfo: ITradeInfo<any>, isBuyer: boolean, socket:Socket) {
+    private async channelSwap(tradeInfo: ITradeInfo<any>, isBuyer: boolean, socket: Observable<any>) {
         const { buyer, seller, props, type } = tradeInfo;
         console.log('Inside channel swap:', JSON.stringify(tradeInfo));
         
