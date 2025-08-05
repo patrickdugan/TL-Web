@@ -82,6 +82,7 @@ export class SocketService {
 
   /** Emits an event to in-app subscribers (no networking) */
   public emitEvent(event: string, data: any): void {
+    console.log('event emitter '+event +' '+JSON.stringify(data))
     this.eventSubject.next({ event, data });
   }
 
