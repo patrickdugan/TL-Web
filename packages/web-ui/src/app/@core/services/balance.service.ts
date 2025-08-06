@@ -84,7 +84,7 @@ export class BalanceService {
     }else{
       this.url = 'https://api.layerwallet.com'
     }
-
+   //
     try {
         const accounts = await this.walletService.requestAccounts(this._NETWORK);
         console.log("Accounts with pubkeys:", accounts);
