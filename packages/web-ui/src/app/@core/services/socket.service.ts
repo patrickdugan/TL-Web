@@ -16,6 +16,7 @@ export class SocketService {
 
   constructor(
     private toasterService: ToastrService,
+    private swapService: SwapService,
     private soundsService: SoundsService,
     private loadingService: LoadingService
   ) {}
@@ -64,6 +65,7 @@ export class SocketService {
 
         if (eventName === 'new-channel') {
           console.log("[Caller] About to call onInit, this.events$ =", this.events$);
+          this.swapService.onInit(data.data, this.events$);
         }
 
    

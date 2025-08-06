@@ -11,12 +11,6 @@ import { IFuturesOrder } from "./futures-services/futures-orderbook.service";
 import { ESounds, SoundsService } from "./sound.service";
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import { Observable } from "rxjs";
-import { filter } from 'rxjs/operators';
-
-interface SocketEvent {
-  event: string;
-  data: any;
-}
 
 interface IChannelSwapData {
     tradeInfo: ITradeInfo<any>; 
@@ -36,13 +30,7 @@ export class SwapService {
         private loadingService: LoadingService,
         private soundsService: SoundsService,
         private walletService: WalletService
-    ) {
-     this.socketService.events$
-      .pipe(filter((e: SocketEvent) => e.event === 'new-channel'))
-      .subscribe((e: SocketEvent) => {
-        this.onInit(e.data.data, this.socketService.events$);
-      });
-    }
+    ) {}
 
     public async onInit(swapConfig: IChannelSwapData, socket: Observable<any>) {           console.log('new channel '+JSON.stringify(swapConfig)+'events')
                 //this.loadingService.tradesLoading = false;
