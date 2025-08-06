@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
 import { Subject } from 'rxjs';
+import { SwapService } from './swap.service';
 import { ESounds, SoundsService } from "./sound.service";
 import { LoadingService } from "./loading.service";
 
@@ -15,6 +16,7 @@ export class SocketService {
 
   constructor(
     private toasterService: ToastrService,
+    private swapService: SwapService,
     private soundsService: SoundsService,
     private loadingService: LoadingService
   ) {}
