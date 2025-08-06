@@ -100,7 +100,7 @@ export class SocketService {
       console.error('WebSocket is not connected; cannot send message');
       return;
     }
-    const msg = JSON.stringify({ event, data });
+    const msg = JSON.stringify({ event, ...data });
     console.log('[SocketService.send] sending:', msg);
     this.ws.send(msg);
   }
