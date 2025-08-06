@@ -131,7 +131,7 @@ export class BuySwapper extends Swap {
             this.multySigChannelData = msData;
             console.log('multisig data '+JSON.stringify(msData))
             const swapEvent = new SwapEvent('BUYER:STEP2', this.myInfo.socketId);
-            console.log('typeof this.socketService.send:', typeof this.socketService.send);
+            console.log('swapEvent '+JSON.stringify(swapEvent))
             console.log('instanceof SocketService:', this.socketService instanceof SocketService);
             console.log('socketService:', this.socketService);
 
