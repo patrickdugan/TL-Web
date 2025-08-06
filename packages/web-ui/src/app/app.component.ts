@@ -9,6 +9,8 @@ import { RpcService } from './@core/services/rpc.service';
 import { SocketService } from './@core/services/socket.service';
 import { SwapService } from './@core/services/swap.service';
 import { WindowsService } from './@core/services/windows.service';
+import { filter, takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
 
 @Component({
   selector: 'tl-root',
@@ -17,6 +19,8 @@ import { WindowsService } from './@core/services/windows.service';
 })
 export class AppComponent {
   private isOnline: boolean = this.connectionService.isOnline;
+  private destroy$ = new Subject<void>();
+
   constructor(
     private rpcService: RpcService,
     private connectionService: ConnectionService,
@@ -33,6 +37,7 @@ export class AppComponent {
     this.handleInits();
     this.handleConnections();
     //this.handleElectronEvents();
+
   }
 
   get windows() {
@@ -77,6 +82,19 @@ export class AppComponent {
       .subscribe((isOnline) => {
         this.ngZone.run(() => this.isOnline = isOnline);
       })
+
+    this.socketService.events$
+      .pipe(
+        filter((e: any) => e?.event === 'new-channel' && e?.data?.data),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(({ data }: any) => {
+        try {
+          this.swapService.onInit(data.data, this.socketService.events$);
+        } catch (err) {
+          console.error('Swap init failed', err);
+        }
+      });
   }
 
   /*handleElectronEvents() {
@@ -90,6 +108,6 @@ export class AppComponent {
   }*/
 
   openHiddenTerminal() {
-    this.windowsService.openTerminal();
+    this.windowsService?.openTerminal();
   }
 }
