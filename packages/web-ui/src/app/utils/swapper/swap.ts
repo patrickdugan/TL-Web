@@ -24,7 +24,6 @@ export abstract class Swap {
         socketService: SocketService,
     ) {
         this.socket = socket;                    // <--- explicit assignment
-        this.socketService = socketService;
     }
 
 

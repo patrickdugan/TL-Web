@@ -28,7 +28,7 @@ export class BuySwapper extends Swap {
         private toastrService: ToastrService,
         private walletService: WalletService,
         private rpcService: RpcService,
-        socketService: SocketService
+        protected socketService: SocketService
     ) {
         super(typeTrade, tradeInfo, buyerInfo, sellerInfo, socket, txsService,socketService);
         this.handleOnEvents();
