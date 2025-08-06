@@ -12,16 +12,19 @@ export abstract class Swap {
     // ADD:
     protected swapSub?: Subscription;
     public socketService?: SocketService
-    protected socket!: Observable<any>;
+    protected socket!: Observable<any>; // Up top, outside constructor
 
     constructor(
         public typeTrade: ETradeType,
         public tradeInfo: ISpotTradeProps|IFuturesTradeProps, 
         public myInfo: IBuyerSellerInfo,
         public cpInfo: IBuyerSellerInfo,
-        public events: Observable<any>,
+        socket: Observable<any>,                 // <--- plain param
         public txsService: TxsService,
-    ) {}
+    ) {
+        this.socket = socket;                    // <--- explicit assignment
+    }
+
 
     onReady() {
         return new Promise<{ data?: any, error?: any }>((res) => {

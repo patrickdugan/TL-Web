@@ -32,7 +32,7 @@ export class SwapService {
         private walletService: WalletService
     ) {}
 
-    public async onInit(swapConfig: IChannelSwapData, socket: Observable<any>) {           console.log('new channel '+JSON.stringify(swapConfig)+'events '+JSON.stringify(socket))
+    public async onInit(swapConfig: IChannelSwapData, socket: Observable<any>) {           console.log('new channel '+JSON.stringify(swapConfig)+'events '+socket)
                 //this.loadingService.tradesLoading = false;
                 const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer, socket);
                 
@@ -47,6 +47,7 @@ export class SwapService {
     private async channelSwap(tradeInfo: ITradeInfo<any>, isBuyer: boolean, socket: Observable<any>) {
         const { buyer, seller, props, type } = tradeInfo;
         console.log('Inside channel swap:', JSON.stringify(tradeInfo));
+        console.log('sock')
         
         if (!socket) {
             throw new Error("obSocket is not connected");

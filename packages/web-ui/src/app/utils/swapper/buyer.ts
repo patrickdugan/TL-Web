@@ -80,13 +80,13 @@ export class BuySwapper extends Swap {
     const _eventName = `${this.cpInfo.socketId}::swap`;
 
     // If you can't annotate upstream, cast here:
-    (this.socket as Observable<{ event: string; data: SwapEvent }>)
-        .pipe(filter(({ event }) => event === _eventName))
+    this.swapSub = this.socket.pipe(filter(({ event }) => event === _eventName))
         .subscribe((payload) => {
             // payload: { event: string, data: SwapEvent }
 
             const eventData = payload.data;
             console.log('inside rxjs listener '+JSON.stringify(eventData))
+
             this.eventSubs$.next(eventData);
 
             const { socketId, data } = eventData;
