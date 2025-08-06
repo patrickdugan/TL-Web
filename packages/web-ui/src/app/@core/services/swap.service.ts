@@ -32,7 +32,7 @@ export class SwapService {
         private walletService: WalletService
     ) {}
 
-    public async onInit(swapConfig: IChannelSwapData, socket: Observable<any>) {           console.log('new channel '+JSON.stringify(swapConfig)+'events '+socket)
+    public async onInit(swapConfig: IChannelSwapData, socket: Observable<any>) {           console.log('new channel '+JSON.stringify(swapConfig)+'events')
                 //this.loadingService.tradesLoading = false;
                 const res = await this.channelSwap(swapConfig.tradeInfo, swapConfig.isBuyer, socket);
                 
