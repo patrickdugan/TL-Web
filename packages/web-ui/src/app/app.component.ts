@@ -83,7 +83,7 @@ export class AppComponent {
         this.ngZone.run(() => this.isOnline = isOnline);
       })
 
-    /*this.socketService.events$
+    this.socketService.events$
       .pipe(
         filter((e: any) => e?.event === 'new-channel' && e?.data?.data),
         takeUntil(this.destroy$)
@@ -94,7 +94,7 @@ export class AppComponent {
         } catch (err) {
           console.error('Swap init failed', err);
         }
-      });*/
+      });
   }
 
   /*handleElectronEvents() {
