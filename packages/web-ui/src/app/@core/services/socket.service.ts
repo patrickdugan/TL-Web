@@ -95,15 +95,23 @@ export class SocketService {
   }
 
   /** Send a message over the backend WebSocket, if still needed */
-  public send(event: string, data: any): void {
-    if (!this.ws || !this.wsConnected || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not connected; cannot send message');
-      return;
+    public send(event: string, data: any): void {
+      if (!this.ws || !this.wsConnected || this.ws.readyState !== WebSocket.OPEN) {
+        console.error('WebSocket is not connected; cannot send message');
+        return;
+      }
+
+      // Events that expect flattened payloads
+      const flatEvents = ['new-order', 'replace-order'];
+
+      const msg = flatEvents.includes(event)
+        ? JSON.stringify({ event, ...data })      // flattened
+        : JSON.stringify({ event, data });        // nested
+
+      console.log('[SocketService.send] sending:', msg);
+      this.ws.send(msg);
     }
-    const msg = JSON.stringify({ event, ...data });
-    console.log('[SocketService.send] sending:', msg);
-    this.ws.send(msg);
-  }
+
 
   get obSocketConnected(): boolean {
     return this.wsConnected;
