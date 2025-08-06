@@ -1,11 +1,11 @@
 import { Injectable } from '@angular/core';
-import {BalanceService} from './balance.service'
+import { RpcService } from './rpc.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class WalletService {
-  constructor(private balanceService: BalanceService) {
+  constructor(private rpc: RpcService) {
     
     if (!window.myWallet) {
       console.warn('Wallet extension not detected');
@@ -56,10 +56,10 @@ async requestAccounts(network?:string): Promise<{ address: string; pubkey?: stri
   async addMultisig(m: number, pubkeys: string[]): Promise<{ address: string; redeemScript?: string }> {
   this.ensureWalletAvailable();
 
-  console.log('showing network in walletService '+this.balanceService.NETWORK)
-  let network = this.balanceService.NETWORK || "LTC"
+  console.log('showing network in walletService '+this.rpc.NETWORK)
+  let network = this.rpc.NETWORK || "LTC"
   if(network==undefined){network = "LTC"}
-  const payload = { m, pubkeys, network: this.balanceService.NETWORK};
+  const payload = { m, pubkeys, network: this.rpc.NETWORK};
 
     console.log('about to call window with multisig params '+JSON.stringify(payload))
   try {
@@ -85,7 +85,7 @@ async requestAccounts(network?:string): Promise<{ address: string; pubkey?: stri
   async signPSBT(psbt: string): Promise<string> {
     this.ensureWalletAvailable();
     try {
-      return await window.myWallet!.sendRequest('signPSBT', { transaction:psbt, network: this.balanceService.NETWORK }); // Non-null assertion
+      return await window.myWallet!.sendRequest('signPSBT', { transaction:psbt, network: this.rpc.NETWORK }); // Non-null assertion
     } catch (error) {
       console.error('Error signing PSBT:', error);
       throw new Error('Failed to sign PSBT');

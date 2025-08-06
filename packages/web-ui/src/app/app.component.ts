@@ -1,4 +1,4 @@
-import { Component, NgZone } from '@angular/core';
+import { Component, NgZone,Injector, OnDestroy, OnInit } from '@angular/core';
 import { AttestationService } from './@core/services/attestation.service';
 import { BalanceService } from './@core/services/balance.service';
 import { ConnectionService } from './@core/services/connections.service';
@@ -31,7 +31,7 @@ export class AppComponent {
     private attestationService: AttestationService,
     private balanceService: BalanceService,
     private socketService: SocketService,
-    private swapService: SwapService,
+    private injector: Injector, // <-- use injector, not direct SwapService
     private nodeRewardService: NodeRewardService,
   ) {
     this.handleInits();
@@ -83,14 +83,15 @@ export class AppComponent {
         this.ngZone.run(() => this.isOnline = isOnline);
       })
 
-    this.socketService.events$
+   this.socketService.events$
       .pipe(
         filter((e: any) => e?.event === 'new-channel' && e?.data?.data),
         takeUntil(this.destroy$)
       )
       .subscribe(({ data }: any) => {
         try {
-          this.swapService.onInit(data.data, this.socketService.events$);
+          const swapService = this.injector.get(SwapService); // lazy get
+          swapService.onInit(data.data, this.socketService.events$);
         } catch (err) {
           console.error('Swap init failed', err);
         }
