@@ -82,8 +82,9 @@ export class SellSwapper extends Swap {
                     console.log('inside rxjs listener '+JSON.stringify(eventData))
                     this.eventSubs$.next(eventData);
 
-                    const { socketId, data } = eventData;
-                    switch (eventData.eventName) {
+                    const socketId = eventData.data.socketId;
+                    const data = eventData.data.data
+                    switch (eventData.data.eventName){
                         case 'TERMINATE_TRADE':
                             this.onTerminateTrade(socketId, data);
                             break;

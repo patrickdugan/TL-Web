@@ -89,8 +89,9 @@ export class BuySwapper extends Swap {
 
             this.eventSubs$.next(eventData);
 
-            const { socketId, data } = eventData;
-            switch (eventData.eventName) {
+            const socketId = eventData.data.socketId;
+            const data = eventData.data.data
+            switch (eventData.data.eventName) {
                 case 'TERMINATE_TRADE':
                     this.onTerminateTrade?.(socketId, data);
                     break;
