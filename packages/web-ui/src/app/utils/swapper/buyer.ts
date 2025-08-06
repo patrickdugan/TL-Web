@@ -131,7 +131,11 @@ export class BuySwapper extends Swap {
             this.multySigChannelData = msData;
             console.log('multisig data '+JSON.stringify(msData))
             const swapEvent = new SwapEvent('BUYER:STEP2', this.myInfo.socketId);
-            this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
+            console.log('typeof this.socketService.send:', typeof this.socketService.send);
+            console.log('instanceof SocketService:', this.socketService instanceof SocketService);
+            console.log('socketService:', this.socketService);
+
+            this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (error: any) {
             this.terminateTrade(`Step 1: ${error.message}`);
         }
@@ -217,7 +221,7 @@ export class BuySwapper extends Swap {
                     psbtHex: rawHexRes.data.psbtHex,
                     commitTxId: rawtx
                 });
-                this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
+                this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent);
             } else {
                 // Full SPOT logic begins here
                 const { propIdDesired, amountDesired, amountForSale, propIdForSale, transfer } = this.tradeInfo as ISpotTradeProps;
@@ -259,7 +263,7 @@ export class BuySwapper extends Swap {
                     if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {psbtHex: rawHexRes.data.psbtHex});
-                    this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
+                    this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent);
                 } else {
                     const payload = transfer
                         ? ENCODER.encodeTransfer({
@@ -329,7 +333,7 @@ export class BuySwapper extends Swap {
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
                     psbtHex: rawHexRes.data.rawtx,
                     commitHex: rawtx, commitTxId: commitTxSendRes.data});
-                    this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
+                    this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent);
                 }
             }
         } catch (error: any) {
@@ -350,7 +354,7 @@ export class BuySwapper extends Swap {
         if (this.readyRes) this.readyRes({ data: { txid: txidRes.data, seller: false, trade: this.tradeInfo } });
 
         const swapEvent = new SwapEvent('BUYER:STEP6', this.myInfo.socketId, txidRes.data);
-        this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
+        this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent);
         this.removePreviuesListeners();
     }
 }

@@ -116,7 +116,7 @@ export class SellSwapper extends Swap {
             if (!ms || !ms.address || !ms.redeemScript) throw new Error('Multisig setup failed');
 this.multySigChannelData = ms as IMSChannelData;
             const swapEvent = new SwapEvent('SELLER:STEP1', this.myInfo.socketId, this.multySigChannelData);
-            this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
+            this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (err: any) {
             this.terminateTrade(`InitTrade: ${err.message}`);
         }
@@ -161,7 +161,7 @@ this.multySigChannelData = ms as IMSChannelData;
                 redeemScript: this.multySigChannelData.redeemScript
             };
 
-            this.socketService?.send(`${this.myInfo.socketId}::swap`, new SwapEvent('SELLER:STEP3', this.myInfo.socketId, utxo));
+            this.socketService.send(`${this.myInfo.socketId}::swap`, new SwapEvent('SELLER:STEP3', this.myInfo.socketId, utxo));
         } catch (err: any) {
             this.terminateTrade(`Step 2: ${err.message}`);
         }
@@ -183,7 +183,7 @@ this.multySigChannelData = ms as IMSChannelData;
             const signRes = await this.txsService.signPsbt(psbtHex,true);
             if (signRes.error || !signRes.data?.psbtHex) throw new Error(`PSBT sign failed: ${signRes.error}`);
 
-            this.socketService?.send(`${this.myInfo.socketId}::swap`, new SwapEvent('SELLER:STEP5', this.myInfo.socketId, signRes.data.psbtHex));
+            this.socketService.send(`${this.myInfo.socketId}::swap`, new SwapEvent('SELLER:STEP5', this.myInfo.socketId, signRes.data.psbtHex));
         } catch (err: any) {
             this.terminateTrade(`Step 4: ${err.message}`);
         }
