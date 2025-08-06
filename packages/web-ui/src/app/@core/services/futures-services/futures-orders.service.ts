@@ -66,7 +66,7 @@ export class FuturesOrdersService {
     }
 
     closeOpenedOrder(uuid: string) {
-        this.socketService.send('close-order', uuid);
+        this.socketService.send('close-order', { orderUUID: uuid });   
     }
 
     closeAllOrders() {
