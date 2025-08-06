@@ -6,7 +6,7 @@ import { ToastrService } from "ngx-toastr";
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import { RpcService, ENetwork } from 'src/app/@core/services/rpc.service'
 import { ENDPOINTS } from 'src/environments/endpoints.conf';
-import { SocketService } from "../../@core/services/socket.service";
+import { SocketService } from 'src/app/@core/services/socket.service';
 import BigNumber from 'bignumber.js';
 import axios from 'axios';
 import { Subject, Subscription } from "rxjs";
@@ -25,9 +25,10 @@ export class SellSwapper extends Swap {
         txsService: TxsService,
         private toastrService: ToastrService,
         private walletService: WalletService,
-        private rpcService: RpcService
+        private rpcService: RpcService,
+        socketService: SocketService
     ) {
-        super(typeTrade, tradeInfo, sellerInfo, buyerInfo, socket, txsService);
+        super(typeTrade, tradeInfo, sellerInfo, buyerInfo, socket, txsService,socketService);
         this.handleOnEvents();
         this.tradeStartTime = Date.now();
         this.onReady();

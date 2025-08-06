@@ -13,6 +13,7 @@ import axios from 'axios';
 import { Observable } from "rxjs";
 import { Subject, Subscription } from "rxjs";
 import { filter } from "rxjs/operators";
+import { SocketService } from 'src/app/@core/services/socket.service';
 
 export class BuySwapper extends Swap {
     private tradeStartTime: number;
@@ -26,9 +27,10 @@ export class BuySwapper extends Swap {
         txsService: TxsService,
         private toastrService: ToastrService,
         private walletService: WalletService,
-        private rpcService: RpcService
+        private rpcService: RpcService,
+        socketService: SocketService
     ) {
-        super(typeTrade, tradeInfo, buyerInfo, sellerInfo, socket, txsService);
+        super(typeTrade, tradeInfo, buyerInfo, sellerInfo, socket, txsService,socketService);
         this.handleOnEvents();
         this.tradeStartTime = Date.now();
         this.onReady();

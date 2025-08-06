@@ -11,7 +11,7 @@ export abstract class Swap {
     multySigChannelData: IMSChannelData | null = null;
     // ADD:
     protected swapSub?: Subscription;
-    public socketService?: SocketService
+    protected socketService?: SocketService
     protected socket!: Observable<any>; // Up top, outside constructor
 
     constructor(
@@ -21,8 +21,10 @@ export abstract class Swap {
         public cpInfo: IBuyerSellerInfo,
         socket: Observable<any>,                 // <--- plain param
         public txsService: TxsService,
+        socketService: SocketService,
     ) {
         this.socket = socket;                    // <--- explicit assignment
+        this.socketService = socketService;
     }
 
 
