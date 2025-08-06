@@ -126,6 +126,7 @@ export class BuySwapper extends Swap {
                 throw new Error('Multisig mismatch');
             }
             this.multySigChannelData = msData;
+            console.log('multisig data '+JSON.stringify(msData))
             const swapEvent = new SwapEvent('BUYER:STEP2', this.myInfo.socketId);
             this.socketService?.send(`${this.myInfo.socketId}::swap`, swapEvent);
         } catch (error: any) {
