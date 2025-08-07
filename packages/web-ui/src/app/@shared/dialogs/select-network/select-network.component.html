@@ -1,21 +1,19 @@
-<div class="dialog-container">
-    <h1>Select Network</h1>
-    <mat-dialog-content class="mat-typography">
-        <div class="content-container">
-            <mat-form-field appearance="fill" >
-                <mat-label>Network</mat-label>
-                <mat-select [(ngModel)]="network">
-                    <mat-option value="BTC">Bitcoin</mat-option> 
-                    <mat-option value="LTC">Litecoin</mat-option>
-                    <mat-option value="LTCTEST">Litecoin Testnet</mat-option>
-                </mat-select>
-            </mat-form-field>
-            <button
-                style='margin: 0.5rem 0;'
-                class='greenButton'
-                mat-button
-                (click)='selectNetwork()'
-            >Select Network</button>
-        </div>
-    </mat-dialog-content>
+<div class="dialog-body" (clickOutside)="cancel()">
+  <h2>Select Network</h2>
+
+  <mat-form-field appearance="fill" style="width:100%; margin-top:12px;">
+    <mat-label>Network</mat-label>
+    <mat-select [(value)]="network">
+      <mat-option *ngFor="let opt of options" [value]="opt.value">
+        {{ opt.label }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px;">
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-raised-button color="primary" type="button" (click)="confirm()" [disabled]="!network">
+      Select Network
+    </button>
+  </div>
 </div>

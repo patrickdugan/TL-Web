@@ -5,22 +5,23 @@
       <button mat-icon-button (click)="toggleSideBar()" aria-label="Toggle menu">
         <mat-icon>menu</mat-icon>
       </button>
+    <div>
+<div class="brand">
+  <a class="logo" routerLink="/" aria-label="TradeLayer Home">
+    <img src="assets/tl-logo.svg" alt="TradeLayer" />
+  </a>
 
-      <a class="logo" routerLink="/" aria-label="TradeLayer Home">
-        <img src="assets/tl-logo.svg" alt="TradeLayer" />
-      </a>
-
-      <!-- round network icon button placed just to the right of the logo -->
-      <button
-        mat-icon-button
-        class="network-btn"
-        [matTooltip]="'Switch network'"
-        aria-label="Switch network"
-        (click)="openNetworkDialog()"
-      >
-        <img [src]="networkIcon" alt="Network" />
-      </button>
-    </div>
+  <!-- coin button right of logo -->
+  <button
+    mat-icon-button
+    class="network-btn"
+    aria-label="Switch network"
+    (click)="openNetworkDialog()"
+    title="Switch network"
+  >
+    <img [src]="networkIcon" alt="Network" />
+  </button>
+</div>
 
     <span class="spacer"></span>
 

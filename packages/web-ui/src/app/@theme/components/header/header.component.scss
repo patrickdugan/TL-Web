@@ -8,6 +8,38 @@ mat-toolbar {
     }
   }
 
+  .brand {
+  display: inline-flex;          /* keep it inline with menu */
+  align-items: center;
+  gap: 8px;                      /* space between logo & icon */
+}
+
+.brand .logo {
+  display: inline-flex;
+  align-items: center;
+}
+.brand .logo img {
+  height: 28px;
+  display: block;
+}
+
+/* make sure nothing is absolutely positioned */
+.network-btn {
+  position: static;              /* override any absolute */
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  padding: 4px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+}
+.network-btn img { width: 18px; height: 18px; display: block; }
+
+
   .spacer {
     flex: 1 1 auto;
   }
