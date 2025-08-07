@@ -102,6 +102,17 @@ export class FuturesOrderbookService {
     return this.futuresMarketService.marketFilter;
   }
 
+   getContractMeta(contract_id: number) {
+        // Use FuturesMarketService.getMarketByContractId()
+        const market = this.futuresMarketService.getMarketByContractId(contract_id);
+        if (!market) return { contractSize: 1, isInverse: false };
+        // Note: Derive contractSize, isInverse from your market model
+        return {
+            contractSize: market.notional || 1,           // <-- Use .notional for contract size
+            isInverse: !!market.inverse                   // <-- Use .inverse for inverse contracts
+        };
+    }
+
   /**
    *  Subscribe to orderbook-related events from the SocketService
    */
