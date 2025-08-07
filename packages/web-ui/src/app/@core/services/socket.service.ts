@@ -102,7 +102,7 @@ export class SocketService {
       }
 
       // Events that expect flattened payloads
-      const flatEvents = ['new-order', 'close-order'];
+      const flatEvents = ['new-order', 'close-order','::swap'];
 
       const msg = flatEvents.includes(event)
         ? JSON.stringify({ event, ...data })      // flattened
