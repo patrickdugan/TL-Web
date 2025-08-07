@@ -104,7 +104,8 @@ export class SocketService {
       // Events that expect flattened payloads
       const flatEvents = ['new-order', 'close-order','::swap'];
 
-      const msg = flatEvents.includes(event)
+    const isFlat = flatEvents.some(e => event.endsWith(e))
+    const msg = isFlat 
         ? JSON.stringify({ event, ...data })      // flattened
         : JSON.stringify({ event, data });        // nested
 
