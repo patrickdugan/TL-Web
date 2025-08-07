@@ -13,8 +13,8 @@ import { NewTradeLayerApiService } from "../apis/tl-api.service";
 
 export class ApiService {
     private _network: TNETWORK = 'BTC'// null;
-    private _apiUrl: string | null = 'http://172.81.181.19:3000'; // Fixed
-    private _orderbookUrl: string | null = null;
+    private _apiUrl: string | null = 'https://api.layerwallet.com'; // Fixed
+    private _orderbookUrl: string | null = 'wss://ws.layerwallet.com';
 
     constructor(
         private marketApiService: MarketApiService,
