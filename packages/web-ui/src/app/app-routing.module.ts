@@ -18,6 +18,7 @@ export const routes: Routes = [
     path: '',
     canActivate: [RPCGuard],
     children: [
+      { path: '', redirectTo: 'futures', pathMatch: 'full' },
       {
         path: '',
         component: HomePageComponent,

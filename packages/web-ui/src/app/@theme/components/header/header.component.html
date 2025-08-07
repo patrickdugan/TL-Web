@@ -6,6 +6,9 @@
         <mat-icon>menu</mat-icon>
         <img src="./assets/tl-logo.svg" alt="TL Logo">
       </button>
+        <button mat-stroked-button class="ms-2" (click)="openNetworkDialog()">
+            Network: {{ rpcService.NETWORK || 'BTC' }}
+        </button>
     </div>
 
     <span class="spacer"></span>

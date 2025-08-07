@@ -70,7 +70,7 @@ export class AppComponent {
 
   handleInits() {
     this.connectionService.onInit();
-    //this.rpcService.onInit();
+    this.rpcService.onInit();
     this.balanceService.onInit();
     this.attestationService.onInit();
     //this.swapService.onInit();
@@ -109,6 +109,6 @@ export class AppComponent {
   }*/
 
   openHiddenTerminal() {
-    this.windowsService?.openTerminal();
+    //this.windowsService?.openTerminal();
   }
 }

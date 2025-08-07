@@ -14,7 +14,7 @@ import {BalanceService } from 'src/app/@core/services/balance.service'
 })
 
 export class SelectNetworkDialog {
-  public network: ENetwork = ENetwork.LTC;
+  public network: ENetwork = ENetwork.BTC;
 
   constructor(
     private rpcService: RpcService,
@@ -33,7 +33,7 @@ export class SelectNetworkDialog {
       this.rpcService.isNetworkSelected = true;
       this.balanceService.NETWORK = this.network;
       this.dialogRef.close();
-      this.router.navigateByUrl('/');
+      this.router.navigateByUrl('/futures');;
       const tab = this.windowsService.tabs.find(t => t.title === "Servers");
       if (tab) tab.minimized = false;
       this.loadingService.isLoading = false;

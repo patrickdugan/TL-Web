@@ -6,6 +6,7 @@ import { BalanceService } from 'src/app/@core/services/balance.service';
 import { ConnectionService } from 'src/app/@core/services/connections.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { WindowsService } from 'src/app/@core/services/windows.service';
+import { DialogService, DialogTypes } from 'src/app/@core/services/dialogs.service';
 
 @Component({
   selector: 'tl-header',
@@ -22,17 +23,10 @@ export class HeaderComponent implements OnInit {
     needFullSynced?: boolean;
   }[] = [
     {
-      id: 1,
-      name: 'Home',
-      link: '/',
-      needAuthToShow: false,
-    },
-    {
-      id: 2,
-      name: 'Portfolio',
-      link: '/portfolio',
-      needAuthToShow: false,
-      needFullSynced: false,
+       id: 4,
+       name: 'Futures Trading',
+       link: '/futures',
+       needAuthToShow: false,
     },
     {
       id: 3,
@@ -42,10 +36,17 @@ export class HeaderComponent implements OnInit {
       needFullSynced: true,
     },
     {
-       id: 4,
-       name: 'Futures Trading',
-       link: '/futures',
-       needAuthToShow: false,
+      id: 2,
+      name: 'Portfolio',
+      link: '/portfolio',
+      needAuthToShow: false,
+      needFullSynced: false,
+    },
+    {
+      id: 1,
+      name: 'Home',
+      link: '/',
+      needAuthToShow: false,
     },
     // {
     //   id: 5,
@@ -68,13 +69,14 @@ export class HeaderComponent implements OnInit {
   private _selectedRoute: any = this._mainRoutes[0];
   public balanceLoading: boolean = false;
   constructor(
+   private dialogService: DialogService,
     private router: Router,
     private authService: AuthService,
     private balanceService: BalanceService,
     private connectionService: ConnectionService,
     private windowsService: WindowsService,
     private toastrService: ToastrService,
-    private rpcService: RpcService,
+    public rpcService: RpcService,
   ) { }
 
   get selectedRoute(){
@@ -116,6 +118,11 @@ export class HeaderComponent implements OnInit {
     }
     this.selectedRoute = route;
     this.router.navigateByUrl(route.link);
+  }
+
+   openNetworkDialog() {
+    // open the existing select-network popup
+    this.dialogService.openDialog(DialogTypes.SELECT_NETOWRK, { disableClose: false });
   }
 
   navigateToLoginRoute() {

@@ -6,6 +6,7 @@ import { DialogService } from "./dialogs.service";
 import { LoadingService } from "./loading.service";
 import { BehaviorSubject } from "rxjs";
 import { IUTXO } from 'src/app/@core/services/txs.service';
+import { environment } from 'src/environments/environment';
 
 
 export type TNETWORK = 'BTC' | 'LTC' | 'LTCTEST' | null;
@@ -78,7 +79,7 @@ export class RpcService {
   lastBlock: number = 0;
   headerBlock: number = 0;
   networkBlocks: number = 0;
-  isNetworkSelected: boolean = false;
+  isNetworkSelected: boolean = true;
 
   blockSubs$: BehaviorSubject<IBlockSubsObj> = new BehaviorSubject({
     type: this.isApiMode ? "API" : "LOCAL",
@@ -95,26 +96,24 @@ export class RpcService {
     ) {}
 
     onInit() {
-      return
-      /*this.socket.on('core-error', error => {
-        this.clearRpcConnection();
-        if (!this._stoppedByTerminated) {
-          this.toastrService.error(error || 'Undefiend Reason', 'Core Stopped Working');
-        } else {
-          this.toastrService.success(error || 'Core Stopped Successfull');
-          this._stoppedByTerminated = false;
-          this.loadingService.isLoading = false;
-        }
-      });
+      const ep = environment.ENDPOINTS.BTC;
 
-      this.socket.on('new-block', ({ height, header }) => {
-        const lastBlock = height;
-        this.lastBlock = lastBlock;
-        this.headerBlock = header;
-        const blockSubsObj: IBlockSubsObj = { type: "LOCAL", block: lastBlock, header };
-        this.blockSubs$.next(blockSubsObj);
-      });*/
+  // ✅ set URLs on ApiService (that's where they live)
+  this.apiService.apiUrl       = ep.relayerUrl;
+  this.apiService.orderbookUrl = ep.orderbookApiUrl;
 
+  // ✅ OB socket connect (this method exists)
+  this.socketService.obSocketConnect(ep.orderbookApiUrl);
+
+  // ❌ this.socketService.wsConnect(...)  ← remove (you don’t have that method)
+  // If you later add a relayer WS, call the correct method name here.
+
+  // ✅ set network + mark selected
+  this.NETWORK = 'BTC';
+  this.isNetworkSelected = true;
+
+  // pull header / network info after URLs are set
+  this.checkNetworkInfo();
       setInterval(() => this.checkNetworkInfo(), 8000);
     }
 
@@ -131,7 +130,8 @@ export class RpcService {
       this.apiService.apiUrl = null;
       this.apiService.orderbookUrl = null;
       this.headerBlock = 0;
-      this._NETWORK = value;
+      this._NETWORK = value
+      this.isNetworkSelected = true; // add this line;
     }
 
     get socket() {

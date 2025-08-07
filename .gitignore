@@ -1,3 +1,4 @@
 node_modules
 release
 *.log
+packages/web-ui.zip
