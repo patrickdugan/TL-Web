@@ -4,6 +4,14 @@ export class SwapEvent {
         public socketId: string,
         public data: any = null,
     ) {}
+
+    toJSON() {
+    return {
+      eventName: this.eventName,
+      socketId: this.socketId,
+      data: this.data,
+    };
+  }
 };
 
 export enum ETradeType {
