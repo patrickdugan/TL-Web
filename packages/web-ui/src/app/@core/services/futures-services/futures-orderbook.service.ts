@@ -194,7 +194,7 @@ export class FuturesOrderbookService {
       } else {
         result.push({
           price: parseFloat(o.props.price.toFixed(4)),
-          amount: o.props.amount,
+          amount: normalizedAmount,
         });
       }
     });
