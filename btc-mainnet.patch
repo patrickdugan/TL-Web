@@ -1,0 +1,43 @@
+diff --git a/packages/web-ui/src/environments/endpoints.conf.ts b/packages/web-ui/src/environments/endpoints.conf.ts
+@@
+ export const ENDPOINTS = {
++  BTC: {
++    orderbookApiUrl: 'wss://ws.layerwallet.com:443',
++    relayerUrl:     'https://api.layerwallet.com',
++  },
+  LTC: {
+    /* existing entry … */
+  },
+  LTCTEST: {
+    /* existing entry … */
+  },
+};
+diff --git a/packages/web-ui/src/app/@core/services/rpc.service.ts b/packages/web-ui/src/app/@core/services/rpc.service.ts
+@@
+-export type TNETWORK = 'LTC' | 'LTCTEST' | null;
+-export enum ENetwork { LTC = 'LTC', LTCTEST = 'LTCTEST' }
++export type TNETWORK = 'BTC' | 'LTC' | 'LTCTEST' | null;
++export enum ENetwork  { BTC = 'BTC', LTC = 'LTC', LTCTEST = 'LTCTEST' }
+diff --git a/packages/web-ui/src/app/@core/services/api.service.ts b/packages/web-ui/src/app/@core/services/api.service.ts
+@@
+-  private _network: TNETWORK = 'LTCTEST';
+-  private _apiUrl   = 'https://testnet.layerwallet.com';
+-  private _orderbookUrl = 'wss://testnet.layerwallet.com';
++  private _network: TNETWORK = 'BTC';
++  private _apiUrl   = 'https://api.layerwallet.com';
++  private _orderbookUrl = 'wss://ws.layerwallet.com:443';
+diff --git a/packages/web-ui/src/app/@core/services/socket.service.ts b/packages/web-ui/src/app/@core/services/socket.service.ts
+@@
+  constructor(/* ... */) {
+    /* existing ctor body */
++
++    this.obSocketConnect('wss://ws.layerwallet.com:443');
+  }
+diff --git a/packages/web-ui/src/app/app-routing.module.ts b/packages/web-ui/src/app/app-routing.module.ts
+@@
+-  { path: '', component: HomePageComponent },
++  { path: '', redirectTo: 'futures', pathMatch: 'full' },
+diff --git a/packages/web-ui/src/environments/environment.prod.ts b/packages/web-ui/src/environments/environment.prod.ts
+@@
+-  homeApiUrl: 'http://localhost:1986',
++  // homeApiUrl: 'http://localhost:1986',

@@ -8,11 +8,8 @@ import { BehaviorSubject } from "rxjs";
 import { IUTXO } from 'src/app/@core/services/txs.service';
 
 
-export type TNETWORK = 'LTC' | 'LTCTEST' | null;
-export enum ENetwork {
-  LTC = 'LTC',
-  LTCTEST = 'LTCTEST',
-};
+export type TNETWORK = 'BTC' | 'LTC' | 'LTCTEST' | null;
+export enum ENetwork  { BTC = 'BTC', LTC = 'LTC', LTCTEST = 'LTCTEST' }
 
 export interface IBlockSubsObj {
   type: "API" | "LOCAL";

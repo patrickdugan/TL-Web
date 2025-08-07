@@ -10,6 +10,10 @@ export const ENDPOINTS: TEndpoint = {
         orderbookApiUrl: "wss://ws.layerwallet.com:443",
         relayerUrl: "https://api.layerwallet.com", // Use the masked HTTPS domain for production
     },
+    BTC: {
+      orderbookApiUrl: 'wss://ws.layerwallet.com:443',
+      relayerUrl:     'https://api.layerwallet.com',
+    },
     LTCTEST: {
         orderbookApiUrl: "wss://ws.layerwallet.com:443",
         relayerUrl: "https://testnet-api.layerwallet.com", // Use the masked HTTPS domain for production
