@@ -146,3 +146,32 @@ mat-toolbar {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
 }
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;            /* space between logo and button */
+}
+
+.brand .logo img {
+  display: block;
+  height: 28px;        /* match whatever your header uses */
+}
+
+.network-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  padding: 4px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.network-btn img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}

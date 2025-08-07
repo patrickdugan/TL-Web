@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatGridListModule } from '@angular/material/grid-list';
 import { MatIconModule } from '@angular/material/icon/';
@@ -34,6 +34,7 @@ const COMPONENTS = [
 const imports = [
   ...NG_MODULES,
   ...MAT_MODULES,
+    MatTooltipModule,
 ];
 
 const declarations = [
@@ -42,6 +43,7 @@ const declarations = [
 
 const exports = [
   LayoutComponent,
+  MatTooltipModule,
 ];
 
 @NgModule({ imports, declarations, exports })

@@ -1,61 +1,75 @@
 <mat-toolbar>
   <mat-toolbar-row>
-    <!-- Left Side: Logo -->
+    <!-- Left Side: burger + logo + small network icon button -->
     <div class="left-side">
-      <button mat-icon-button (click)="toggleSideBar()">
+      <button mat-icon-button (click)="toggleSideBar()" aria-label="Toggle menu">
         <mat-icon>menu</mat-icon>
-        <img src="./assets/tl-logo.svg" alt="TL Logo">
       </button>
-        <button mat-stroked-button class="ms-2" (click)="openNetworkDialog()">
-            Network: {{ rpcService.NETWORK || 'BTC' }}
-        </button>
+
+      <a class="logo" routerLink="/" aria-label="TradeLayer Home">
+        <img src="assets/tl-logo.svg" alt="TradeLayer" />
+      </a>
+
+      <!-- round network icon button placed just to the right of the logo -->
+      <button
+        mat-icon-button
+        class="network-btn"
+        [matTooltip]="'Switch network'"
+        aria-label="Switch network"
+        (click)="openNetworkDialog()"
+      >
+        <img [src]="networkIcon" alt="Network" />
+      </button>
     </div>
 
     <span class="spacer"></span>
 
-    <!-- Right Side: Wallet and Balance Information -->
+    <!-- Right Side: Wallet and Balance Information (unchanged) -->
     <div class="right-side">
-    <div id="wallet-ui">
+      <div id="wallet-ui">
         <!-- Download TL Wallet Button -->
         <button
-            id="download-wallet-btn"
-            class="download-wallet-btn"
-            *ngIf="!walletAddress"
-            (click)="openWalletDownload()"
+          id="download-wallet-btn"
+          class="download-wallet-btn"
+          *ngIf="!walletAddress"
+          (click)="openWalletDownload()"
         >
-            Download TL Wallet
+          Download TL Wallet
         </button>
 
         <!-- Connect Wallet Button -->
         <button
-            id="connectWalletButton"
-            class="connect-button"
-            *ngIf="!walletAddress"
-            (click)="connectWallet()"
+          id="connectWalletButton"
+          class="connect-button"
+          *ngIf="!walletAddress"
+          (click)="connectWallet()"
         >
-            Connect Wallet
+          CONNECT WALLET
         </button>
 
         <!-- Wallet Info Display -->
         <div id="wallet-info" *ngIf="walletAddress" class="wallet-address-display">
-            Connected: <span id="connectedAddress">{{ walletAddress | slice: 0:6 }}...{{ walletAddress | slice: -6 }}</span>
+          Connected:
+          <span id="connectedAddress">
+            {{ walletAddress | slice:0:6 }}...{{ walletAddress | slice:-6 }}
+          </span>
         </div>
+      </div>
     </div>
-</div>
-
   </mat-toolbar-row>
 </mat-toolbar>
 
+<!-- Tabs -->
 <div class="nav-container">
-    <nav mat-tab-nav-bar mat-align-tabs="center">
-        <a
-            *ngFor="let route of mainRoutes"
-            mat-tab-link
-            (click)="navigateTo(route)"
-            [active]="selectedRoute === route"
-            [disabled]="route.disabled"
-        >
-            {{ route.name }}
-        </a>
-    </nav>
+  <nav mat-tab-nav-bar mat-align-tabs="center">
+    <a
+      *ngFor="let route of mainRoutes"
+      mat-tab-link
+      (click)="navigateTo(route)"
+      [active]="selectedRoute === route"
+      [disabled]="route.disabled"
+    >
+      {{ route.name }}
+    </a>
+  </nav>
 </div>

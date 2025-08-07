@@ -185,6 +185,15 @@ async connectWallet() {
   }
 }
 
+  get networkIcon(): string {
+    switch (this.rpcService.NETWORK) {
+      case 'BTC':     return 'assets/icons/btc.svg';
+      case 'LTC':     return 'assets/icons/ltc.svg';
+      case 'LTCTEST': return 'assets/icons/ltc-test.svg';
+      default:        return 'assets/icons/net.svg';
+    }
+  }
+
 openWalletDownload() {
   window.open(
     "https://chromewebstore.google.com/detail/tradelayer-wallet-extensi/ilfdpenpmlmjljckbjcafgmbemogdkfn",

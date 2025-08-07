@@ -1,38 +1,9 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "packages/web-ui/dist/**/*",
-      "use": "@vercel/static"
-    }
-  ],
- "redirects": [
-    {
-      "source": "/404",
-      "destination": "/",
-      "statusCode": 307
-    },
- 	{
-      "source": "/:path*",
-      "destination": "/",
-      "statusCode": 307
-    },
-	{
-      "source": "/portfolio",
-      "destination": "/",
-      "statusCode": 307
-    },
-	{
-      "source": "/spot",
-      "destination": "/",
-      "statusCode": 307
-    },
-	{
-      "source": "/futures",
-      "destination": "/",
-      "statusCode": 307
-    }
-
-
+  "buildCommand": "npm run build:web-ui-prod",
+  "outputDirectory": "packages/web-ui/dist/apps/web-ui",
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
   ]
 }
