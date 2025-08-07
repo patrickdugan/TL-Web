@@ -1,7 +1,7 @@
 {
   "version": 2,
   "buildCommand": "npm ci && npm run build --prefix packages/web-ui",
-  "outputDirectory": "packages/web-ui/dist/apps/web-ui",
+  "outputDirectory": "packages/web-ui/dist",
   "routes": [
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
