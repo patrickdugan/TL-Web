@@ -27,22 +27,16 @@ export class SelectNetworkDialog implements OnInit {
     private windowsService: WindowsService,
     private balanceService: BalanceService
   ) {
-    // allow click-off
     this.dialogRef.disableClose = false;
-    this.dialogRef.backdropClick().subscribe(() => this.dialogRef.close());
+    this.dialogRef.backdropClick().subscribe(() => this.cancel());
   }
 
   ngOnInit(): void {
-    // Generic, runtime-safe population of enum -> options.
-    // Works even if ENetwork values are strings or numbers.
     const keys = Object.keys(ENetwork).filter(k => isNaN(Number(k)));
     this.options = keys.map(k => ({
       value: (ENetwork as any)[k] as ENetwork,
-      label: k.replace(/_/g, ' '),
+      label: k.replace(/_/g, ' ')
     }));
-
-    // (Optional) default select if only one option exists
-    if (this.options.length === 1) this.network = this.options[0].value;
   }
 
   async confirm(): Promise<void> {
@@ -53,4 +47,23 @@ export class SelectNetworkDialog implements OnInit {
     try {
       this.loadingService.isLoading = true;
 
-      this.rpcService.NETWORK = t
+      this.rpcService.NETWORK = this.network;
+      this.rpcService.isNetworkSelected = true;
+      this.balanceService.NETWORK = this.network;
+
+      this.dialogRef.close(true);
+      this.router.navigateByUrl('/futures');
+
+      const tab = this.windowsService.tabs.find(t => t.title === 'Servers');
+      if (tab) tab.minimized = false;
+    } catch (error: any) {
+      this.toastrService.error(error?.message || 'Failed to set network', 'Error');
+    } finally {
+      this.loadingService.isLoading = false;
+    }
+  }
+
+  cancel(): void {
+    this.dialogRef.close(false);
+  }
+}
