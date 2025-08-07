@@ -12,6 +12,11 @@ import { ThemeModule } from './@theme/theme.module';
 import { ToastrModule } from 'ngx-toastr';
 
 import { AppComponent } from './app.component';
+// Add these imports at the top with the other Angular Material imports
+import { MatDialogModule } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
 
 const NG_MODULES = [
   BrowserModule,
@@ -35,9 +40,17 @@ const TL_MODULES = [
   ToastrModule.forRoot(toastrOptionsObject),
 ];
 
+const MATERIAL_MODULES = [
+  MatDialogModule,
+  MatFormFieldModule,
+  MatSelectModule,
+  MatButtonModule
+];
+
 const imports = [
   ...NG_MODULES,
   ...TL_MODULES,
+  ...MATERIAL_MODULES
 ];
 
 const declarations = [AppComponent];
