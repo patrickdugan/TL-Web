@@ -215,7 +215,6 @@ export class WalletService {
   }
 
   // Non-BTC (or Phantom unavailable): original Layer Extension path
-  this.ensureWalletAvailable();
   try {
     const accounts = await window.myWallet!.sendRequest('requestAccounts', { network });
     if (!accounts || accounts.length === 0) {

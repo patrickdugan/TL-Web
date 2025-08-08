@@ -25,7 +25,7 @@ export class SelectNetworkDialog implements OnInit {
     private toastrService: ToastrService,
     private loadingService: LoadingService,
     private windowsService: WindowsService,
-    private balanceService: BalanceService
+    private balanceService: BalanceService,
     private cdr: ChangeDetectorRef
   ) {
     // enable click-off close
