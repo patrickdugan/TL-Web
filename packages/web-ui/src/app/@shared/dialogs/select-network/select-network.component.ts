@@ -7,7 +7,7 @@ import { ENetwork, RpcService } from 'src/app/@core/services/rpc.service';
 import { WindowsService } from 'src/app/@core/services/windows.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 
-type NetworkOpt = { value: ENetwork; label: string };
+type NetworkOpt = { value: ENetwork | string; label: string };
 
 @Component({
   selector: 'select-network-dialog',
@@ -15,7 +15,7 @@ type NetworkOpt = { value: ENetwork; label: string };
   styleUrls: ['./select-network.component.scss'],
 })
 export class SelectNetworkDialog implements OnInit {
-  network: ENetwork | null = null;
+  network: ENetwork | string | null = null;
   options: NetworkOpt[] = [];
 
   constructor(
@@ -33,10 +33,18 @@ export class SelectNetworkDialog implements OnInit {
 
   ngOnInit(): void {
     const keys = Object.keys(ENetwork).filter(k => isNaN(Number(k)));
-    this.options = keys.map(k => ({
-      value: (ENetwork as any)[k] as ENetwork,
-      label: k.replace(/_/g, ' ')
-    }));
+    if (keys.length) {
+      this.options = keys.map(k => ({
+        value: (ENetwork as any)[k],
+        label: k.replace(/_/g, ' ')
+      }));
+    } else {
+      // Fallback if enum is empty
+      this.options = [
+        { value: 'MAINNET', label: 'Mainnet' },
+        { value: 'TESTNET', label: 'Testnet' }
+      ];
+    }
   }
 
   async confirm(): Promise<void> {
@@ -47,9 +55,9 @@ export class SelectNetworkDialog implements OnInit {
     try {
       this.loadingService.isLoading = true;
 
-      this.rpcService.NETWORK = this.network;
+      this.rpcService.NETWORK = this.network as ENetwork;
       this.rpcService.isNetworkSelected = true;
-      this.balanceService.NETWORK = this.network;
+      this.balanceService.NETWORK = this.network as ENetwork;
 
       this.dialogRef.close(true);
       this.router.navigateByUrl('/futures');

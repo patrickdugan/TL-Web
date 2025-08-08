@@ -29,15 +29,15 @@ mat-toolbar {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  padding: 4px;
+  padding: 0px;
   background: rgba(255,255,255,.08);
   border: 1px solid rgba(255,255,255,.12);
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   margin-left: 4px;
 }
-.network-btn img { width: 18px; height: 18px; display: block; }
+.network-btn img { width: 20px; height: 20px; display: block; }
 
 
   .spacer {
