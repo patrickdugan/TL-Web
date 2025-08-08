@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
@@ -26,6 +26,7 @@ export class SelectNetworkDialog implements OnInit {
     private loadingService: LoadingService,
     private windowsService: WindowsService,
     private balanceService: BalanceService
+    private cdr: ChangeDetectorRef
   ) {
     // enable click-off close
     this.dialogRef.disableClose = false;
@@ -53,6 +54,9 @@ export class SelectNetworkDialog implements OnInit {
     if (!this.options.some(o => o.value === this.network)) {
       this.network = this.options[0]?.value ?? this.network;
     }
+
+  // 👉 force a render pass so mat-select sees options immediately
+    Promise.resolve().then(() => this.cdr.detectChanges());
   }
 
   async selectNetwork(): Promise<void> {

@@ -196,17 +196,44 @@ export class WalletService {
     return this.available().length > 0;
   }
 
-  async requestAccounts(network?: string): Promise<{ address: string; pubkey?: string }[]> {
-    const p = this.provider$.value || this.pick();
-    if (!p) throw new Error('Wallet extension not detected');
+ async requestAccounts(network?: string): Promise<{ address: string; pubkey?: string }[]> {
+  // Prefer Phantom for BTC so we always get a pubkey
+  const isBTC = network === 'BTC' || network === 'BITCOIN';
+  const phantomBtc = (window as any)?.phantom?.bitcoin;
 
-    const net = network
-      ? (network.toLowerCase().includes('test') ? 'testnet' : 'mainnet')
-      : this.providerNet();
-
-    const addrs = await p.getAddresses(net);
-    return addrs.map(a => ({ address: a, pubkey: undefined }));
+  if (isBTC && phantomBtc?.requestAccounts) {
+    try {
+      const btcAccounts = await phantomBtc.requestAccounts(); // prompts connect if needed
+      return btcAccounts.map((a: { address: string; publicKey: string }) => ({
+        address: a.address,
+        pubkey: a.publicKey, // <- normalize to your shape
+      }));
+    } catch (e) {
+      console.warn('[wallet] Phantom requestAccounts failed, falling back to myWallet', e);
+      // fall through to myWallet
+    }
   }
+
+  // Non-BTC (or Phantom unavailable): original Layer Extension path
+  this.ensureWalletAvailable();
+  try {
+    const accounts = await window.myWallet!.sendRequest('requestAccounts', { network });
+    if (!accounts || accounts.length === 0) {
+      throw new Error('No accounts returned by the wallet');
+    }
+
+    // Normalize to { address, pubkey? }
+    return accounts.map((account: { address: string; pubkey?: string }) => ({
+      address: account.address,
+      pubkey: account.pubkey, // may be undefined for now if your extension doesn't fill it
+    }));
+  } catch (error: any) {
+    console.error('Error requesting accounts:', error?.message || error);
+    throw new Error('Failed to request accounts');
+  }
+}
+
+
 
   async signMessage(message: string, scheme: 'bip322' | 'ecdsa' = 'bip322'): Promise<string> {
     const p = this.provider$.value || this.pick();
