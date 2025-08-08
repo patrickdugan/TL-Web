@@ -7,7 +7,7 @@ import { ENetwork, RpcService } from 'src/app/@core/services/rpc.service';
 import { WindowsService } from 'src/app/@core/services/windows.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 
-type NetworkOpt = { value: ENetwork | string; label: string };
+type NetworkOpt = { value: ENetwork; label: string };
 
 @Component({
   selector: 'select-network-dialog',
@@ -15,60 +15,71 @@ type NetworkOpt = { value: ENetwork | string; label: string };
   styleUrls: ['./select-network.component.scss'],
 })
 export class SelectNetworkDialog implements OnInit {
-  network: ENetwork | string | null = null;
-  options: NetworkOpt[] = [];
+  public network: ENetwork = ENetwork.LTC; // default like old version
+  public options: NetworkOpt[] = [];
 
   constructor(
+    private rpcService: RpcService,
     public dialogRef: MatDialogRef<SelectNetworkDialog>,
     private router: Router,
     private toastrService: ToastrService,
     private loadingService: LoadingService,
-    private rpcService: RpcService,
     private windowsService: WindowsService,
     private balanceService: BalanceService
   ) {
+    // enable click-off close
     this.dialogRef.disableClose = false;
     this.dialogRef.backdropClick().subscribe(() => this.cancel());
   }
 
   ngOnInit(): void {
-    const keys = Object.keys(ENetwork).filter(k => isNaN(Number(k)));
+    // Build options from ENetwork; fall back if enum is empty at runtime
+    const enumObj = (ENetwork as any) || {};
+    const keys = Object.keys(enumObj).filter(k => isNaN(Number(k)));
     if (keys.length) {
       this.options = keys.map(k => ({
-        value: (ENetwork as any)[k],
+        value: enumObj[k] as ENetwork,
         label: k.replace(/_/g, ' ')
       }));
     } else {
-      // Fallback if enum is empty
+      // Fallback list so the modal is never empty
       this.options = [
-        { value: 'MAINNET', label: 'Mainnet' },
-        { value: 'TESTNET', label: 'Testnet' }
+        { value: ENetwork.LTC, label: 'LTC' },
+        // add others if your enum normally has them
       ];
+    }
+
+    // Ensure the selected value is one of the options
+    if (!this.options.some(o => o.value === this.network)) {
+      this.network = this.options[0]?.value ?? this.network;
     }
   }
 
-  async confirm(): Promise<void> {
-    if (!this.network) {
-      this.toastrService.warning('Please select a network');
-      return;
-    }
+  async selectNetwork(): Promise<void> {
     try {
       this.loadingService.isLoading = true;
 
-      this.rpcService.NETWORK = this.network as ENetwork;
+      this.rpcService.NETWORK = this.network;
       this.rpcService.isNetworkSelected = true;
-      this.balanceService.NETWORK = this.network as ENetwork;
+      this.balanceService.NETWORK = this.network;
 
       this.dialogRef.close(true);
-      this.router.navigateByUrl('/futures');
 
-      const tab = this.windowsService.tabs.find(t => t.title === 'Servers');
+      // Old behaviour navigated to '/', keep that here
+      this.router.navigateByUrl('/');
+
+      const tab = this.windowsService.tabs?.find((tab: any) => tab.title === 'Servers');
       if (tab) tab.minimized = false;
     } catch (error: any) {
       this.toastrService.error(error?.message || 'Failed to set network', 'Error');
     } finally {
       this.loadingService.isLoading = false;
     }
+  }
+
+  // Alias to support templates calling (click)="confirm()"
+  async confirm(): Promise<void> {
+    return this.selectNetwork();
   }
 
   cancel(): void {

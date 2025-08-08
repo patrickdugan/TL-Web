@@ -42,12 +42,6 @@ export class HeaderComponent implements OnInit {
       needAuthToShow: false,
       needFullSynced: false,
     },
-    {
-      id: 1,
-      name: 'Home',
-      link: '/',
-      needAuthToShow: false,
-    },
     // {
     //   id: 5,
     //   name: 'Node Reward',

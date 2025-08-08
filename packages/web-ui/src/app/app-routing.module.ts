@@ -16,48 +16,21 @@ declare const gtag: Function; // Declare gtag globally
 export const routes: Routes = [
   {
     path: '',
-    canActivate: [RPCGuard],
-    children: [
-      { path: '', redirectTo: 'futures', pathMatch: 'full' },
-      {
-        path: '',
-        component: HomePageComponent,
-      },
-       {
-         path: 'login',
-         component: LoginPageComponent,
-       },
-      {
-         path: 'tx-builder',
-         component: TxBuilderPageComponent,
-       },
-      {
-        path: 'portfolio',
-        component: PortfolioPageComponent,
-        canActivate: [],
-      },
-      {
-        path: 'spot',
-        component: SpotPageComponent,
-        canActivate: [],
-      },
-       {
-         path: 'futures',
-         component: FuturesPageComponent,
-         canActivate: [],
-       },
-      // {
-      //   path: 'node-reward',
-      //   component: NodeRewardPageComponent,
-      //   canActivate: [SyncedGuard],
-      // },
-      {
-        path: '**',
-        component: FuturesPageComponent,
-      },
-    ],
+    component: FuturesPageComponent,
+    canActivate: [RPCGuard]
   },
+  {
+    path: 'spot',
+    component: SpotPageComponent,
+    canActivate: [RPCGuard]
+  },
+  {
+    path: 'portfolio',
+    component: PortfolioPageComponent,
+    canActivate: [RPCGuard]
+  }
 ];
+
 
 
   @NgModule({
