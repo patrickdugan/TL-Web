@@ -102,7 +102,6 @@ export class HeaderComponent implements OnInit {
   ngOnInit(): void { }
 
   navigateTo(route: any) {
-    // remove OB socket gating and server popup/toastr
     this.selectedRoute = route;
 
     // normalize URL: '' => '/', 'spot' => '/spot', '/portfolio' stays
