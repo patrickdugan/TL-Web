@@ -25,7 +25,7 @@ export class HeaderComponent implements OnInit {
     {
        id: 4,
        name: 'Futures Trading',
-       link: '/futures',
+       link: '',
        needAuthToShow: false,
     },
     {
@@ -102,19 +102,19 @@ export class HeaderComponent implements OnInit {
   ngOnInit(): void { }
 
   navigateTo(route: any) {
-    if (route.id === 3 || route.id === 4) {
-      if (!this.connectionService.isOBSocketConnected) {
-        this.toastrService.warning('Please first connect to Server');
-        const window = this.windowsService.tabs.find(tab => tab.title === 'Servers');
-        if (window) window.minimized = false;
-        return;
-      }
-    }
+    // remove OB socket gating and server popup/toastr
     this.selectedRoute = route;
-    this.router.navigateByUrl(route.link);
+
+    // normalize URL: '' => '/', 'spot' => '/spot', '/portfolio' stays
+    const link = route.link || '';
+    const url =
+      link === '' ? '/' :
+      link.startsWith('/') ? link : `/${link}`;
+
+    this.router.navigateByUrl(url);
   }
 
-   openNetworkDialog() {
+  openNetworkDialog() {
     // open the existing select-network popup
     this.dialogService.openDialog(DialogTypes.SELECT_NETOWRK, { disableClose: false });
   }

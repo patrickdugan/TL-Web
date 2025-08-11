@@ -17,7 +17,7 @@ export const routes: Routes = [
   {
     path: '',
     component: FuturesPageComponent,
-    canActivate: [RPCGuard]
+    /*canActivate: [RPCGuard]*/
   },
   {
     path: 'spot',
@@ -34,7 +34,7 @@ export const routes: Routes = [
 
 
   @NgModule({
-    imports: [RouterModule.forRoot(routes)], // Ensure `RouterModule` is properly imported
+    imports: [RouterModule.forRoot(routes, { onSameUrlNavigation: 'reload' })], // Ensure `RouterModule` is properly imported
     exports: [RouterModule],
   })
   export class AppRoutingModule {

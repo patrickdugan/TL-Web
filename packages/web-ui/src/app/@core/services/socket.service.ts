@@ -34,7 +34,6 @@ export class SocketService {
 
     this.ws.onopen = () => {
       this.wsConnected = true;
-      this.toasterService.success('OB Socket Connected', 'Socket');
       console.log('OB WebSocket connected');
     };
 
