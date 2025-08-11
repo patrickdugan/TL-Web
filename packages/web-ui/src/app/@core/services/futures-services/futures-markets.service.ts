@@ -40,7 +40,7 @@ export class FuturesMarketService {
     private _futuresMarketsTypes: IFuturesMarketType[] = [];
     private _selectedMarketType: IFuturesMarketType = this.futuresMarketsTypes[0] || null;
     private _selectedMarket: IFutureMarket = this.selectedMarketType?.markets[0] || null;
-
+    private _lastNet?: string;
     public isContractDataReady = false; // Guard flag for data readiness
 
     constructor(
@@ -123,7 +123,7 @@ export class FuturesMarketService {
     }
 
     getMarkets() {
-        this.apiService.marketApi.getFuturesMarkets()
+        this.apiService.marketApi.getFuturesMarkets(this.rpcService?.NETWORK.toString())
             .subscribe(async (marketTypes: IFuturesMarketType[]) => {
                 this._futuresMarketsTypes = marketTypes;
                 this._selectedMarketType = marketTypes.find(e => !e.disabled) || marketTypes[0];
@@ -145,6 +145,8 @@ export class FuturesMarketService {
         // Emit the event directly via SocketService
         this.socketService.emitEvent('update-orderbook', this.marketFilter);
     }
+
+    public clearCache() { (this as any)._futuresMarketsTypes = []; } 
 
     private async enrichWithContractInfo() {
         const allMarkets = this._futuresMarketsTypes

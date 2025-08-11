@@ -1,6 +1,7 @@
 import { Injectable } from "@angular/core";
 import { ApiService } from "../api.service";
 import { SocketService } from "../socket.service";
+import { RpcService, ENetwork } from 'src/app/@core/services/rpc.service';
 
 export interface ISpotMarketType {
     name: string,
@@ -29,13 +30,14 @@ export interface IToken {
 export class SpotMarketsService {
 
     private _spotMarketsTypes: ISpotMarketType[] = [];
-
+    private _lastNet?: string;
     private _selectedMarketType: ISpotMarketType = this.spotMarketsTypes[0] || null;
     private _selectedMarket: IMarket = this.selectedMarketType?.markets[0] || null;
 
     constructor(
         private apiService: ApiService,
         private socketService: SocketService,
+        private rpcService: RpcService
     ) { }
 
     get spotMarketsTypes() {
@@ -82,8 +84,10 @@ export class SpotMarketsService {
         };
     };
 
+    clearCache() { (this as any)._spotMarketsTypes = []; }
+
     getMarkets() {
-        this.apiService.marketApi.getSpotMarkets()
+        this.apiService.marketApi.getSpotMarkets(this.rpcService?.NETWORK.toString())
             .subscribe((marketTypes: ISpotMarketType[]) => {
                 this._spotMarketsTypes = marketTypes;
                 this.selectedMarketType = marketTypes.find(e => !e.disabled) || marketTypes[0];

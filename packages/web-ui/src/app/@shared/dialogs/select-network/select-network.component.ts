@@ -6,6 +6,8 @@ import { LoadingService } from 'src/app/@core/services/loading.service';
 import { ENetwork, RpcService } from 'src/app/@core/services/rpc.service';
 import { WindowsService } from 'src/app/@core/services/windows.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
+import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
+import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
 
 type NetworkOpt = { value: ENetwork; label: string };
 
@@ -26,7 +28,9 @@ export class SelectNetworkDialog implements OnInit {
     private loadingService: LoadingService,
     private windowsService: WindowsService,
     private balanceService: BalanceService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private futures: FuturesMarketService,
+    private spot: SpotMarketsService
   ) {
     // enable click-off close
     this.dialogRef.disableClose = false;
@@ -66,14 +70,17 @@ export class SelectNetworkDialog implements OnInit {
       this.rpcService.NETWORK = this.network;
       this.rpcService.isNetworkSelected = true;
       this.balanceService.NETWORK = this.network;
+      this.spot.clearCache();
+      this.futures.clearCache();
+      this.spot.getMarkets();
+      this.futures.getMarkets();
+
 
       this.dialogRef.close(true);
 
       // Old behaviour navigated to '/', keep that here
       this.router.navigateByUrl('/');
 
-      const tab = this.windowsService.tabs?.find((tab: any) => tab.title === 'Servers');
-      if (tab) tab.minimized = false;
     } catch (error: any) {
       this.toastrService.error(error?.message || 'Failed to set network', 'Error');
     } finally {
