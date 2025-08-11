@@ -87,8 +87,9 @@ export class SpotMarketsService {
     clearCache() { (this as any)._spotMarketsTypes = []; }
 
     getMarkets() {
-        this.apiService.marketApi.getSpotMarkets(this.rpcService?.NETWORK.toString())
-            .subscribe((marketTypes: ISpotMarketType[]) => {
+        const net = this.rpcService.NETWORK;
+            if (!net) return;
+            this.apiService.marketApi.getSpotMarkets(net.toString()).subscribe((marketTypes: ISpotMarketType[]) => {
                 this._spotMarketsTypes = marketTypes;
                 this.selectedMarketType = marketTypes.find(e => !e.disabled) || marketTypes[0];
             });

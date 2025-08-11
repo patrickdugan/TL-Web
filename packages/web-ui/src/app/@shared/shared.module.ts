@@ -17,8 +17,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select'; 
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatSliderModule } from '@angular/material/slider';
-
-
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { SideNavComponent } from './components/side-nav/side-nav.component';
 import { InfoLineComponent } from '../@shared/components/info-line/info-line.component';
 import { DisconnectedLineComponent } from './components/disconnected-line/disconnected-line.component';
@@ -29,7 +28,6 @@ import { SelectNetworkDialog } from './dialogs/select-network/select-network.com
 import { SyncNodeDialog } from './dialogs/sync-node/sync-node.component';
 import { NewNodeDialog } from './dialogs/new-node/new-node.component';
 import { TerminalDialog } from './dialogs/terminal/terminal.component';
-
 import { WindowComponent } from './components/window/window.component';
 import { EncKeyDialog } from './dialogs/enc-key/enc-key.component';
 import { PasswordDialog } from './dialogs/password/password.component';
@@ -54,6 +52,7 @@ const MAT_MODULES = [
     MatExpansionModule,
     MatCardModule,
     MatTabsModule,
+    MatFormFieldModule,
     MatCheckboxModule,
     MatProgressBarModule,
     MatIconModule,

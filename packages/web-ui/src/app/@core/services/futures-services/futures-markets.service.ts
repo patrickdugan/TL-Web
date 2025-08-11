@@ -123,7 +123,12 @@ export class FuturesMarketService {
     }
 
     getMarkets() {
-        this.apiService.marketApi.getFuturesMarkets(this.rpcService?.NETWORK.toString())
+            const net = this.rpcService.NETWORK;
+            if (!net) { 
+              // optionally log/return EMPTY or throw
+              return; 
+            }
+            this.apiService.marketApi.getFuturesMarkets(net.toString())
             .subscribe(async (marketTypes: IFuturesMarketType[]) => {
                 this._futuresMarketsTypes = marketTypes;
                 this._selectedMarketType = marketTypes.find(e => !e.disabled) || marketTypes[0];
