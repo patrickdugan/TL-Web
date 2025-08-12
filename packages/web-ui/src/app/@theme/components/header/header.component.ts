@@ -141,11 +141,44 @@ export class HeaderComponent implements OnInit {
 async connectWallet() {
   try {
     console.log("Checking for wallet...");
+//
+    // --- Phantom Bitcoin provider (preferred) ---
+    const ph: any = (window as any)?.phantom?.bitcoin;
+    if (ph?.isPhantom) {
+      console.log("Phantom Bitcoin detected.");
 
-    if (typeof window.myWallet !== "undefined") {
-      console.log("Wallet detected.");
+      // Must be called from a user gesture (your button click) to show the approval modal.
+      const accounts = await ph.requestAccounts(); // triggers Phantom approval UI
+      if (accounts && accounts.length > 0) {
+        // accounts: BtcAccount[] per docs: { address, addressType, publicKey, purpose }
+        this.walletAddress = accounts[0].address;
+        this.balanceVisible = true;
+        console.log("Connected Phantom BTC Address:", this.walletAddress);
+        this.toastrService.success("Phantom connected successfully!");
+      }
 
-      const accounts = await window.myWallet.sendRequest("requestAccounts", {});
+      // Listen for account switches (Phantom BTC supports 'accountsChanged')
+      if (typeof ph.on === "function") {
+        ph.on("accountsChanged", (newAccounts: any[]) => {
+          console.log("Phantom accounts changed:", newAccounts);
+          if (Array.isArray(newAccounts) && newAccounts.length > 0) {
+            this.walletAddress = newAccounts[0].address;
+            this.toastrService.info("Phantom account switched.");
+          } else {
+            // If empty array, try to reconnect (per docs suggestion)
+            ph.requestAccounts().catch((e: any) => console.warn("Re-connect failed:", e));
+          }
+        });
+      }
+
+      return; // Done with Phantom path
+    }
+
+    // --- Fallback: your existing custom wallet path ---
+    if (typeof (window as any).myWallet !== "undefined") {
+      console.log("Fallback wallet detected.");
+
+      const accounts = await (window as any).myWallet.sendRequest("requestAccounts", {});
       if (accounts && accounts.length > 0) {
         this.walletAddress = accounts[0]?.address || accounts[0];
         this.balanceVisible = true;
@@ -153,15 +186,14 @@ async connectWallet() {
         this.toastrService.success("Wallet connected successfully!");
       }
 
-      // Listen for account changes
-      if (typeof window.myWallet.on === "function") {
-        window.myWallet.on("accountsChanged", (newAccounts: string[]) => {
+      if (typeof (window as any).myWallet.on === "function") {
+        (window as any).myWallet.on("accountsChanged", (newAccounts: string[]) => {
           console.log("Accounts changed:", newAccounts);
           this.walletAddress = newAccounts[0] || null;
           this.toastrService.info("Account switched.");
         });
-
-        window.myWallet.on("networkChanged", (network: string) => {
+        // Only keep this if your custom wallet actually emits it. Phantom BTC does not document 'networkChanged'.
+        (window as any).myWallet.on("networkChanged", (network: string) => {
           console.log("Network changed:", network);
           this.toastrService.info(`Network changed to ${network}.`);
         });
@@ -169,7 +201,7 @@ async connectWallet() {
         console.warn("Wallet does not support event listeners.");
       }
     } else {
-      console.warn("Wallet extension not detected.");
+      console.warn("No wallet extension detected.");
       this.toastrService.error("Wallet extension not detected.");
     }
   } catch (error: any) {
@@ -177,6 +209,7 @@ async connectWallet() {
     this.toastrService.error("Failed to connect wallet.");
   }
 }
+
 
   get networkIcon(): string {
     switch (this.rpcService.NETWORK) {
