@@ -41,12 +41,24 @@
 
         <!-- Connect Wallet Button -->
         <button
-          id="connectWalletButton"
-          class="connect-button"
-          *ngIf="!walletAddress"
-          (click)="connectWallet()"
-        >
+            id="connectWalletButton"
+            class="connect-button"
+            *ngIf="!walletAddress"
+            (click)="connectWallet()"
+          >
           CONNECT WALLET
+          <img
+            *ngIf="isBitcoinNetwork"
+            class="phantom-coin"
+            src="assets/icons/Phantom_SVG_Icon.svg"
+            alt="Phantom"
+          />
+          <img
+            *ngIf="isLitecoinNetwork"
+            class="phantom-coin"
+            src="assets/icons/tl_logo_circle_only_small.png"
+            alt="TL Wallet"
+          />
         </button>
 
         <!-- Wallet Info Display -->

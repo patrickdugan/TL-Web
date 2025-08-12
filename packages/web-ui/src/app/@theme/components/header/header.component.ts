@@ -77,6 +77,18 @@ export class HeaderComponent implements OnInit {
     return this._selectedRoute;
   }
 
+  // header.component.ts
+  get isBitcoinNetwork(): boolean {
+    const icon = (this.networkIcon ?? '').toLowerCase();
+    return icon.includes('btc') || icon.includes('bitcoin');
+  }
+
+  get isLitecoinNetwork(): boolean {
+    const net = (this.rpcService?.NETWORK ?? '').toLowerCase();
+    return net === 'ltc' || net === 'ltctest';
+  }
+
+
   set selectedRoute(value: any){
     this._selectedRoute = value;
   }

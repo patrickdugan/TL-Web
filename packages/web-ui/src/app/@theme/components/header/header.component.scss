@@ -86,6 +86,10 @@ mat-toolbar {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;              /* space between text and coin */
+    padding-right: 12px; 
 
     &:hover {
       background: linear-gradient(90deg, #00f2fe, #4facfe);
@@ -98,6 +102,15 @@ mat-toolbar {
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
   }
+
+.phantom-coin {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: inline-block;
+  vertical-align: middle;
+  pointer-events: none;  /* clicking the coin still clicks the button */
+}
 
   .wallet-address-display {
     font-size: 0.9rem;
