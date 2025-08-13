@@ -22,5 +22,14 @@
   "routes": [
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
+  ],
+"redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.layerwallet.com" }],
+      "destination": "https://layerwallet.com/:path*",
+      "permanent": true
+    }
   ]
+
 }
