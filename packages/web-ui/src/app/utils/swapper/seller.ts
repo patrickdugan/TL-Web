@@ -167,13 +167,25 @@ this.multySigChannelData = ms as IMSChannelData;
         }
     }
 
+private isSpotZeroTrade(): boolean {
+  if (this.typeTrade !== ETradeType.SPOT) return false;
+
+  // Prefer the top-level shape you showed
+  if ('propIdDesired' in (this.tradeInfo as any) && 'propIdForSale' in (this.tradeInfo as any)) {
+    const { propIdDesired, propIdForSale } = this.tradeInfo as any;
+    return Number(propIdDesired) === 0 || Number(propIdForSale) === 0;
+  }
+  return false
+}
+
     private async onStep4(cpId: string, psbtHex: string, commitTxId?: string) {
         this.logTime('Step 4 Start');
         try {
             if (cpId !== this.cpInfo.socketId) throw new Error('Step 4: p2p mismatch');
             if (!psbtHex) throw new Error('Step 4: missing PSBT');
-
-            if (commitTxId) {
+            
+            const skipRbf = this.isSpotZeroTrade();
+            if (commitTxId && !skipRbf) {
                 const txRes = await axios.get(`https://api.layerwallet.com/tx/${commitTxId}?verbose=true`);
                 const vins = txRes?.data?.vin || [];
                 const isRbf = vins.some((vin: any) => vin.sequence < 0xfffffffe);
