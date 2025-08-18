@@ -1,82 +1,296 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
-import { IChannelCommit, SpotChannelsService } from 'src/app/@core/services/spot-services/spot-channels.service';
 import { Subscription } from 'rxjs';
-import { IBuildTxConfig, TxsService } from 'src/app/@core/services/txs.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
 import { ToastrService } from 'ngx-toastr';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { SpotChannelsService } from 'src/app/@core/services/spot-services/spot-channels.service';
+import { DialogService } from 'src/app/@core/services/dialogs.service';
+import { TxsService } from 'src/app/@core/services/txs.service';
+import { ENCODER } from 'src/app/utils/payloads/encoder';
+import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError, finalize, map } from 'rxjs/operators';
+
+interface ChannelBalanceRow {
+  channel: string;
+  column: 'A' | 'B';
+  propertyId: number;
+  amount: number;
+  participants?: { A?: string; B?: string };
+  counterparty?: string;
+  lastCommitmentBlock?: number;
+}
 
 @Component({
   selector: 'tl-spot-channels',
   templateUrl: './spot-channels.component.html',
   styleUrls: ['./spot-channels.component.scss']
 })
+export class SpotChannelsComponent implements OnInit {
 
-export class SpotChannelsComponent implements OnInit, OnDestroy {
-    private subsArray: Subscription[] = [];
-    displayedColumns: string[] = ['property', 'sender', 'channel', 'amount', 'block', 'actions'];
+  displayedColumns = ['property', 'column', 'channel', 'counterparty', 'amount', 'block', 'actions'];
+  activeChannelsCommits: ChannelBalanceRow[] = [];
+  total = 0;
+  loading = false;
+  working = false;
+  error?: string;
+  private sub?: Subscription;
+  private address: string
+  private propertyId: number
+  private rows: ChannelBalanceRow[] = [];
 
-    constructor(
-      private spotChannelsService: SpotChannelsService,
-      private rpcService: RpcService,
-      private authService: AuthService,
-      private txsService: TxsService,
-      private loadingService: LoadingService,
-      private toastrService: ToastrService,
-    ) {}
+  constructor(
+    private spotSvc: SpotChannelsService,
+    private spotMkts: SpotMarketsService,
+    private dialogs: DialogService,
+    private auth: AuthService,
+    private txs: TxsService
+  ) {}
 
-    get activeChannelsCommits() {
-      return this.spotChannelsService.channelsCommits;
+   ngOnInit(): void {
+    this.refresh();
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+  }
+
+  private resolveAddress(): string {
+    return this.auth.walletAddresses?.[0] ?? '';
+  }
+
+  private resolvePropertyId(): number | undefined {
+    // Be flexible; different builds store selected spot market differently.
+    const m: any = this.spotMkts?.selectedMarket;
+    return (
+      m?.propIdDesired ??
+      m?.propIdForSale ??
+      m?.base?.propertyId ??
+      m?.quote?.propertyId ??
+      m?.property?.propertyId ??
+      m?.propertyId
+    );
+  }
+
+ refresh(): void {
+  const pid1 = this.spotMkts?.selectedMarket.first_token.propertyId
+  const pid2 = this.spotMkts?.selectedMarket.second_token.propertyId
+  const address = this.resolveAddress();
+
+  if (!pid1 || !pid2) {
+    this.activeChannelsCommits = [];
+    this.total = 0;
+    return;
+  }
+
+  this.loading = true;
+  this.error = '';
+
+  forkJoin({
+  r1: this.spotSvc.getChannelBalances(address, pid1),
+  r2: this.spotSvc.getChannelBalances(address, pid2),
+})
+.pipe(
+  map(({ r1, r2 }) => {
+    const a = this._extractCommits(r1);
+    const b = this._extractCommits(r2);
+    return this._mergeCommits(a, b);
+  }),
+  map(rows => this._sortByBlockDesc(rows)),
+  catchError((e) => {
+    this.error = e?.message || 'Failed to load channels';
+    return of<any[]>([]);
+  }),
+  finalize(() => { this.loading = false; })
+)
+.subscribe((rows) => {
+  this.activeChannelsCommits = rows;
+  this.total = rows.reduce((s, r) => s + (Number.isFinite(r?.amount) ? Number(r.amount) : 0), 0);
+});
+
+}
+
+  copy(value?: string | null) {
+    if (!value) return;
+    navigator.clipboard?.writeText(value).catch(() => {});
+  }
+
+  // ----- Transfer via DialogsService -----
+  transfer(row: ChannelBalanceRow) {
+    const data = {
+      mode: 'channel-transfer',
+      address: this.address,
+      channel: row.channel,
+      column: row.column,
+      propertyId: row.propertyId,
+      maxAmount: row.amount,
+      counterparty: row.counterparty,
+      participants: row.participants
+    };
+
+    const ref = (this.dialogs as any).openTransfer
+      ? (this.dialogs as any).openTransfer(data)
+      : (this.dialogs as any).open?.(/* component */ undefined, { data });
+
+    if (ref?.afterClosed) {
+      ref.afterClosed().subscribe((res: any) => {
+        if (res?.success) this.refresh();
+      });
     }
+  }
 
-    async closeCommit(commit: IChannelCommit) {
-      this.loadingService.isLoading = true;
+  // ----- Withdraw builds the tx directly -----
+  async withdraw(row: ChannelBalanceRow) {
+    if (this.working) return;
+    if (!row?.amount || row.amount <= 0) return;
+
+    try {
+      this.working = true;
+
+      const columnNum = row.column === 'A' ? 0 : 1;
+
+      const payload = ENCODER.encodeWithdrawal({
+        withdrawAll: 0,
+        propertyId: row.propertyId,
+        amountOffered: row.amount,
+        column: columnNum,
+        channelAddress: row.channel
+      });
+
+      const buildCfg = {
+        fromKeyPair: { address: this.address },
+        toKeyPair:   { address: row.channel },
+        payload
+      };
+
+      const res = await this.txs.buildSignSendTx(buildCfg as any);
+      if (res?.error) throw new Error(res.error);
+
+      this.refresh();
+    } catch (err: any) {
+      console.error('[Spot][Withdraw] error:', err?.message || err);
+      this.error = err?.message || 'Withdraw failed';
+    } finally {
+      this.working = false;
+    }
+  }
+
+  async withdrawAll() {
+  if (this.working) return;
+
+  // pick rows currently shown; if this.propertyId is set, rows are likely already filtered,
+  // but we'll defensively filter again.
+  const targetRows = (this.activeChannelsCommits || []).filter(r =>
+    (!this.propertyId && r.amount > 0) ||
+    (this.propertyId != null && r.propertyId === this.propertyId && r.amount > 0)
+  );
+
+  if (!targetRows.length) return;
+
+  this.working = true;
+  this.error = undefined;
+
+  try {
+    let ok = 0, fail = 0;
+
+    // Process sequentially to avoid RPC/mempool bursts
+    for (const row of targetRows) {
+      const columnNum = row.column === 'A' ? 0 : 1;
+
+      // withdrawAll=1 tells protocol to withdraw entire balance for this property on that column
+      const payload = ENCODER.encodeWithdrawal({
+        withdrawAll: 1,
+        propertyId: row.propertyId,
+        // amountOffered is ignored by withdrawAll in protocol; passing current visible amount is harmless
+        amountOffered: row.amount,
+        column: columnNum,
+        channelAddress: row.channel
+      });
+
+      const buildCfg = {
+        fromKeyPair: { address: this.address }, // wallet
+        toKeyPair:   { address: row.channel },  // channel target
+        payload
+      };
+
       try {
-        const payloadConfig = [commit.propertyId, (commit.amount).toString()];
-        const payloadRes = await this.rpcService.rpc('tl_createpayload_withdrawal_fromchannel', payloadConfig);
-        if (payloadRes.error || !payloadRes.data) throw new Error(payloadRes.error);
-        const config: IBuildTxConfig = {
-          fromKeyPair: {
-            address: commit.sender,
-          },
-          toKeyPair: {
-            address: commit.channel
-          },
-          payload: payloadRes.data,
-        };
-        const res = await this.txsService.buildSignSendTx(config);
-        if (res.error || !res.data) throw new Error(res.error);
-        this.toastrService.success(`Withdraw TX: ${res.data}`, 'Success');
-      } catch (err: any) {
-        this.toastrService.error(err.message, 'Error');
-      } finally {
-        this.loadingService.isLoading = false;
+        const res = await this.txs.buildSignSendTx(buildCfg as any);
+        if (res?.error) {
+          console.error('[WithdrawAll] item failed:', row, res.error);
+          fail++;
+        } else {
+          ok++;
+        }
+      } catch (e: any) {
+        console.error('[WithdrawAll] item exception:', row, e?.message || e);
+        fail++;
       }
+
+      // small delay to be gentle on node/mempool
+      await new Promise(r => setTimeout(r, 200));
     }
 
-    ngOnInit() {
-      this.subscribes();
-    }
+    console.log(`[WithdrawAll] done: ok=${ok} fail=${fail}`);
+    this.refresh(); // refresh table (rows may shrink/disappear)
+  } catch (err: any) {
+    this.error = err?.message || 'Withdraw All failed';
+    console.error('[WithdrawAll] error:', this.error);
+  } finally {
+    this.working = false;
+  }
+}
 
-    subscribes() {
-      const blockSubs = this.rpcService.blockSubs$
-        .subscribe(() => this.spotChannelsService.updateOpenChannels());
 
-      const updateSubs$ = this.authService.updateAddressesSubs$
-        .subscribe(kp =>{
-          if (!this.authService.activeSpotKey || !kp.length) this.spotChannelsService.removeAll();
-          this.spotChannelsService.updateOpenChannels();
-        });
-      this.subsArray = [blockSubs, updateSubs$];
-    }
+  transferAll() {
+    if (!this.activeChannelsCommits.length) return;
+    this.transfer(this.activeChannelsCommits[0]);
+  }
 
-    ngOnDestroy(): void {
-      this.subsArray.forEach(s => s.unsubscribe()) ;
-    }
+  trackByChan = (_: number, r: ChannelBalanceRow) => `${r.channel}:${r.propertyId}:${r.column}`;
 
-    copy(text: string) {
-      navigator.clipboard.writeText(text);
-      this.toastrService.info(`Transaction Id Copied to clipboard: ${text}`, 'Copied')
-    }
+  
+private _mergeCommits(a?: any[], b?: any[]): any[] {
+  const rows = ([] as any[]).concat(a || [], b || []);
+  const keyOf = (n: any) => `${n?.propertyId}|${n?.column}|${n?.channel}`;
+  const seen = new Set<string>();
+  const out: any[] = [];
+  for (const r of rows) {
+    const k = keyOf(r);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(r);
+  }
+  return out;
+}
+
+private _sortByBlockDesc(rows: any[]): any[] {
+  return [...(rows || [])].sort((x, y) =>
+    (Number(y?.lastCommitmentBlock ?? 0) - Number(x?.lastCommitmentBlock ?? 0))
+  );
+}
+
+private _extractCommits(resp: any): any[] {
+  if (!resp) return [];
+  if (Array.isArray(resp)) return resp;
+
+  // Common shapes from APIs
+  const arr =
+    resp.commits ??
+    resp.channels ??
+    resp.activeChannelsCommits ??
+    resp.rows ??
+    resp.data ??
+    resp.items;
+
+  if (Array.isArray(arr)) return arr;
+
+  // Last resort: first array field in the object
+  for (const k of Object.keys(resp)) {
+    if (Array.isArray((resp as any)[k])) return (resp as any)[k];
+  }
+  return [];
+}
+
 }

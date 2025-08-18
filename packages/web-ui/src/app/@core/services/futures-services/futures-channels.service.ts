@@ -3,6 +3,25 @@ import { ToastrService } from "ngx-toastr";
 import { AuthService } from "../auth.service";
 import { BalanceService } from "../balance.service";
 import { RpcService } from "../rpc.service";
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+interface ChannelBalanceRow {
+  channel: string;
+  column: 'A' | 'B';
+  propertyId: number;
+  amount: number;
+  participants?: { A?: string; B?: string };
+  counterparty?: string;
+  lastCommitmentBlock?: number;
+}
+
+interface ChannelBalancesResponse {
+  total: number;
+  rows: ChannelBalanceRow[];
+}
+
 
 export interface IChannelCommit {
     amount: number;
@@ -19,14 +38,46 @@ export interface IChannelCommit {
 
 export class FuturesChannelsService {
     private _channelsCommits: IChannelCommit[] = [];
+    private url = "https://api.layerwallet.com";
 
     constructor(
         private rpcService: RpcService,
         private authService: AuthService,
         private toastrService: ToastrService,
         private balanceService: BalanceService,
+        private http: HttpClient
     ) { }
 
+    getChannelBalances(address: string, propertyId?: number): Observable<ChannelBalancesResponse> {
+    let params = new HttpParams().set('address', address);
+    if (propertyId !== undefined && propertyId !== null) {
+      params = params.set('propertyId', String(propertyId));
+    }
+    return this.http.post(`${this.url}/rpc/tl_channelBalanceForCommiter`,{address:address,propertyId:propertyId}).pipe(
+  map((res: any): ChannelBalancesResponse => {
+    const raw: any[] = Array.isArray(res?.rows) ? res.rows : [];
+    const rows: ChannelBalanceRow[] = raw.map((r: any) => ({
+      // ✅ REQUIRED by ChannelBalanceRow
+      propertyId: Number(r?.propertyId ?? r?.collateralPropertyId ?? r?.property ?? 0),
+
+      // keep your existing fields
+      column: r?.column ?? r?.col ?? '',
+      channel: String(r?.channel ?? r?.chan ?? ''),
+      counterparty: r?.counterparty ?? r?.cp ?? r?.address ?? '',
+      amount: Number(r?.amount ?? r?.balance ?? 0),
+      lastCommitmentBlock: r?.lastCommitmentBlock ?? r?.block ?? null,
+      sender: r?.sender ?? r?.owner ?? r?.from ?? undefined,
+      // (optional extra; harmless even if ChannelBalanceRow doesn't declare it)
+      // contractId: Number(r?.contractId ?? r?.contract_id ?? 0),
+    }));
+
+    return {
+      total: Number(res?.total ?? rows.length ?? 0),
+      rows,
+    };
+  })
+);
+}
     get channelsCommits() {
         return this._channelsCommits;
     }
@@ -63,3 +114,4 @@ export class FuturesChannelsService {
         this._channelsCommits = [];
     }
 }
+          
