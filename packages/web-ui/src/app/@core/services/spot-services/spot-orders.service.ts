@@ -2,6 +2,8 @@ import { Injectable } from "@angular/core";
 import { LoadingService } from "../loading.service";
 import { SocketService } from "../socket.service";
 import { ISpotOrder } from "./spot-orderbook.service";
+import { filter } from 'rxjs/operators'; 
+
 
 interface ITradeConf {
     keypair: {
@@ -32,10 +34,15 @@ export class SpotOrdersService {
     private _openedOrders: ISpotOrder[] = [];
     private _orderHistory: any[] = [];
 
-    constructor(
-        private socketService: SocketService,
-        private loadingService: LoadingService,
-    ) { }
+
+    constructor(private socketService: SocketService, private loading: LoadingService) {
+      this.socketService.events$
+        .pipe(filter(({event}) => event === 'order:filled' || event === 'order:closed' || event === 'order:canceled'))
+        .subscribe(({data}) => {
+          const uuid = data?.uuid || data?.orderUUID || data?.order?.uuid;
+          if (uuid) this.openedOrders = this._openedOrders.filter(o => o.uuid !== uuid);
+        });
+    }
 
     get openedOrders(): ISpotOrder[] {
         return this._openedOrders;
@@ -54,7 +61,6 @@ export class SpotOrdersService {
     }
 
     newOrder(orderConf: ISpotTradeConf) {
-        this.loadingService.tradesLoading = true;
         console.log('inside new order '+JSON.stringify(orderConf))
         this.socketService.send('new-order', orderConf);
     }
@@ -64,7 +70,7 @@ export class SpotOrdersService {
     }
 
     closeOpenedOrder(uuid: string) {
-        this.socketService.send('close-order', uuid);
+        this.socketService.send('close-order', { orderUUID: uuid });
     }
 
     closeAllOrders() {

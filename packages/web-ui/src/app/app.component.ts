@@ -11,6 +11,10 @@ import { SwapService } from './@core/services/swap.service';
 import { WindowsService } from './@core/services/windows.service';
 import { filter, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
+import {SpotTradeHistoryService} from './@core/services/spot-services/spot-trade-history.service'
+import {FuturesTradeHistoryService} from './@core/services/futures-services/futures-trade-history.service'
+import {SpotChannelsService} from './@core/services/spot-services/spot-channels.service'
+import {FuturesChannelsService} from './@core/services/futures-services/futures-channels.service'
 
 @Component({
   selector: 'tl-root',
@@ -33,6 +37,10 @@ export class AppComponent {
     private socketService: SocketService,
     private injector: Injector, // <-- use injector, not direct SwapService
     private nodeRewardService: NodeRewardService,
+    private spotHistory: SpotTradeHistoryService,
+    private futHistory: FuturesTradeHistoryService,
+    private spotChannels: SpotChannelsService,
+    private futChannels: FuturesChannelsService
   ) {
     this.handleInits();
     this.handleConnections();
@@ -75,6 +83,10 @@ export class AppComponent {
     this.attestationService.onInit();
     //this.swapService.onInit();
     this.nodeRewardService.onInit();
+    this.spotHistory.start()
+    this.futHistory.start()
+    this.spotChannels.startPolling()
+    this.futChannels.startPolling()
   }
 
   handleConnections() {

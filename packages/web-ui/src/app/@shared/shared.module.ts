@@ -36,6 +36,7 @@ import { DepositDialog } from './dialogs/deposit/deposit.component';
 import { CommingSoonDialog } from './dialogs/comming-soon/comming-soon.componet';
 import { ServersDialog } from './dialogs/servers/servers.component';
 import { TransferDialog } from './dialogs/transfer/transfer.component';
+import { UploadSystemDialogComponent } from './dialogs/upload-system-dialog/upload-system-dialog.component';
 
 const NG_MODULES = [
     CommonModule,
@@ -73,6 +74,7 @@ const DIALOGS = [
     CommingSoonDialog,
     ServersDialog,
     TransferDialog,
+    UploadSystemDialogComponent
 ];
 
 const COMPONENTS = [

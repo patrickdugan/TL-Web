@@ -1,8 +1,6 @@
 import { NgModule } from '@angular/core';
 
-import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -14,11 +12,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip'; 
 import { MatSelectModule } from '@angular/material/select';
+import { CommonModule } from '@angular/common';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { MatDialogModule } from '@angular/material/dialog';
 
 import { LoginPageComponent } from './login-page/login-page.component';
 import { PortfolioPageComponent } from './portfolio-page/portfolio-page.component';
 import { SpotPageComponent } from './spot-page/spot-page.component';
 import { TxBuilderPageComponent } from './tx-builder-page/tx-builder-page.component';
+import {AlgoTradingPageComponent} from './algo-trading/algo-trading.component'
 
 import { SpotMarketsToolbarComponent } from './spot-page/spot-markets-toolbar/spot-markets-toolbar.component'; 
 import { SpotTradingGridComponent } from './spot-page/spot-trading-grid/spot-trading-grid.component';
@@ -73,7 +75,9 @@ const MAT_MODULES = [
     MatProgressSpinnerModule,
     MatTooltipModule,
     MatSlideToggleModule,
-    MatSelectModule
+    MatSelectModule,
+    MatDialogModule,
+    MatSnackBarModule
 ];
 
 const PAGE_COMPONENTS = [
@@ -88,6 +92,7 @@ const PAGE_COMPONENTS = [
     SignTxTabComponent,
     SendTxTabComponent,
     DecodeTxTabComponent,
+    AlgoTradingPageComponent
 ];
 
 const SPOT_COMPONENTS = [

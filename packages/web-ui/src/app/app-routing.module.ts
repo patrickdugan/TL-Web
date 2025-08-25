@@ -10,6 +10,8 @@ import { LoginPageComponent } from './@pages/login-page/login-page.component';
 import { PortfolioPageComponent } from './@pages/portfolio-page/portfolio-page.component';
 import { SpotPageComponent } from './@pages/spot-page/spot-page.component';
 import { TxBuilderPageComponent } from './@pages/tx-builder-page/tx-builder-page.component';
+import {AlgoTradingPageComponent } from './@pages/algo-trading/algo-trading.component'
+
 
 declare const gtag: Function; // Declare gtag globally
 
@@ -28,6 +30,10 @@ export const routes: Routes = [
     path: 'portfolio',
     component: PortfolioPageComponent,
     canActivate: [RPCGuard]
+  }, 
+  { path: 'algo',
+         component: AlgoTradingPageComponent,
+         canActivate: [] 
   }
 ];
 

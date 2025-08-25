@@ -137,8 +137,8 @@ export class SpotOrderbookService {
       this.socketService.events$
         .pipe(filter(({ event }) => event === "update-orders-request"))
         .subscribe(() => {
-          this.socketService.emitEvent("update-orderbook", this.marketFilter);
-        })
+            this.socketService.send("update-orderbook", this.marketFilter)
+         })
     );
 
     // RxJS: "orderbook-data"
