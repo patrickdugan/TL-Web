@@ -74,13 +74,18 @@ export class PortfolioPageComponent implements OnInit {
     }
   }
 
-  openDialog(dialog: string, address?: any, _propId?: number) {
-    const data = { address, propId: _propId };
-    const TYPE = dialog === 'deposit'
-      ? DialogTypes.DEPOSIT
-      : dialog === 'withdraw'
-      ? DialogTypes.WITHDRAW
-      : null;
+  openDialog(dialog: string, address?: any, _propId?: number, _amount?:number) {
+    const data = { address, propId: _propId, amount: _amount };
+
+    let TYPE = null;
+    if (dialog === 'deposit') {
+      TYPE = DialogTypes.DEPOSIT;
+    } else if (dialog === 'withdraw') {
+      TYPE = DialogTypes.WITHDRAW;
+    } else if (dialog === 'synth') {
+      TYPE = DialogTypes.SYNTH;
+    }
+
     if (!TYPE || !data) return;
     this.dialogService.openDialog(TYPE, { disableClose: false, data });
   }

@@ -1,7 +1,7 @@
 // src/app/@core/services/wallet.service.ts
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
-import { RpcService } from './rpc.service';
+import { RpcService, TNETWORK } from './rpc.service';
 
 type WalletKind = 'phantom-btc' | 'custom';
 
@@ -9,9 +9,15 @@ type PhantomBtc = {
   request: (args: { method: string; params?: any }) => Promise<any>;
   on?: (ev: string, cb: (...a: any[]) => void) => void;
 };
-const getPhantomBtc = (): PhantomBtc | undefined => window.phantom?.bitcoin as PhantomBtc | undefined;
 
+const isLtcNet = (net?: TNETWORK | string) =>
+  String(net ?? '').toUpperCase().startsWith('LTC');
 
+const getPhantomBtc = (net?: TNETWORK): PhantomBtc | undefined => {
+  // Prevent Phantom from hijacking Litecoin flows
+  if (isLtcNet(net)) return undefined;
+  return (window as any).phantom?.bitcoin as PhantomBtc | undefined;
+};
 
 interface IWalletProvider {
   kind: WalletKind;
@@ -49,16 +55,16 @@ export class WalletService {
   private phantomBtc: IWalletProvider = {
     kind: 'phantom-btc',
     name: 'Phantom (Bitcoin)',
-  isAvailable: () => !!getPhantomBtc(),
+    isAvailable: () => !!getPhantomBtc('BTC' as any),
 
   connect: async (net) => {
-    const ph = getPhantomBtc();
+    const ph = getPhantomBtc(net);
     if (!ph) throw new Error('Phantom Bitcoin provider not available');
     await ph.request({ method: 'btc_connect', params: { network: net } });
   },
 
-  getAddresses: async () => {
-    const ph = getPhantomBtc();
+  getAddresses: async (net) => {
+    const ph = getPhantomBtc(net);
     if (!ph) throw new Error('Phantom Bitcoin provider not available');
     const res = await ph.request({ method: 'btc_getAddresses' });
     return (res?.addresses ?? []).map((x: any) => x.address);

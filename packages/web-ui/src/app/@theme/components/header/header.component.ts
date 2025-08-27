@@ -156,7 +156,7 @@ async connectWallet() {
 //
     // --- Phantom Bitcoin provider (preferred) ---
     const ph: any = (window as any)?.phantom?.bitcoin;
-    if (ph?.isPhantom) {
+    if (!this.isLitecoinNetwork && ph?.isPhantom) {
       console.log("Phantom Bitcoin detected.");
 
       // Must be called from a user gesture (your button click) to show the approval modal.
@@ -170,7 +170,7 @@ async connectWallet() {
       }
 
       // Listen for account switches (Phantom BTC supports 'accountsChanged')
-      if (typeof ph.on === "function") {
+      if (!this.isLitecoinNetwork && typeof ph.on === "function") {
         ph.on("accountsChanged", (newAccounts: any[]) => {
           console.log("Phantom accounts changed:", newAccounts);
           if (Array.isArray(newAccounts) && newAccounts.length > 0) {
@@ -189,6 +189,10 @@ async connectWallet() {
     // --- Fallback: your existing custom wallet path ---
     if (typeof (window as any).myWallet !== "undefined") {
       console.log("Fallback wallet detected.");
+
+      if (this.isLitecoinNetwork && this.walletAddress && this.walletAddress.startsWith('bc1')) {
+        this.walletAddress = null;
+      }
 
       const accounts = await (window as any).myWallet.sendRequest("requestAccounts", {});
       if (accounts && accounts.length > 0) {

@@ -8,6 +8,7 @@ import { DepositDialog } from "src/app/@shared/dialogs/deposit/deposit.component
 import { WithdrawDialog } from "src/app/@shared/dialogs/withdraw/withdraw.component";
 import { CommingSoonDialog } from "src/app/@shared/dialogs/comming-soon/comming-soon.componet";
 import { TransferDialog } from 'src/app/@shared/dialogs/transfer/transfer.component';
+import {SynthMintRedeemDialogComponent} from 'src/app/@shared/dialogs/synth/synth-mint-redeem-dialog.component'
 
 export enum DialogTypes {
     SELECT_NETOWRK = "SELECT_NETOWRK",
@@ -18,6 +19,7 @@ export enum DialogTypes {
     WITHDRAW = 'WITHDRAW',
     DEPOSIT = 'DEPOSIT',
     TRANSFER = 'TRANSFER',
+    SYNTH = 'SYNTH'
 };
 
 const dialogs: { [key: string]: any; } = {
@@ -29,6 +31,7 @@ const dialogs: { [key: string]: any; } = {
     'WITHDRAW': WithdrawDialog,
     'DEPOSIT': DepositDialog,
     'TRANSFER': TransferDialog,
+    'SYNTH' :SynthMintRedeemDialogComponent
 };
 
 @Injectable({
