@@ -105,10 +105,11 @@ export class BalanceService {
             await this.updateTokensBalanceForAddress(address);
         }
     } catch (error: any) {
-        this.toastrService.warning(
+        console.log('error with updating balances '+error.message)
+        /*this.toastrService.warning(
             error.message || "Error with updating balances",
             "Balance Error"
-        );
+        );*/
     }
 }
 

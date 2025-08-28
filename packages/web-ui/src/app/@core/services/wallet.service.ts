@@ -13,7 +13,7 @@ type PhantomBtc = {
 const isLtcNet = (net?: TNETWORK | string) =>
   String(net ?? '').toUpperCase().startsWith('LTC');
 
-const getPhantomBtc = (net?: TNETWORK): PhantomBtc | undefined => {
+const getPhantomBtc = (net?: TNETWORK | string): PhantomBtc | undefined => {
   // Prevent Phantom from hijacking Litecoin flows
   if (isLtcNet(net)) return undefined;
   return (window as any).phantom?.bitcoin as PhantomBtc | undefined;
