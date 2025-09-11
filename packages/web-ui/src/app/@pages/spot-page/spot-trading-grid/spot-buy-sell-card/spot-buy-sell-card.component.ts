@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ToastrService } from 'ngx-toastr';
@@ -47,6 +47,7 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
       private walletService: WalletService,
       public matDialog: MatDialog,
       private dialogService: DialogService,
+      private cdRef: ChangeDetectorRef
     ) {}
 
     get spotKeyPair() {
@@ -56,6 +57,10 @@ export class SpotBuySellCardComponent implements OnInit, OnDestroy {
 
     get spotAddress() {
       return this.spotKeyPair.address;
+    }
+
+    public forceRefresh() {
+      this.cdRef.detectChanges();
     }
 
     get isLoading(): boolean {

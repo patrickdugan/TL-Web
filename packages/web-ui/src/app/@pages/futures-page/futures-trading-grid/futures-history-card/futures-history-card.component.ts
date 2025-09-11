@@ -16,7 +16,6 @@ export class FuturesHistoryCardComponent {
     ) { }
 
     get tradeHistory() {
-        return [];
         return this.futuresOrderbookService.tradeHistory   
             .map(trade => {
                 const { txid } = trade;

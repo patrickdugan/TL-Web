@@ -2,10 +2,17 @@
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { HttpClient } from '@angular/common/http';
+import { ToastrService } from 'ngx-toastr';
+import { IBuildTxConfig, TxsService } from 'src/app/@core/services/txs.service'; import { ENCODER } from 'src/app/utils/payloads/encoder';
 
 export type SynthMode = 'mint' | 'redeem';
 
-type ContractRow = { id: number; label: string; notional?: number; maxMintLTC?: number };
+type ContractRow = { 
+    id: number; 
+    label: string; 
+    notional?: number; 
+    maxMintLTC?: number
+    maxMintUnits?: number; };
 
 @Component({
   selector: 'app-synth-mint-redeem-dialog',
@@ -23,7 +30,7 @@ export class SynthMintRedeemDialogComponent {
     @Inject(MAT_DIALOG_DATA) public data: {
       mode?: SynthMode;                 // now optional — we’ll infer if not provided
       address: string;
-      propertyId: number | string;      // may be 's<pid>-<cid>' alias or a number
+      propId: number | string;      // may be 's<pid>-<cid>' alias or a number
       available?: number
     },
     private http: HttpClient,
@@ -32,7 +39,7 @@ export class SynthMintRedeemDialogComponent {
   async ngOnInit() {
     // 1) Infer mode from propertyId if not explicitly provided:
     if (!this.data.mode) {
-      const isSynthAlias = typeof this.data.propertyId === 'string' && /^s\d+-\d+$/i.test(this.data.propertyId);
+      const isSynthAlias = typeof this.data.propId === 'string' && /^s\d+-\d+$/i.test(this.data.propId);
       this.data.mode = isSynthAlias ? 'redeem' : 'mint';
     }
 
@@ -46,11 +53,11 @@ export class SynthMintRedeemDialogComponent {
 
   private async loadEligibility() {
     try {
-      const pid = typeof this.data.propertyId === 'string'
-        ? Number(this.data.propertyId.replace(/^s/i, '').split('-')[0])
-        : Number(this.data.propertyId);
+      const pid = typeof this.data.propId === 'string'
+        ? Number(this.data.propId.replace(/^s/i, '').split('-')[0])
+        : Number(this.data.propId);
 
-      const resp: any = await this.http.post(`'https://api.layerwallet.com/rpc/tl_getMaxSynth`, { address: this.data.address, propertyId: String(pid)}).toPromise();
+      const resp: any = await this.http.post(`'https://api.layerwallet.com/rpc/tl_getMaxSynth`, { address: this.data.address, propId: String(pid)}).toPromise();
 
       // Normalize to dialog shape
       this.contracts = (resp?.contracts || []).map((c: any) => ({
@@ -128,10 +135,10 @@ export class SynthMintRedeemDialogComponent {
     this.dialogRef.close({
       mode: this.data.mode,
       amount: this.amount,
-      propertyIdUsed:
-        typeof this.data.propertyId === 'string'
-          ? Number(this.data.propertyId.replace(/^s/i, '').split('-')[0])
-          : Number(this.data.propertyId),
+      propIdUsed:
+        typeof this.data.propId === 'string'
+          ? Number(this.data.propId.replace(/^s/i, '').split('-')[0])
+          : Number(this.data.propId),
       contractIdUsed: this.data.mode === 'mint' ? this.selectedContractId : undefined,
       address: this.data.address,
     });

@@ -73,18 +73,9 @@ export class FuturesTradeHistoryService {
 
   /** try to extract ids from various possible shapes your futures market might use */
   private extractIdsFromMarket(m: any): { contractId?: number; collateralPropertyId?: number } {
-    const cid =
-      m?.contractId ??
-      m?.contract?.id ??
-      m?.contract?.propertyId ??
-      m?.propertyId ??
-      m?.id;
+    const cid = m?.contract_id
 
-    const collat =
-      m?.collateralPropertyId ??
-      m?.collateralId ??
-      m?.collateral?.propertyId ??
-      m?.marginAsset?.propertyId;
+    const collat = m?.collateral?.propertyId
 
     return {
       contractId: cid !== undefined && cid !== null ? Number(cid) : undefined,

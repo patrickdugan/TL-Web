@@ -5,13 +5,14 @@ import { SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
 import { LoadingService } from "../loading.service";
 import { AuthService } from "../auth.service";
-import { FuturesMarketService } from "./futures-markets.service";
+import { FuturesMarketService, IFutureMarket } from "./futures-markets.service";
 import { ITradeInfo } from "src/app/utils/swapper";
 import { IFuturesTradeProps } from "src/app/utils/swapper/common";
 
 interface IFuturesOrderbookData {
   orders: IFuturesOrder[];
   history: IFuturesHistoryTrade[];
+
 }
 
 export interface IFuturesHistoryTrade extends ITradeInfo<IFuturesTradeProps> {
@@ -44,13 +45,20 @@ export interface IFuturesOrder {
   providedIn: "root",
 })
 export class FuturesOrderbookService {
+  private activeKey: string | null = null;
   private _rawOrderbookData: IFuturesOrder[] = [];
+  private subs: Subscription[] = [];
   outsidePriceHandler: Subject<number> = new Subject();
+  private books: Record<string, IFuturesOrderbookData> = {};
   buyOrderbooks: { amount: number; price: number }[] = [];
   sellOrderbooks: { amount: number; price: number }[] = [];
   tradeHistory: IFuturesHistoryTrade[] = [];
   currentPrice: number = 1;
   lastPrice: number = 1;
+  private key(type: string, id: number|string) { return `${type}:${id}`; }
+  private _lastRequestedKey: string | null = null;
+  private bound = false;
+  onUpdate?: () => void;
 
   // Subscriptions for RxJS event streams
   private orderbookSubs: Subscription[] = [];
@@ -69,6 +77,10 @@ export class FuturesOrderbookService {
 
   get activeFuturesAddress() {
     return this.activeFuturesKey?.address;
+  }
+
+  private get socket() {
+        return this.socketService.ws;
   }
 
   get selectedMarket() {
@@ -141,20 +153,37 @@ export class FuturesOrderbookService {
 
       this.socketService.events$.pipe(
         filter(({ event }) => event === "orderbook-data")
-      ).subscribe(({ data: orderbookData }: { data: IFuturesOrderbookData }) => {
-        this.rawOrderbookData = orderbookData.orders;
-        this.tradeHistory = orderbookData.history;
-        const lastTrade = this.tradeHistory[0];
-        if (!lastTrade) {
-          this.currentPrice = 1;
-          return;
-        }
-        this.currentPrice = lastTrade?.props?.price || 1;
-      })
-    );
+      ).subscribe(({ data: orderbookData }: { data: any }) => {
+        console.log('[Futures OB] update ' + JSON.stringify(orderbookData));
 
-    // Manually request the latest orderbook
-    this.socketService.send("update-orderbook", this.marketFilter);
+          const mk = orderbookData?.marketKey || this.activeKey;
+          if (mk && this.activeKey && mk !== this.activeKey) return;
+
+          if (Array.isArray(orderbookData.orders)) {
+              this.rawOrderbookData = orderbookData.orders as IFuturesOrder[];
+          }
+
+            this.tradeHistory = orderbookData.history || [];
+            const lastTrade = this.tradeHistory[0];
+
+          if (!lastTrade) {
+            this.currentPrice = 1;
+          } else {
+            const { price } = lastTrade.props;
+            this.currentPrice =price || 1;
+          }
+
+            this.currentPrice = lastTrade?.props?.price || 1;
+          if (this.onUpdate) {
+              try {
+                this.onUpdate();
+              } catch {}
+            }
+          }
+
+        // Manually request the latest orderbook
+        this.socketService.send("update-orderbook", this.marketFilter);
+      )
   }
 
   /**
@@ -172,6 +201,48 @@ export class FuturesOrderbookService {
     this.buyOrderbooks = this._structureOrderbook(true);
     this.sellOrderbooks = this._structureOrderbook(false);
   }
+
+   private bindOnce() {
+     if (this.bound) return; 
+     this.bound = true;
+     this.subs.push(
+       this.socketService.events$
+         .pipe(filter(ev => ev.event === 'ORDERBOOK_DATA'))
+         .subscribe(ev => {
+           const msg = ev.data;
+           if (!msg?.marketKey || msg.marketKey !== this.activeKey) return;
+           this.books[msg.marketKey] = { orders: msg.orders, history: msg.history };
+           this.onUpdate?.();
+         })
+     );
+   }
+
+    async switchMarket(
+      type: 'FUTURES' | 'SPOT',
+      contract_id: number,
+      p?: { depth?: number; side?: 'bids' | 'asks' | 'both'; includeTrades?: boolean }
+    ) {
+      this.bindOnce();
+      const newKey = this.key(type, contract_id);
+
+      if (this.activeKey && this.activeKey !== newKey) {
+        this.socketService.send('orderbook:leave',this.activeKey)
+      }
+      this.activeKey = newKey;
+      this._lastRequestedKey = newKey;
+
+      // 1. Ask server for a fresh snapshot (WS)
+      this.socketService.send('update-orderbook',{
+              type,
+              contract_id,
+              depth: String(p?.depth ?? 50),
+              side: p?.side ?? 'both',
+              includeTrades: String(p?.includeTrades ?? false),
+            })
+
+      // 2. Join the market room for live deltas
+      this.socketService.send('orderbook:join', newKey)
+    }
 
   private _structureOrderbook(isBuy: boolean) {
     const contract_id = this.selectedMarket.contract_id;
@@ -207,4 +278,8 @@ export class FuturesOrderbookService {
       ? result.sort((a, b) => b.price - a.price).slice(0, 9)
       : result.sort((a, b) => b.price - a.price).slice(Math.max(result.length - 9, 0));
   }
+
+   switchFuturesMarket(contract_id: number, opts?: { depth?: number; side?:'bids'|'asks'|'both'; includeTrades?: boolean }) {
+        return this.switchMarket('FUTURES', contract_id, opts);
+    }
 }

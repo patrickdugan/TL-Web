@@ -1,13 +1,14 @@
 import { Injectable } from "@angular/core";
 import { Subject, Subscription } from "rxjs";
 import { filter } from "rxjs/operators";
-import { SpotMarketsService } from "./spot-markets.service";
+import { SpotMarketsService, IMarket } from "./spot-markets.service";
 import { SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
 import { LoadingService } from "../loading.service";
 import { AuthService } from "../auth.service";
 import { ITradeInfo } from "src/app/utils/swapper";
 import { ISpotTradeProps } from "src/app/utils/swapper/common";
+type Side = 'bids' | 'asks' | 'both';
 
 interface ISpotOrderbookData {
   orders: ISpotOrder[];
@@ -32,11 +33,11 @@ export interface ISpotOrder {
     id_for_sale: number;
     price: number;
   };
-  socket_id: string;
+  socketService_id: string;
   timestamp: number;
   type: "SPOT";
   uuid: string;
-  state?: "CANCALED" | "FILLED";
+  state?: "CANCELED" | "FILLED";
 }
 
 @Injectable({
@@ -50,9 +51,12 @@ export class SpotOrderbookService {
   tradeHistory: ISpotHistoryTrade[] = [];
   currentPrice: number = 1;
   lastPrice: number = 1;
+  private activeKey: string | null = null;
+  private _lastRequestedKey: string | null = null;
+  onUpdate?: () => void;
 
   // ADD: For rxjs event subscriptions
-  private socketSubscriptions: Subscription[] = [];
+  private socketServiceSubscriptions: Subscription[] = [];
 
   constructor(
     private socketService: SocketService,
@@ -104,6 +108,10 @@ export class SpotOrderbookService {
     return this.spotMarkertService.marketFilter;
   }
 
+  private normalizeKey(p1: number, p2: number): string {
+    return p1 < p2 ? `${p1}-${p2}` : `${p2}-${p1}`;
+  }
+
   /**
    * Subscribe to raw events:
    *  "order:error", "order:saved", "update-orders-request", "orderbook-data"
@@ -112,7 +120,7 @@ export class SpotOrderbookService {
     this.endOrderbookSubscription();
 
     // RxJS: "order:error"
-    this.socketSubscriptions.push(
+    this.socketServiceSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "order:error"))
         .subscribe(({ data }) => {
@@ -123,7 +131,7 @@ export class SpotOrderbookService {
     );
 
     // RxJS: "order:saved"
-    this.socketSubscriptions.push(
+    this.socketServiceSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "order:saved"))
         .subscribe(({ data }) => {
@@ -133,7 +141,7 @@ export class SpotOrderbookService {
     );
 
     // RxJS: "update-orders-request"
-    this.socketSubscriptions.push(
+    this.socketServiceSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "update-orders-request"))
         .subscribe(() => {
@@ -142,34 +150,48 @@ export class SpotOrderbookService {
     );
 
     // RxJS: "orderbook-data"
-    this.socketSubscriptions.push(
+    this.socketServiceSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "orderbook-data"))
-        .subscribe(({ data }) => {
-          const orderbookData: ISpotOrderbookData = data;
+        .subscribe(({ data: any }) => {
+          const orderbookData: any = data;
           this.rawOrderbookData = orderbookData.orders;
           this.tradeHistory = orderbookData.history;
           const lastTrade = this.tradeHistory[0];
-          if (!lastTrade) {
-            this.currentPrice = 1;
-            return;
-          }
           const { amountForSale, amountDesired } = lastTrade.props as any;
           const price = parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
-          this.currentPrice = price;
+
+          console.log('[Spot OB] update ' + JSON.stringify(orderbookData));
+
+          const mk = orderbookData?.marketKey || this.activeKey;
+          if (mk && this.activeKey && mk !== this.activeKey) return;
+
+          if (Array.isArray(orderbookData.orders)) {
+              this.rawOrderbookData = orderbookData.orders as ISpotOrder[];
+          }
+
+          if (!lastTrade) {
+            this.currentPrice = 1;
+          } else {
+            const { amountForSale, amountDesired } = lastTrade.props;
+            this.currentPrice =
+              parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
+          }
+
+          this.onUpdate?.();
         })
     );
 
     // Finally, request the current orderbook
-    this.socketService.emitEvent("update-orderbook", this.marketFilter);
+    this.socketService.send("update-orderbook",this.marketFilter);
   }
 
   /**
    * Unsubscribe from the raw events
    */
   endOrderbookSubscription() {
-    this.socketSubscriptions.forEach(sub => sub.unsubscribe());
-    this.socketSubscriptions = [];
+    this.socketServiceSubscriptions.forEach(sub => sub.unsubscribe());
+    this.socketServiceSubscriptions = [];
   }
 
   /**
@@ -179,6 +201,40 @@ export class SpotOrderbookService {
     this.buyOrderbooks = this._structureOrderbook(true);
     this.sellOrderbooks = this._structureOrderbook(false);
   }
+
+  async switchMarket(
+        first_token:number, second_token:number,
+        p?: { depth?: number; side?: 'bids' | 'asks' | 'both'; includeTrades?: boolean }
+      ) {
+        const newKey = this.normalizeKey(first_token,second_token);
+
+        // Leave old
+        if (this.activeKey && this.activeKey !== newKey) {
+          this.socketService.send('orderbook:leave',this.activeKey);
+        }
+
+        this.activeKey = newKey;
+        this._lastRequestedKey = newKey;
+
+        // Ask server for snapshot
+        this.socketService.send(
+            'update-orderbook',
+            {
+              filter: {
+                type: 'SPOT',
+                first_token,
+                second_token,
+                depth: String(p?.depth ?? 50),
+                side: p?.side ?? 'both',
+                includeTrades: String(p?.includeTrades ?? false),
+              }
+            },
+          })
+        );
+
+        // Join for live deltas
+        this.socketService.send('orderbook:join', { marketKey: newKey}));
+      }
 
   private _structureOrderbook(isBuy: boolean) {
     const propIdDesired = isBuy

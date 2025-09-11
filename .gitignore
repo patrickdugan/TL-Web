@@ -2,3 +2,4 @@ node_modules
 release
 *.log
 packages/web-ui.zip
+packages/web-ui/http-server/

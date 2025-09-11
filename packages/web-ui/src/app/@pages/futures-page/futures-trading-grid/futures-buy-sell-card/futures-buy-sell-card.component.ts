@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef  } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ToastrService } from 'ngx-toastr';
@@ -53,6 +53,7 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       private futuresOrdersService: FuturesOrdersService,
       private futuresOrderbookService: FuturesOrderbookService,
       public matDialog: MatDialog,
+      private cdRef: ChangeDetectorRef
     ) {}
 
     get futureKeyPair() {
@@ -70,6 +71,10 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
 
     get selectedMarket(): IFutureMarket {
       return this.futuresMarketService.selectedMarket
+    }
+
+    public forceRefresh() {
+      this.cdRef.detectChanges();
     }
 
     get currentPrice() {
