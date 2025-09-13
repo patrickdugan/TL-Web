@@ -151,35 +151,34 @@ export class SpotOrderbookService {
 
     // RxJS: "orderbook-data"
     this.socketServiceSubscriptions.push(
-      this.socketService.events$
-        .pipe(filter(({ event }) => event === "orderbook-data"))
-        .subscribe(({ data: any }) => {
-          const orderbookData: any = data;
-          this.rawOrderbookData = orderbookData.orders;
-          this.tradeHistory = orderbookData.history;
-          const lastTrade = this.tradeHistory[0];
-          const { amountForSale, amountDesired } = lastTrade.props as any;
-          const price = parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
+       this.socketService.events$
+    .pipe(filter(({ event }) => event === "orderbook-data"))
+    .subscribe(({ data }: { data: any }) => {
+      console.log('[Spot OB] update ' + JSON.stringify(data));
 
-          console.log('[Spot OB] update ' + JSON.stringify(orderbookData));
+      const mk = data?.marketKey || this.activeKey;
+      if (mk && this.activeKey && mk !== this.activeKey) return;
 
-          const mk = orderbookData?.marketKey || this.activeKey;
-          if (mk && this.activeKey && mk !== this.activeKey) return;
+      if (Array.isArray(data.orders)) {
+        this.rawOrderbookData = data.orders as ISpotOrder[];
+      }
 
-          if (Array.isArray(orderbookData.orders)) {
-              this.rawOrderbookData = orderbookData.orders as ISpotOrder[];
-          }
+      this.tradeHistory = data.history || [];
+      const lastTrade = this.tradeHistory[0];
 
-          if (!lastTrade) {
-            this.currentPrice = 1;
-          } else {
-            const { amountForSale, amountDesired } = lastTrade.props;
-            this.currentPrice =
-              parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
-          }
+      if (!lastTrade) {
+        this.currentPrice = 1;
+      } else {
+        const { amountForSale, amountDesired } = lastTrade.props;
+        this.currentPrice = parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
+      }
 
-          this.onUpdate?.();
-        })
+      if (this.onUpdate) {
+        try {
+          this.onUpdate();
+        } catch {}
+      }
+    })
     );
 
     // Finally, request the current orderbook
@@ -229,11 +228,10 @@ export class SpotOrderbookService {
                 includeTrades: String(p?.includeTrades ?? false),
               }
             },
-          })
         );
 
         // Join for live deltas
-        this.socketService.send('orderbook:join', { marketKey: newKey}));
+        this.socketService.send('orderbook:join', { marketKey: newKey});
       }
 
   private _structureOrderbook(isBuy: boolean) {

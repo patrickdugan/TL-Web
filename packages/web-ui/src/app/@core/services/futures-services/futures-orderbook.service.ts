@@ -129,9 +129,9 @@ export class FuturesOrderbookService {
    *  Subscribe to orderbook-related events from the SocketService
    */
   subscribeForOrderbook() {
-    this.endOrderbookSubscription();
+        this.endOrderbookSubscription();
 
-    this.orderbookSubs.push(
+     this.orderbookSubs.push(
       this.socketService.events$.pipe(
         filter(({ event }) => event === "order:error")
       ).subscribe(({ data: message }) => {
@@ -156,35 +156,34 @@ export class FuturesOrderbookService {
       ).subscribe(({ data: orderbookData }: { data: any }) => {
         console.log('[Futures OB] update ' + JSON.stringify(orderbookData));
 
-          const mk = orderbookData?.marketKey || this.activeKey;
-          if (mk && this.activeKey && mk !== this.activeKey) return;
+        const mk = orderbookData?.marketKey || this.activeKey;
+        if (mk && this.activeKey && mk !== this.activeKey) return;
 
-          if (Array.isArray(orderbookData.orders)) {
-              this.rawOrderbookData = orderbookData.orders as IFuturesOrder[];
-          }
+        if (Array.isArray(orderbookData.orders)) {
+          this.rawOrderbookData = orderbookData.orders as IFuturesOrder[];
+        }
 
-            this.tradeHistory = orderbookData.history || [];
-            const lastTrade = this.tradeHistory[0];
+        this.tradeHistory = orderbookData.history || [];
+        const lastTrade = this.tradeHistory[0];
 
-          if (!lastTrade) {
-            this.currentPrice = 1;
-          } else {
-            const { price } = lastTrade.props;
-            this.currentPrice =price || 1;
-          }
+        if (!lastTrade) {
+          this.currentPrice = 1;
+        } else {
+          const { price } = lastTrade.props;
+          this.currentPrice = price || 1;
+        }
 
-            this.currentPrice = lastTrade?.props?.price || 1;
-          if (this.onUpdate) {
-              try {
-                this.onUpdate();
-              } catch {}
-            }
-          }
+        if (this.onUpdate) {
+          try {
+            this.onUpdate();
+          } catch {}
+        }
+            this.socketService.send("update-orderbook", this.marketFilter);
+      })
+    );
 
-        // Manually request the latest orderbook
-        this.socketService.send("update-orderbook", this.marketFilter);
-      )
-  }
+    // Manually request the latest orderbook *after* subscriptions are set up
+    }
 
   /**
    *  Unsubscribe from all event streams

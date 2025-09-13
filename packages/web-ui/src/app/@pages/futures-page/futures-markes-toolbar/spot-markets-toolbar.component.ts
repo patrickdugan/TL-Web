@@ -1,4 +1,4 @@
-import { Component, ViewChildren } from '@angular/core';
+import { Component, ViewChildren, ViewChild } from '@angular/core';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
 import { FuturesOrderbookService } from 'src/app/@core/services/futures-services/futures-orderbook.service';
 import { FuturesChannelsService } from 'src/app/@core/services/futures-services/futures-channels.service';
