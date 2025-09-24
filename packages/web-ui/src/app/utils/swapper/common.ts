@@ -30,15 +30,17 @@ export interface ISpotTradeProps {
     propIdDesired: number;
     propIdForSale: number;
     transfer?: boolean; // Add this  
+    sellerIsMaker?: boolean;
 };
 
 export interface IFuturesTradeProps {
     amount: number;
     contract_id: number;
     price: number;
-    margin: number;
+    initMargin: number;
     collateral: number;
     transfer?: boolean;
+    sellerIsMaker?: boolean;
 };
 
 export interface IMSChannelData {

@@ -153,10 +153,13 @@ export class BuySwapper extends Swap {
             const bbData = parseFloat(chainInfo.blocks) + 10;
 
             if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
-                const { contract_id, amount, price, margin,collateral, transfer = false } = this.tradeInfo;
+                const { contract_id, amount, price, initMargin,collateral, transfer = false, sellerIsMaker } = this.tradeInfo;
+                const margin = initMargin
                 const column = await this.txsService.predictColumn(this.multySigChannelData.address, this.myInfo.keypair.address, this.cpInfo.keypair.address);
                 const isA = column === 'A' ? 1 : 0;
-
+                let columnAIsMaker = isA === 1 ? (sellerIsMaker ? 1 : 0)
+                                    : (!sellerIsMaker ? 1 : 0); // seller is B
+            
             console.log('collat in futures buy step 3 '+collateral)
             console.log('initMargin calc '+margin+' '+price+' '+isA)
 
@@ -200,8 +203,9 @@ export class BuySwapper extends Swap {
                     expiryBlock: bbData,
                     price,
                     action: 1,
-                    columnAIsSeller: column === 'A',
-                    insurance:false
+                    columnAIsSeller: isA,
+                    insurance:false,
+                    columnAIsMaker
                 };
                 const payload2 = ENCODER.encodeTradeContractChannel(cpcitOptions);
                 let buildOptions: IBuildLTCITTxConfig = {
@@ -224,10 +228,11 @@ export class BuySwapper extends Swap {
                 this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent.toJSON());
             } else {
                 // Full SPOT logic begins here
-                const { propIdDesired, amountDesired, amountForSale, propIdForSale, transfer } = this.tradeInfo as ISpotTradeProps;
+                const { propIdDesired, amountDesired, amountForSale, propIdForSale, transfer, sellerIsMaker } = this.tradeInfo as ISpotTradeProps;
                 const column = await this.txsService.predictColumn(this.multySigChannelData.address,this.myInfo.keypair.address, this.cpInfo.keypair.address);
                 const isA = column === 'A' ? 1 : 0;
-
+                let columnAIsMaker = isA === 1 ? (sellerIsMaker ? 1 : 0)
+                                      : (!sellerIsMaker ? 1 : 0); // seller is B
                 let ltcTrade = false;
                 let ltcForSale = false;
                 if (propIdDesired === 0) {
@@ -245,7 +250,7 @@ export class BuySwapper extends Swap {
                     const payload = ENCODER.encodeTradeTokenForUTXO({
                         propertyId: tokenId,
                         amount: tokensSold,
-                        columnA: isA === 1,
+                        columnA: isA,
                         satsExpected: satsPaid,
                         tokenOutput: 1,
                         payToAddress: 0
@@ -313,7 +318,8 @@ export class BuySwapper extends Swap {
                         amountOffered1: amountForSale,
                         amountDesired2: amountDesired,
                         columnAIsOfferer: isA,
-                        expiryBlock: bbData
+                        expiryBlock: bbData,
+                        columnAIsMaker
                     };
 
                     const cpitRes = { data: ENCODER.encodeTradeTokensChannel(cpitLTCOptions), error: null };

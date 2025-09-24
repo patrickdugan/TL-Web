@@ -141,7 +141,8 @@ this.multySigChannelData = ms as IMSChannelData;
                     ? ENCODER.encodeTransfer({ propertyId: propIdDesired, amount: amountDesired, isColumnA: isA, destinationAddr: toKeyPair.address })
                     : ENCODER.encodeCommit({ propertyId: propIdDesired, amount: amountDesired, channelAddress: toKeyPair.address });
             }else if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
-                const { contract_id, amount, price, margin, collateral, transfer = false } = this.tradeInfo;
+                const { contract_id, amount, price, initMargin, collateral, transfer = false } = this.tradeInfo;
+                const margin = initMargin
                 const isA = await this.txsService.predictColumn(this.multySigChannelData.address,this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
     
                 payload = transfer
