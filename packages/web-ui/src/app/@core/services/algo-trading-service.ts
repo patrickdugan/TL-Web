@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, Subject, of } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 import { parseAlgoMetaFromSource, AlgoIndexItem } from '../algo-meta';
 import { dbGetIndex, dbPutIndex, dbPutFile, dbGetFile } from '../algo-db';
@@ -51,6 +52,8 @@ const running = new Map<string, WorkerHandle>();
 @Injectable({ providedIn: 'root' })
 export class AlgoTradingService {
   constructor(private http: HttpClient) {}
+  private base = environment.apiBase + '/algo';
+  private preloadDefaults = environment.algoDefaults;
 
   /** Discovery (ranked systems) and running instances for current user */
   readonly discovery$ = new BehaviorSubject<DiscoveryRow[]>([]);
