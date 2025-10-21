@@ -3,9 +3,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/app",
-    "types": [],
-    "lib": ["ES2020", "DOM", "DOM.Iterable", "WebWorker"]
+    "types": []
   },
   "files": ["src/main.ts", "src/polyfills.ts"],
-  "include": ["src/**/*.d.ts", "src/**/*.ts"]
+  "include": ["src/**/*.d.ts"]
 }
