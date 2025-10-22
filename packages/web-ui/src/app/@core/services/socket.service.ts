@@ -53,7 +53,7 @@ export class SocketService {
       try {
         const data = JSON.parse(msg.data);
         const eventName = data.event || data.type || 'unknown';
-        console.log('incoming websocket '+JSON.stringify(msg))
+        console.log('incoming websocket '+JSON.stringify(data))
         if (eventName === 'connected' && data.id) {
           this.clientId = data.id;
           console.log('[OB WS] Assigned client id:', data.id);
