@@ -228,48 +228,52 @@ export class BuySwapper extends Swap {
                 this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent.toJSON());
             } else {
                 // Full SPOT logic begins here
-                const { propIdDesired, amountDesired, amountForSale, propIdForSale, transfer, sellerIsMaker } = this.tradeInfo as ISpotTradeProps;
-                const column = await this.txsService.predictColumn(this.multySigChannelData.address,this.myInfo.keypair.address, this.cpInfo.keypair.address);
-                const isA = column === 'A' ? 1 : 0;
-                let columnAIsMaker = isA === 1 ? (sellerIsMaker ? 1 : 0)
-                                      : (!sellerIsMaker ? 1 : 0); // seller is B
-                let ltcTrade = false;
-                let ltcForSale = false;
-                if (propIdDesired === 0) {
-                    ltcTrade = true;
-                } else if (propIdForSale === 0) {
-                    ltcTrade = true;
-                    ltcForSale = true;
-                }
+                    const { propIdDesired, amountDesired, amountForSale, propIdForSale, transfer, sellerIsMaker } = this.tradeInfo as ISpotTradeProps;
 
-                if (ltcTrade === true) {
-                    const tokenId = ltcForSale ? propIdDesired : propIdForSale;
-                    const tokensSold = ltcForSale ? amountDesired : amountForSale;
-                    const satsPaid = ltcForSale ? amountForSale : amountDesired;
+                    const column = await this.txsService.predictColumn(
+                      this.multySigChannelData.address,
+                      this.myInfo.keypair.address,
+                      this.cpInfo.keypair.address
+                    );
+                    const isA = column === 'A' ? 1 : 0;
+                    let columnAIsMaker = isA === 1 ? (sellerIsMaker ? 1 : 0) : (!sellerIsMaker ? 1 : 0); // seller is B
 
-                    const payload = ENCODER.encodeTradeTokenForUTXO({
+                    // normalize transfer default
+                    const _transfer = transfer ?? false;
+
+                    // LTC path: standardized pair means prop 0 always hits this block when present on either side
+                    if (propIdDesired === 0 || propIdForSale === 0) {
+                      // desktop-flattened mapping
+                      const tokenId    = propIdForSale;
+                      const tokensSold = amountForSale;
+                      const satsPaid   = amountDesired;
+
+                      const payload = ENCODER.encodeTradeTokenForUTXO({
                         propertyId: tokenId,
                         amount: tokensSold,
                         columnA: isA,
                         satsExpected: satsPaid,
-                        tokenOutput: 1,
-                        payToAddress: 0
-                    });
+                        tokenOutput: 0,
+                        payToAddress: 1
+                      });
 
-                    const buildOptions: IBuildLTCITTxConfig = {
+                      const buildOptions: IBuildLTCITTxConfig = {
                         buyerKeyPair: this.myInfo.keypair,
                         sellerKeyPair: this.cpInfo.keypair,
                         commitUTXOs: [commitUTXO],
                         payload,
-                        amount: satsPaid
-                    };
+                        amount: amountForSale
+                      };
 
-                    const rawHexRes = await this.txsService.buildLTCITTx(buildOptions, satsPaid);
-                    if (rawHexRes.error || !rawHexRes.data?.psbtHex) throw new Error(`Build Trade: ${rawHexRes.error}`);
+                      const rawHexRes = await this.txsService.buildLTCITTx(buildOptions, satsPaid);
+                      if (rawHexRes.error || !rawHexRes.data?.psbtHex) {
+                        throw new Error(`Build Trade: ${rawHexRes.error}`);
+                      }
 
-                    const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {psbtHex: rawHexRes.data.psbtHex});
-                    this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent.toJSON());
-                } else {
+                      const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, { psbtHex: rawHexRes.data.psbtHex });
+                      this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent.toJSON());
+                      return;
+                    } else {
                     const payload = transfer
                         ? ENCODER.encodeTransfer({
                             propertyId: propIdForSale,
