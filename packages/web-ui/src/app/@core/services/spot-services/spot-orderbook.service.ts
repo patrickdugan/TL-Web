@@ -168,10 +168,9 @@ export class SpotOrderbookService {
       this.socketService.events$
         .pipe(filter(({ event }) => event === "orderbook-data"))
         .subscribe(({ data }: { data: any }) => {
-           console.log('orderbook data raw  '+JSON.stringify(data))
+           console.log('orderbook data raw '+JSON.stringify(data))
           // Normalize like desktop
           let ob = wrangleObMessageInPlace(data);
-          console.log('normalized '+JSON.stringify(ob))
           // Ignore clearing snapshots (desktop behavior)
           if (Array.isArray(ob?.orders)) {
             // proceed; desktop ignores only illegal empty array when delta expected
