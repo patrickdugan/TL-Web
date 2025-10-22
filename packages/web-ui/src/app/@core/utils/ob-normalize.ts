@@ -68,6 +68,8 @@ export function wrangleObMessageInPlace(input: any): any {
     out.marketKey = _mk(String(symbol));
   }
 
+  console.log('emitting normalized book '+JSON.stringify(out))
+
   return out;
 }
 
