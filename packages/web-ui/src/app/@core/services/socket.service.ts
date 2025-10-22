@@ -4,6 +4,8 @@ import { Subject } from 'rxjs';
 //import { SwapService } from './swap.service';
 import { ESounds, SoundsService } from "./sound.service";
 import { LoadingService } from "./loading.service";
+import { wrangleObMessageInPlace } from "src/app/@core/utils/ob-normalize";
+
 
 @Injectable({
   providedIn: 'root',
@@ -65,6 +67,11 @@ export class SocketService {
         if (eventName === 'new-channel') {
           console.log("[Caller] About to call onInit, this.events$ =", this.events$);
           //this.swapService.onInit(data.data, this.events$);
+        }
+
+        if(eventName=== 'orderbook-data'){
+          let ob = wrangleObMessageInPlace(data);
+          console.log('normalized '+JSON.stringify(ob))
         }
 
    
