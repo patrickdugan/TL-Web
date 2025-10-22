@@ -49,7 +49,7 @@ export class SpotOrdersComponent implements OnInit, OnDestroy {
                 q.keypair.pubkey === this.authService.activeSpotKey?.pubkey &&
                 q.state
               );
-            this.spotOrdersService.openedOrders = openedOrders.filter(q => q.type === "SPOT");
+this.spotOrdersService.openedOrders = (openedOrders.filter(q => q.type === "SPOT") as any);
           })
       );
 
