@@ -8,6 +8,8 @@ import { LoadingService } from "../loading.service";
 import { AuthService } from "../auth.service";
 import { ITradeInfo } from "src/app/utils/swapper";
 import { ISpotTradeProps } from "src/app/utils/swapper/common";
+import { wrangleObMessageInPlace } from "src/app/@core/utils/ob-normalize";
+
 type Side = 'bids' | 'asks' | 'both';
 
 interface ISpotOrderbookData {
@@ -33,16 +35,14 @@ export interface ISpotOrder {
     id_for_sale: number;
     price: number;
   };
-  socketService_id: string;
+  socketService_id: string; // keep web naming
   timestamp: number;
   type: "SPOT";
   uuid: string;
   state?: "CANCELED" | "FILLED";
 }
 
-@Injectable({
-  providedIn: "root",
-})
+@Injectable({ providedIn: "root" })
 export class SpotOrderbookService {
   private _rawOrderbookData: ISpotOrder[] = [];
   outsidePriceHandler: Subject<number> = new Subject();
@@ -55,7 +55,7 @@ export class SpotOrderbookService {
   private _lastRequestedKey: string | null = null;
   onUpdate?: () => void;
 
-  // ADD: For rxjs event subscriptions
+  // RxJS subscription holders
   private socketServiceSubscriptions: Subscription[] = [];
 
   constructor(
@@ -82,34 +82,35 @@ export class SpotOrderbookService {
     return this._rawOrderbookData;
   }
 
-  get relatedHistoryTrades() {
-    if (!this.activeSpotAddress) return [];
-    return this.tradeHistory
-      .filter(
-        (e) =>
-          e.seller.keypair.address === this.activeSpotAddress ||
-          e.buyer.keypair.address === this.activeSpotAddress
-      )
-      .map((t) => ({
-        ...t,
-        side:
-          t.buyer.keypair.address === this.activeSpotAddress
-            ? "BUY"
-            : "SELL",
-      })) as ISpotHistoryTrade[];
-  }
-
-  set rawOrderbookData(value: ISpotOrder[]) {
-    this._rawOrderbookData = value;
-    this.structureOrderBook();
-  }
-
   get marketFilter() {
     return this.spotMarkertService.marketFilter;
   }
 
+  /** Normalize spot keys using p1<p2 rule */
   private normalizeKey(p1: number, p2: number): string {
     return p1 < p2 ? `${p1}-${p2}` : `${p2}-${p1}`;
+  }
+
+  /** If activeKey is not set, adopt it from message.marketKey or current selected market */
+  private ensureActiveKeyFromMessage(msg: any): void {
+    if (this.activeKey) return;
+
+    const mk =
+      typeof msg?.marketKey === "string" && /^\d+-\d+$/.test(msg.marketKey)
+        ? msg.marketKey
+        : null;
+
+    if (mk) {
+      this.activeKey = mk;
+      return;
+    }
+
+    const sel = this.selectedMarket;
+    const base = sel?.first_token?.propertyId;
+    const quote = sel?.second_token?.propertyId;
+    if (typeof base === "number" && typeof quote === "number") {
+      this.activeKey = this.normalizeKey(base, quote);
+    }
   }
 
   /**
@@ -119,7 +120,7 @@ export class SpotOrderbookService {
   subscribeForOrderbook() {
     this.endOrderbookSubscription();
 
-    // RxJS: "order:error"
+    // order:error
     this.socketServiceSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "order:error"))
@@ -130,66 +131,88 @@ export class SpotOrderbookService {
         })
     );
 
-    // RxJS: "order:saved"
+    // order:saved
     this.socketServiceSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "order:saved"))
-        .subscribe(({ data }) => {
+        .subscribe(() => {
           this.loadingService.tradesLoading = false;
           this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
         })
     );
 
-    // RxJS: "update-orders-request"
+    // update-orders-request (server asks for a refresh)
     this.socketServiceSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "update-orders-request"))
         .subscribe(() => {
-            this.socketService.send("update-orderbook", this.marketFilter)
-         })
+          const marketKey = this.normalizeKey(
+            this.marketFilter.first_token,
+            this.marketFilter.second_token
+          );
+
+          // add hints for the server (matches desktop shape but via web send)
+          const payload = {
+            ...this.marketFilter, // { type, first_token, second_token, depth, side, includeTrades, ... }
+            marketKey,
+            activeKey: this.activeKey ?? marketKey,
+            lastRequestedKey: this._lastRequestedKey ?? null,
+          };
+
+          this.socketService.send("update-orderbook", payload);
+        })
     );
 
-    // RxJS: "orderbook-data"
+    // orderbook-data
     this.socketServiceSubscriptions.push(
-       this.socketService.events$
-    .pipe(filter(({ event }) => event === "orderbook-data"))
-    .subscribe(({ data }: { data: any }) => {
-      console.log('[Spot OB] update ' + JSON.stringify(data));
+      this.socketService.events$
+        .pipe(filter(({ event }) => event === "orderbook-data"))
+        .subscribe(({ data }: { data: any }) => {
+          // Normalize like desktop
+          let ob = wrangleObMessageInPlace(data);
 
-      const mk = data?.marketKey || this.activeKey;
-      if (mk && this.activeKey && mk !== this.activeKey) return;
+          // Ignore clearing snapshots (desktop behavior)
+          if (Array.isArray(ob?.orders)) {
+            // proceed; desktop ignores only illegal empty array when delta expected
+          }
 
-      if (Array.isArray(data.orders)) {
-        this.rawOrderbookData = data.orders as ISpotOrder[];
-      }
+          // Infer/confirm active key
+          this.ensureActiveKeyFromMessage(ob);
 
-      this.tradeHistory = data.history || [];
-      const lastTrade = this.tradeHistory[0];
+          const mk = ob?.marketKey || this.activeKey;
+          if (mk && this.activeKey && mk !== this.activeKey) return;
 
-      if (!lastTrade) {
-        this.currentPrice = 1;
-      } else {
-        const { amountForSale, amountDesired } = lastTrade.props;
-        this.currentPrice = parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
-      }
+          if (ob.isDelta) {
+            this.rawOrderbookData = this.mergeOrders(
+              this.rawOrderbookData,
+              ob.orders as ISpotOrder[]
+            );
+          } else {
+            this.rawOrderbookData = ob.orders as ISpotOrder[];
+          }
 
-      if (this.onUpdate) {
-        try {
-          this.onUpdate();
-        } catch {}
-      }
-    })
+          this.tradeHistory = ob.history || [];
+          const lastTrade = this.tradeHistory[0];
+
+          this.currentPrice = lastTrade
+            ? parseFloat(
+                (lastTrade.props.amountForSale / lastTrade.props.amountDesired).toFixed(6)
+              ) || 1
+            : 1;
+
+          this.onUpdate?.();
+        })
     );
 
-    // Finally, request the current orderbook
-    this.socketService.send("update-orderbook",this.marketFilter);
+    // initial snapshot request
+    this.socketService.send("update-orderbook", this.marketFilter);
   }
 
   /**
    * Unsubscribe from the raw events
    */
   endOrderbookSubscription() {
-    this.socketServiceSubscriptions.forEach(sub => sub.unsubscribe());
+    this.socketServiceSubscriptions.forEach((sub) => sub.unsubscribe());
     this.socketServiceSubscriptions = [];
   }
 
@@ -202,50 +225,53 @@ export class SpotOrderbookService {
   }
 
   async switchMarket(
-        first_token:number, second_token:number,
-        p?: { depth?: number; side?: 'bids' | 'asks' | 'both'; includeTrades?: boolean }
-      ) {
-        const newKey = this.normalizeKey(first_token,second_token);
+    first_token: number,
+    second_token: number,
+    p?: { depth?: number; side?: Side; includeTrades?: boolean }
+  ) {
+    const newKey = this.normalizeKey(first_token, second_token);
 
-        // Leave old
-        if (this.activeKey && this.activeKey !== newKey) {
-          this.socketService.send('orderbook:leave',this.activeKey);
-        }
+    // remember previous requested key
+    this._lastRequestedKey = this.activeKey;
 
-        this.activeKey = newKey;
-        this._lastRequestedKey = newKey;
+    // leave old
+    if (this.activeKey && this.activeKey !== newKey) {
+      this.socketService.send("orderbook:leave", { marketKey: this.activeKey });
+    }
 
-        // Ask server for snapshot
-        this.socketService.send(
-            'update-orderbook',
-            {
-              filter: {
-                type: 'SPOT',
-                first_token,
-                second_token,
-                depth: String(p?.depth ?? 50),
-                side: p?.side ?? 'both',
-                includeTrades: String(p?.includeTrades ?? false),
-              }
-            },
-        );
+    this.activeKey = newKey;
 
-        // Join for live deltas
-        this.socketService.send('orderbook:join', { marketKey: newKey});
-      }
+    // Ask server for snapshot
+    this.socketService.send("update-orderbook", {
+      filter: {
+        type: "SPOT",
+        first_token,
+        second_token,
+        depth: String(p?.depth ?? 50),
+        side: p?.side ?? "both",
+        includeTrades: String(p?.includeTrades ?? false),
+      },
+    });
+
+    // Join for live deltas
+    this.socketService.send("orderbook:join", { marketKey: newKey });
+  }
 
   private _structureOrderbook(isBuy: boolean) {
-    const propIdDesired = isBuy
-      ? this.selectedMarket.first_token.propertyId
-      : this.selectedMarket.second_token.propertyId;
-    const propIdForSale = isBuy
-      ? this.selectedMarket.second_token.propertyId
-      : this.selectedMarket.first_token.propertyId;
-    const filteredOrderbook = this._rawOrderbookData.filter(
-      (o) => o.props.id_desired === propIdDesired && o.props.id_for_sale === propIdForSale
+    const baseId = this.selectedMarket.first_token.propertyId;   // normalized: base < quote
+    const quoteId = this.selectedMarket.second_token.propertyId;
+    const myKey = this.normalizeKey(baseId, quoteId);
+
+    // BUY shows quotes for sale; SELL shows base for sale (matches desktop code behavior)
+    const filteredOrderbook = (this.rawOrderbookData || []).filter(
+      (o) =>
+        this.normalizeKey(o?.props?.id_for_sale, o?.props?.id_desired) === myKey &&
+        (isBuy ? o?.props?.id_for_sale === quoteId : o?.props?.id_for_sale === baseId)
     );
+
     const range = 1000;
     const result: { price: number; amount: number }[] = [];
+
     filteredOrderbook.forEach((o) => {
       const _price = Math.trunc(o.props.price * range);
       const existing = result.find((_o) => Math.trunc(_o.price * range) === _price);
@@ -258,6 +284,7 @@ export class SpotOrderbookService {
         });
       }
     });
+
     // If it's a sell side, we keep track of 'lastPrice' from the sorted array
     if (!isBuy) {
       this.lastPrice =
@@ -270,5 +297,40 @@ export class SpotOrderbookService {
     return isBuy
       ? result.sort((a, b) => b.price - a.price).slice(0, 9)
       : result.sort((a, b) => b.price - a.price).slice(Math.max(result.length - 9, 0));
+  }
+
+  private mergeOrders(current: ISpotOrder[], deltas: ISpotOrder[]): ISpotOrder[] {
+    const map = new Map(current.map((o) => [o.uuid, o]));
+
+    for (const d of deltas) {
+      // normalize/guard
+      d.props.amount = d.props.amount;
+      if (d.props.amount === 0 || d.state === "CANCELED") {
+        map.delete(d.uuid);
+      } else {
+        map.set(d.uuid, d);
+      }
+    }
+
+    return Array.from(map.values());
+  }
+
+  set rawOrderbookData(value: ISpotOrder[]) {
+    this._rawOrderbookData = value;
+    this.structureOrderBook();
+  }
+
+  get relatedHistoryTrades() {
+    if (!this.activeSpotAddress) return [];
+    return this.tradeHistory
+      .filter(
+        (e) =>
+          e.seller.keypair.address === this.activeSpotAddress ||
+          e.buyer.keypair.address === this.activeSpotAddress
+      )
+      .map((t) => ({
+        ...t,
+        side: t.buyer.keypair.address === this.activeSpotAddress ? "BUY" : "SELL",
+      })) as ISpotHistoryTrade[];
   }
 }

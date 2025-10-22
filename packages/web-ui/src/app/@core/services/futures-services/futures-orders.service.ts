@@ -1,75 +1,85 @@
 import { Injectable } from "@angular/core";
 import { LoadingService } from "../loading.service";
 import { SocketService } from "../socket.service";
-import { IFuturesOrder } from "./futures-orderbook.service";
+import { FuturesMarketService } from "./futures-markets.service";
 
-interface ITradeConf {
-    keypair: {
-        address: string;
-        pubkey: string;
-    };
-    action: "BUY" | "SELL";
-    type: "FUTURES";
-    isLimitOrder: boolean;
-    marketName: string;
+export interface IFuturesTradeConf {
+  keypair: { address: string; pubkey: string };
+  action: "BUY" | "SELL";
+  type: "FUTURES";
+  isLimitOrder: boolean;
+  marketName: string;
+  props: {
+    amount: number;
+    contract_id: number;
+    price: number;
+    collateral: number;
+    leverage?: number;   // optional to match caller
+    margin?: number;     // optional to match caller
+    transfer?: boolean;  // optional passthrough
+  };
 }
 
-export interface IFuturesTradeConf extends ITradeConf {
-    props: {
-        contract_id: number,
-        amount: number,
-        price: number,
-        margin?: number,
-        collateral: number;
-        transfer: boolean;
-    };
+// Make amount/price/collateral REQUIRED so components can safely do amount*price
+export interface IFuturesOrderRow {
+  uuid?: string;
+  props: {
+    contract_id?: number;
+    amount: number;
+    price: number;
+    collateral?: number;
+    [k: string]: any;
+  };
+  [k: string]: any;
 }
 
-@Injectable({
-    providedIn: 'root',
-})
-
+@Injectable({ providedIn: "root" })
 export class FuturesOrdersService {
-    private _openedOrders: IFuturesOrder[] = [];
-    private _orderHistory: any[] = [];
+  private _openedOrders: IFuturesOrderRow[] = [];
 
-    constructor(
-        private socketService: SocketService,
-        private loadingService: LoadingService,
-    ) { }
+  // UI reads/writes this
+  public orderHistory: any[] = [];
 
-    get openedOrders(): IFuturesOrder[] {
-        return this._openedOrders;
-    }
+  constructor(
+    private loadingService: LoadingService,
+    private socketService: SocketService,
+    private futuresMarketService: FuturesMarketService
+  ) {}
 
-    set openedOrders(value: IFuturesOrder[]) {
-        this._openedOrders = value;
-    }
+  get openedOrders(): IFuturesOrderRow[] {
+    return this._openedOrders;
+  }
+  set openedOrders(value: IFuturesOrderRow[]) {
+    this._openedOrders = Array.isArray(value) ? value.slice() : [];
+  }
 
-    get orderHistory() {
-        return this._orderHistory;
-    }
+  openedOrdersForActive(): IFuturesOrderRow[] {
+    const sel = (this.futuresMarketService as any)?.selectedMarket;
+    if (!sel) return this._openedOrders;
+    const cid = Number(sel.contract_id);
+    return this._openedOrders.filter(o => Number(o?.props?.contract_id) === cid);
+  }
 
-    set orderHistory(value: any[]) {
-        this._orderHistory = value;
-    }
+  placeOrder(orderConf: IFuturesTradeConf) {
+    this.socketService.send("new-order", orderConf);
+  }
 
+  // Alias some UI calls use
+  newOrder(orderConf: IFuturesTradeConf) {
+    this.placeOrder(orderConf);
+  }
 
-    newOrder(orderConf: IFuturesTradeConf) {
-        //this.loadingService.tradesLoading = true;
-        console.log('inside newOrder '+JSON.stringify(orderConf))
-        this.socketService.send('new-order', orderConf);
-        }
+  addLiquidity(orders: IFuturesTradeConf[]) {
+    this.socketService.send("many-orders", orders);
+  }
 
-    addLiquidity(orders: IFuturesTradeConf[]) {
-        this.socketService.send('many-orders', orders);
-    }
+  closeOpenedOrder(uuid: string) {
+    const sel = (this.futuresMarketService as any)?.selectedMarket;
+    const ctx = sel ? { contract_id: sel.contract_id } : {};
+    this.socketService.send("close-order", { orderUUID: uuid, ...ctx });
+  }
 
-    closeOpenedOrder(uuid: string) {
-        this.socketService.send('close-order', { orderUUID: uuid });   
-    }
-
-    closeAllOrders() {
-        this._openedOrders.forEach(o => this.closeOpenedOrder(o.uuid));
-    }
+  closeAllOrders() {
+    (this._openedOrders || []).forEach(o => this.closeOpenedOrder((o as any).uuid));
+  }
 }

@@ -1,79 +1,98 @@
 import { Injectable } from "@angular/core";
 import { LoadingService } from "../loading.service";
 import { SocketService } from "../socket.service";
-import { ISpotOrder } from "./spot-orderbook.service";
-import { filter } from 'rxjs/operators'; 
+import { SpotMarketsService, IMarket } from "./spot-markets.service";
 
-
-interface ITradeConf {
-    keypair: {
-        address: string;
-        pubkey: string;
-    };
-    action: "BUY" | "SELL";
-    type: "SPOT";
-    isLimitOrder: boolean;
-    marketName: string;
+export interface ISpotTradeConf {
+  keypair: { address: string; pubkey: string };
+  action: "BUY" | "SELL";
+  type: "SPOT";
+  isLimitOrder: boolean;
+  marketName: string;
+  props: {
+    amount: number;
+    id_desired: number;
+    id_for_sale: number;
+    price: number;
+    transfer?: boolean; // optional passthrough
+  };
 }
 
-export interface ISpotTradeConf extends ITradeConf {
-    props: {
-        id_desired: number,
-        id_for_sale: number,
-        amount: number,
-        price: number,
-        transfer?: boolean; // Add this  
-    };
+// Make amount/price/id_for_sale REQUIRED so components can safely destructure/use
+export interface ISpotOrderRow {
+  uuid?: string;
+  props: {
+    id_for_sale: number;
+    id_desired?: number;
+    amount: number;
+    price: number;
+    [k: string]: any;
+  };
+  [k: string]: any;
 }
 
-@Injectable({
-    providedIn: 'root',
-})
-
+@Injectable({ providedIn: "root" })
 export class SpotOrdersService {
-    private _openedOrders: ISpotOrder[] = [];
-    private _orderHistory: any[] = [];
+  private _openedOrders: ISpotOrderRow[] = [];
 
+  // UI reads/writes this
+  public orderHistory: any[] = [];
 
-    constructor(private socketService: SocketService, private loading: LoadingService) {
-      this.socketService.events$
-        .pipe(filter(({event}) => event === 'order:filled' || event === 'order:closed' || event === 'order:canceled'))
-        .subscribe(({data}) => {
-          const uuid = data?.uuid || data?.orderUUID || data?.order?.uuid;
-          if (uuid) this.openedOrders = this._openedOrders.filter(o => o.uuid !== uuid);
-        });
-    }
+  constructor(
+    private loadingService: LoadingService,
+    private socketService: SocketService,
+    private spotMarketService: SpotMarketsService
+  ) {}
 
-    get openedOrders(): ISpotOrder[] {
-        return this._openedOrders;
-    }
+  get openedOrders(): ISpotOrderRow[] {
+    return this._openedOrders;
+  }
+  set openedOrders(value: ISpotOrderRow[]) {
+    this._openedOrders = Array.isArray(value) ? value.slice() : [];
+  }
 
-    set openedOrders(value: ISpotOrder[]) {
-        this._openedOrders = value;
-    }
+  openedOrdersForActive(): ISpotOrderRow[] {
+    const sel = (this.spotMarketService as any)?.selectedMarket as IMarket | undefined;
+    if (!sel) return this._openedOrders;
+    const base = Number(sel.first_token?.propertyId);
+    const quote = Number(sel.second_token?.propertyId);
+    return this._openedOrders.filter(o => {
+      const a = Number(o?.props?.id_for_sale);
+      const b = Number(o?.props?.id_desired);
+      return (a === base && b === quote) || (a === quote && b === base);
+    });
+  }
 
-    get orderHistory() {
-        return this._orderHistory;
-    }
+  placeOrder(orderConf: ISpotTradeConf) {
+    this.socketService.send("new-order", orderConf);
+  }
 
-    set orderHistory(value: any[]) {
-        this._orderHistory = value;
-    }
+  // Alias some UI calls use
+  newOrder(orderConf: ISpotTradeConf) {
+    this.placeOrder(orderConf);
+  }
 
-    newOrder(orderConf: ISpotTradeConf) {
-        console.log('inside new order '+JSON.stringify(orderConf))
-        this.socketService.send('new-order', orderConf);
-    }
+  addLiquidity(orders: ISpotTradeConf[]) {
+    this.socketService.send("many-orders", orders);
+  }
 
-    addLiquidity(orders: ISpotTradeConf[]) {
-        this.socketService.send('many-orders', orders);
-    }
+  closeOpenedOrder(uuid: string) {
+    const found = (this._openedOrders || []).find(o => o?.uuid === uuid);
+    const base =
+      found?.props?.id_for_sale ??
+      (this.spotMarketService as any)?.selectedMarket?.first_token?.propertyId;
+    const quote =
+      found?.props?.id_desired ??
+      (this.spotMarketService as any)?.selectedMarket?.second_token?.propertyId;
 
-    closeOpenedOrder(uuid: string) {
-        this.socketService.send('close-order', { orderUUID: uuid });
-    }
+    this.socketService.send("close-order", {
+      orderUUID: uuid,
+      id_for_sale: base,
+      id_desired: quote
+    });
+  }
 
-    closeAllOrders() {
-        this._openedOrders.forEach(o => this.closeOpenedOrder(o.uuid));
-    }
+  closeAllOrders() {
+    (this._openedOrders || []).forEach(o => this.closeOpenedOrder((o as any).uuid));
+  }
 }
