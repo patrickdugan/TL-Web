@@ -4,7 +4,7 @@ import { Subject } from 'rxjs';
 //import { SwapService } from './swap.service';
 import { ESounds, SoundsService } from "./sound.service";
 import { LoadingService } from "./loading.service";
-import { wrangleObMessageInPlace } from "src/app/@core/utils/ob-normalize";
+import { wrangleObMessageInPlace, wrangleFuturesObMessageInPlace } from "src/app/@core/utils/ob-normalize";
 
 
 @Injectable({
@@ -70,7 +70,7 @@ export class SocketService {
         }
 
         if(eventName=== 'orderbook-data'){
-          let ob = wrangleObMessageInPlace(data);
+          const ob = wrangleFuturesObMessageInPlace(data)
           console.log('normalized '+JSON.stringify(ob))
         }
 

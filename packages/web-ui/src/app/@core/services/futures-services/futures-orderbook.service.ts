@@ -5,6 +5,7 @@ import { SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
 import { LoadingService } from "../loading.service";
 import { FuturesMarketService } from "./futures-markets.service";
+import { wrangleFuturesObMessageInPlace } from "src/app/@core/utils/ob-normalize";
 
 type Side = "bids" | "asks" | "both";
 
@@ -144,38 +145,17 @@ export class FuturesOrderbookService {
       this.socketService.events$
         .pipe(filter(({ event }) => event === "orderbook-data"))
         .subscribe(({ data }: { data: any }) => {
-          if (!data) return;
+          // inside your existing WS handler after wrangling:
+          const msg  = wrangleFuturesObMessageInPlace(data);
+          if (msg.event !== 'orderbook-data') return;
 
-          // ensure/confirm active key
-          this.ensureActiveKeyFromMessage(data);
-          const mk = data?.marketKey || this.activeKey;
-          if (mk && this.activeKey && mk !== this.activeKey) return;
+          const book = msg.orders || {};
+          const bids = book.bids ?? msg.bids ?? [];
+          const asks = book.asks ?? msg.asks ?? [];
 
-          // snapshot form (bids/asks) or orders/delta form
-          const hasBidsAsks =
-            Array.isArray(data?.bids) && Array.isArray(data?.asks);
-
-          if (hasBidsAsks) {
-            // aggregated levels provided directly
-            const bids = data.bids as { amount: number; price: number }[];
-            const asks = data.asks as { amount: number; price: number }[];
-            this.buyOrderbooks = Array.isArray(bids) ? bids : [];
-            this.sellOrderbooks = Array.isArray(asks) ? asks : [];
-            this._rawOrderbookData = (data.orders as IFuturesOrderRow[]) || [];
-          } else {
-            // orders list with optional delta
-            if (data.isDelta) {
-              this._rawOrderbookData = this.mergeOrders(
-                this._rawOrderbookData,
-                (data.orders as IFuturesOrderRow[]) || []
-              );
-            } else {
-              this._rawOrderbookData = (data.orders as IFuturesOrderRow[]) || [];
-            }
-            // rebuild local arrays
-            this.structureOrderBook();
-          }
-
+          this.buyOrderbooks  = bids;   // or whatever arrays your template reads
+          this.sellOrderbooks = asks;
+          
           // optional history
           if (Array.isArray(data?.history)) {
             this.tradeHistory = data.history as IFuturesHistoryTrade[];
