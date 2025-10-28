@@ -1,277 +1,388 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subject, of } from 'rxjs';
-import { catchError, map, tap } from 'rxjs/operators';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../environments/environment';
+import { BehaviorSubject } from 'rxjs';
 
-import { parseAlgoMetaFromSource, AlgoIndexItem } from '../algo-meta';
-import { dbGetIndex, dbPutIndex, dbPutFile, dbGetFile } from '../algo-db';
+// ---- public types that the component imports ----
 
-export interface DiscoveryRow {
+export interface StrategyRow {
   id: string;
-  rank: number;
-  market: string;
+  name: string;
+  symbol: string;
   mode: 'SPOT' | 'FUTURES';
   leverage?: string;
   roiPct: number;
   pnlUsd: number;
   copiers: number;
   runtime: string;
-  meta?: any;
+  status: 'running' | 'stopped';
+  amount: number; // planned allocation
+  code: string;   // the actual algo source code
 }
 
-export interface RunningSystem {
-  runId: string;
+export interface RunningInstance {
+  systemId: string;
   name: string;
-  allocated: number;
-  pnl: number;
-  startedAt: string | number | Date;
-  counterVenuePct?: number;
+  symbol: string;
+  amount: number;
+  pnlUsd: number;
+  startedAt: number;
+  status: 'running' | 'stopped';
 }
 
-type Dict<T = any> = { [k: string]: T };
-
-// --------------------
-
-const DEFAULTS_DIR = 'assets/algo-defaults';
-const DEFAULT_FILES = ['meanReversion.js','gridBot.js','mmEx.js'];
-
-function shortId(seed: string) {
-  const s = seed + Date.now();
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
-  const h = (hash >>> 0).toString(16).padStart(8, '0') + Math.floor(Math.random()*0xffffffff).toString(16).padStart(8,'0');
-  return h.slice(0, 12);
+// ---- internal handle we keep for each live worker ----
+interface WorkerHandle {
+  worker: Worker;
+  systemId: string;
+  startedAt: number;
+  amount: number;
+  pnlUsd: number;
+  status: 'running' | 'stopped';
 }
-function safeName(s: string) { return String(s || '').replace(/[^\w.\-]+/g, '_'); }
-
-// Worker handles by systemId
-type WorkerHandle = { worker: Worker; startedAt: number };
-const running = new Map<string, WorkerHandle>();
 
 @Injectable({ providedIn: 'root' })
 export class AlgoTradingService {
-  constructor(private http: HttpClient) {}
-  private base = environment.apiBase + '/algo';
-  private preloadDefaults = environment.algoDefaults;
+  // discovery$: "what strategies exist"
+  public discovery$ = new BehaviorSubject<StrategyRow[]>([]);
 
-  /** Discovery (ranked systems) and running instances for current user */
-  readonly discovery$ = new BehaviorSubject<DiscoveryRow[]>([]);
-  readonly running$   = new BehaviorSubject<RunningSystem[]>([]);
+  // running$: "what's actually alive right now"
+  public running$ = new BehaviorSubject<RunningInstance[]>([]);
 
-  // Optional loading flags if your UI uses them
-  readonly loadingDiscovery$ = new BehaviorSubject<boolean>(false);
-  readonly loadingRunning$   = new BehaviorSubject<boolean>(false);
-  readonly uploading$        = new BehaviorSubject<boolean>(false);
+  // pretend this is our on-disk / IndexedDB catalog
+  private catalog: Map<string, StrategyRow> = new Map();
 
-  // ---- Bootstrap defaults on first use
-  private seeded = false;
-  private async seedDefaultsIfEmpty(): Promise<void> {
-    if (this.seeded) return;
-    const current = await dbGetIndex();
-    if (current.length > 0) { this.seeded = true; return; }
+  // live workers
+  private workers: Map<string, WorkerHandle> = new Map();
 
-    const list: AlgoIndexItem[] = [];
-    for (const name of DEFAULT_FILES) {
-      try {
-        const src = await this.http.get(`${DEFAULTS_DIR}/${name}`, { responseType: 'text' }).toPromise();
-        if (!src) continue;
-        const meta = parseAlgoMetaFromSource(src);
-        const id = shortId(name);
-        const fileName = `${id}-${safeName(name)}`;
-        await dbPutFile(fileName, src);
-        list.push({
-          id,
-          name: meta?.name || name,
-          fileName,
-          size: new Blob([src]).size,
-          createdAt: Date.now(),
-          status: 'stopped',
-          amount: 0,
-          meta,
-        });
-      } catch (e) {
-        console.warn('[algo.defaults] failed to import', name, e);
-      }
-    }
-    await dbPutIndex(list);
-    this.seeded = true;
+  constructor() {
+    this.seedDefaults();
+    this.refreshDiscovery();
+    this.refreshRunning();
   }
 
-  // ---- Public API (keeps same shape your components call)
+  // -------------------------------------------------
+  // PUBLIC API that component calls
+  // -------------------------------------------------
 
-  fetchDiscovery(filters: Dict): Observable<DiscoveryRow[]> {
-    this.loadingDiscovery$.next(true);
-    return new Observable<DiscoveryRow[]>(observer => {
-      (async () => {
-        await this.seedDefaultsIfEmpty();
-        const rows = await dbGetIndex();
-        // Map to UI DiscoveryRow (safe placeholders)
-        const mapped = rows.map((i, idx): DiscoveryRow => ({
-          id: i.id,
-          rank: idx + 1,
-          market: i.meta?.symbol || '—',
-          mode: (i.meta?.mode || 'SPOT') as 'SPOT' | 'FUTURES',
-          leverage: i.meta?.leverage != null ? String(i.meta.leverage) : undefined,
-          roiPct: 0,
-          pnlUsd: 0,
-          copiers: 0,
-          runtime: i.status === 'running' ? 'Running' : 'Stopped',
-          meta: i,
-        }));
-        this.discovery$.next(mapped);
-        observer.next(mapped);
-        observer.complete();
-        this.loadingDiscovery$.next(false);
-      })().catch(err => {
-        console.error('[algo] fetchDiscovery error:', err);
-        this.discovery$.next([]);
-        observer.next([]);
-        observer.complete();
-        this.loadingDiscovery$.next(false);
-      });
-    });
+  fetchDiscovery() {
+    this.refreshDiscovery();
   }
 
-  fetchRunning(): Observable<RunningSystem[]> {
-    this.loadingRunning$.next(true);
-    return new Observable<RunningSystem[]>(observer => {
-      (async () => {
-        const rows = await dbGetIndex();
-        const nowRunning = rows.filter(r => r.status === 'running');
-        const mapped = nowRunning.map(i => ({
-          runId: i.id,
-          name: i.meta?.name || i.name,
-          allocated: i.amount ?? 0,
-          pnl: 0,
-          startedAt: i.createdAt,
-          counterVenuePct: undefined,
-        }));
-        this.running$.next(mapped);
-        observer.next(mapped);
-        observer.complete();
-        this.loadingRunning$.next(false);
-      })().catch(err => {
-        console.error('[algo] fetchRunning error:', err);
-        this.running$.next([]);
-        observer.next([]);
-        observer.complete();
-        this.loadingRunning$.next(false);
-      });
-    });
+  fetchRunning() {
+    this.refreshRunning();
   }
 
-  uploadSystem(file: File, name?: string): Observable<{ ok: boolean; systemId: string }> {
-    this.uploading$.next(true);
-    return new Observable(observer => {
-      (async () => {
-        const src = await file.text();
-        const meta = parseAlgoMetaFromSource(src);
-        const id = shortId(file.name);
-        const fileName = `${id}-${safeName(name || file.name)}`;
-        await dbPutFile(fileName, src);
-
-        const item: AlgoIndexItem = {
-          id,
-          name: meta?.name || name || file.name,
-          fileName,
-          size: file.size,
-          createdAt: Date.now(),
-          status: 'stopped',
-          amount: 0,
-          meta,
-        };
-        const list = await dbGetIndex();
-        list.push(item);
-        await dbPutIndex(list);
-
-        // refresh discovery
-        this.fetchDiscovery({}).subscribe();
-
-        observer.next({ ok: true, systemId: id });
-        observer.complete();
-        this.uploading$.next(false);
-      })().catch(err => {
-        console.error('[algo] upload error:', err);
-        observer.error(err);
-        this.uploading$.next(false);
-      });
-    });
+  registerStrategy(partial: {
+    name: string;
+    symbol: string;
+    mode: 'SPOT' | 'FUTURES';
+    leverage?: string;
+    code: string;
+  }) {
+    const id = this.genId();
+    const row: StrategyRow = {
+      id,
+      name: partial.name,
+      symbol: partial.symbol,
+      mode: partial.mode,
+      leverage: partial.leverage ?? '10x',
+      roiPct: 0,
+      pnlUsd: 0,
+      copiers: 0,
+      runtime: '0h',
+      status: 'stopped',
+      amount: 0,
+      code: partial.code,
+    };
+    this.catalog.set(id, row);
+    this.refreshDiscovery();
   }
 
-  runSystem(systemId: string) {
-    return new Observable<{ ok: boolean }>(observer => {
-      (async () => {
-        const list = await dbGetIndex();
-        const item = list.find(i => i.id === systemId);
-        if (!item) throw new Error('System not found');
-        if (running.has(systemId)) { observer.next({ ok:true }); observer.complete(); return; }
+  runSystem(
+    systemId: string,
+    opts?: { amount?: number; counterVenueKey?: string; hedgeMode?: string }
+  ) {
+    const cfg = this.catalog.get(systemId);
+    if (!cfg) return;
 
-        const source = await dbGetFile(item.fileName);
-        if (!source) throw new Error('Source missing');
+    // update catalog status
+    cfg.status = 'running';
+    cfg.amount = opts?.amount ?? cfg.amount ?? 0;
+    this.catalog.set(systemId, cfg);
 
-        // Worker creation (Angular supports the URL pattern since v13+ / Webpack 5)
-        const worker = new Worker(new URL('../workers/algo.worker.ts', import.meta.url), { type: 'module' });
+    // spin worker
+    const worker = new Worker(
+      new URL('./algo.worker.ts', import.meta.url), // adjust path if needed
+      { type: 'module' }
+    );
 
-        worker.postMessage({
-          type: 'run',
-          systemId,
-          fileName: item.fileName,
-          source,
-          meta: item.meta || null,
-          config: {}, // pass web wallet/relayer config later as needed
-        });
+    const handle: WorkerHandle = {
+      worker,
+      systemId,
+      startedAt: Date.now(),
+      amount: cfg.amount,
+      pnlUsd: 0,
+      status: 'running',
+    };
+    this.workers.set(systemId, handle);
 
-        worker.onmessage = (e: MessageEvent) => {
-          const msg = e.data;
-          if (!msg || typeof msg !== 'object') return;
-          if (msg.type === 'stopped' || msg.type === 'error') {
-            this.stopSystem(systemId).subscribe(); // ensure state sync
+    // wire messages FROM worker
+    worker.onmessage = (ev: MessageEvent) => {
+      const msg = ev.data;
+      if (!msg || typeof msg !== 'object') return;
+
+      switch (msg.type) {
+        case 'log': {
+          // forward console output so you can see algo chatter
+          // NOTE: this is how you'll see console output from running algos
+          console.log(
+            `[ALGO ${msg.systemId} LOG]`,
+            ...(msg.args || [])
+          );
+          break;
+        }
+        case 'metric': {
+          // update pnl, etc.
+          const h = this.workers.get(msg.systemId);
+          if (h) {
+            if (typeof msg.pnl === 'number') {
+              h.pnlUsd = msg.pnl;
+            }
+            this.workers.set(msg.systemId, h);
+            this.refreshRunning();
           }
-          // if (msg.type === 'metric') { /* fan out to charts */ }
-        };
+          break;
+        }
+        case 'order': {
+          // strategy is asking to place an order
+          // TODO: risk checks, signing, relayer call
+          console.warn(
+            `[ALGO ${msg.systemId} ORDER REQUEST]`,
+            msg.order
+          );
+          break;
+        }
+        case 'stopped': {
+          // worker says it's done
+          this.internalStop(msg.systemId);
+          break;
+        }
+        case 'error': {
+          console.error(
+            `[ALGO ${msg.systemId} ERROR]`,
+            msg.error
+          );
+          // optional: mark as stopped on error
+          this.internalStop(msg.systemId);
+          break;
+        }
+      }
+    };
 
-        running.set(systemId, { worker, startedAt: Date.now() });
-        item.status = 'running';
-        await dbPutIndex(list);
-
-        // refresh streams
-        this.fetchDiscovery({}).subscribe();
-        this.fetchRunning().subscribe();
-
-        observer.next({ ok: true });
-        observer.complete();
-      })().catch(err => {
-        console.error('[algo] run error:', err);
-        observer.error(err);
-      });
+    // send RUN message TO worker with code + config/meta
+    worker.postMessage({
+      type: 'run',
+      systemId,
+      source: cfg.code,
+      config: {
+        amount: cfg.amount,
+        hedgeMode: opts?.hedgeMode ?? 'mirror',
+        counterVenueKey: opts?.counterVenueKey ?? '',
+      },
+      meta: {
+        name: cfg.name,
+        symbol: cfg.symbol,
+        mode: cfg.mode,
+        leverage: cfg.leverage,
+      },
     });
+
+    this.refreshDiscovery();
+    this.refreshRunning();
   }
 
   stopSystem(systemId: string) {
-    return new Observable<{ ok: boolean }>(observer => {
-      (async () => {
-        const h = running.get(systemId);
-        if (h) { h.worker.postMessage({ type: 'stop' }); h.worker.terminate(); running.delete(systemId); }
+    // ask worker to stop gracefully
+    const h = this.workers.get(systemId);
+    if (!h) {
+      // nothing live, but mark catalog stopped anyway
+      const cfg = this.catalog.get(systemId);
+      if (cfg) {
+        cfg.status = 'stopped';
+        this.catalog.set(systemId, cfg);
+      }
+      this.refreshDiscovery();
+      this.refreshRunning();
+      return;
+    }
 
-        const list = await dbGetIndex();
-        const item = list.find(i => i.id === systemId);
-        if (item) { item.status = 'stopped'; await dbPutIndex(list); }
+    h.worker.postMessage({ type: 'stop', systemId });
+    // we'll also kill it locally here; worker will echo 'stopped' anyway
+    this.internalStop(systemId);
+  }
 
-        // refresh streams
-        this.fetchDiscovery({}).subscribe();
-        this.fetchRunning().subscribe();
+  // -------------------------------------------------
+  // INTERNAL HELPERS
+  // -------------------------------------------------
 
-        observer.next({ ok: true });
-        observer.complete();
-      })().catch(err => {
-        console.error('[algo] stop error:', err);
-        observer.error(err);
+  private internalStop(systemId: string) {
+    const h = this.workers.get(systemId);
+    if (h) {
+      try {
+        h.worker.terminate();
+      } catch (e) {
+        /* noop */
+      }
+      this.workers.delete(systemId);
+    }
+
+    const cfg = this.catalog.get(systemId);
+    if (cfg) {
+      cfg.status = 'stopped';
+      this.catalog.set(systemId, cfg);
+    }
+
+    this.refreshDiscovery();
+    this.refreshRunning();
+  }
+
+  private refreshDiscovery() {
+    this.discovery$.next(
+      Array.from(this.catalog.values()).map(row => ({
+        ...row,
+        runtime:
+          row.status === 'running'
+            ? this.prettyRuntime(row.id)
+            : '0h',
+        copiers: this.countCopiers(row.id),
+        pnlUsd: this.getCurrentPnl(row.id),
+        roiPct: this.calcRoiPct(row.id),
+      }))
+    );
+  }
+
+  private refreshRunning() {
+    const live: RunningInstance[] = [];
+    for (const [systemId, h] of this.workers.entries()) {
+      const base = this.catalog.get(systemId);
+      if (!base) continue;
+      live.push({
+        systemId,
+        name: base.name,
+        symbol: base.symbol,
+        amount: h.amount,
+        pnlUsd: h.pnlUsd,
+        startedAt: h.startedAt,
+        status: h.status,
       });
+    }
+    this.running$.next(live);
+  }
+
+  private seedDefaults() {
+    // You can blow these away later; this is just to have 1-2 visible rows in the UI.
+    const id1 = this.genId();
+    const id2 = this.genId();
+    this.catalog.set(id1, {
+      id: id1,
+      name: 'Scalper-1',
+      symbol: '3-PERP',
+      mode: 'FUTURES',
+      leverage: '10x',
+      roiPct: 0,
+      pnlUsd: 0,
+      copiers: 12,
+      runtime: '0h',
+      status: 'stopped',
+      amount: 100,
+      code: `
+        // Example strategy code injected into the worker sandbox
+        // Required: define onTick(ctx)
+        // Optional: start(api, config, meta), stop()
+        function start(api, config, meta) {
+          api.log('Starting Scalper-1 on', meta.symbol, 'alloc', config.amount);
+        }
+
+        function onTick(ctx) {
+          // pretend pnl drifts
+          if (!self._pnl) self._pnl = 0;
+          self._pnl += Math.sin(ctx.t / 5) * 0.5;
+          api.metric(self._pnl);
+
+          // demo order request every ~30 ticks
+          if (ctx.t % 30 === 0) {
+            api.placeOrder({
+              side: 'BUY',
+              size: 1,
+              price: 100 + (ctx.t % 10),
+            });
+          }
+        }
+
+        function stop() {
+          // cleanup if needed
+        }
+      `,
+    });
+
+    this.catalog.set(id2, {
+      id: id2,
+      name: 'TrendFollower',
+      symbol: '5-PERP',
+      mode: 'FUTURES',
+      leverage: '5x',
+      roiPct: 0,
+      pnlUsd: 0,
+      copiers: 4,
+      runtime: '0h',
+      status: 'stopped',
+      amount: 250,
+      code: `
+        function start(api, config, meta) {
+          api.log('TrendFollower booted', meta);
+        }
+
+        function onTick(ctx) {
+          if (!self._pnl2) self._pnl2 = 50;
+          self._pnl2 += (Math.random() - 0.5) * 0.2;
+          api.metric(self._pnl2);
+        }
+
+        function stop() {
+          // tidy up
+        }
+      `,
     });
   }
 
-  // Stubs to keep existing component calls happy; wire when relayer is ready
-  allocate(req: { systemId: string; amount: number }) { return of({ ok: true }); }
-  withdraw(payload: { systemId: string; amount: number }) { return of({ ok: true }); }
+  private genId(): string {
+    // quick local unique-ish id
+    return 'sys-' + Math.random().toString(36).slice(2, 9);
+  }
+
+  private getCurrentPnl(systemId: string): number {
+    const h = this.workers.get(systemId);
+    if (h) return h.pnlUsd;
+    const row = this.catalog.get(systemId);
+    return row?.pnlUsd ?? 0;
+  }
+
+  private calcRoiPct(systemId: string): number {
+    const base = this.catalog.get(systemId);
+    if (!base) return 0;
+    const pnl = this.getCurrentPnl(systemId);
+    const amt = base.amount || 1;
+    return amt === 0 ? 0 : (pnl / amt) * 100;
+  }
+
+  private countCopiers(_systemId: string): number {
+    // stub: you could track how many users are running this config
+    return 1;
+  }
+
+  private prettyRuntime(systemId: string): string {
+    const h = this.workers.get(systemId);
+    if (!h) return '0h';
+    const ms = Date.now() - h.startedAt;
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    return hours + 'h';
+  }
 }
