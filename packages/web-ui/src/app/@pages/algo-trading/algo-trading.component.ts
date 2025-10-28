@@ -1,175 +1,75 @@
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-} from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
-import {
-  AlgoTradingService,
-  StrategyRow,
-  RunningRow,
-} from './algo-trading-service'; // adjust relative path if needed
+import { AlgoTradingService, StrategyRow, RunningRow } from '../../@core/algo-trading.service';
 
 @Component({
-  selector: 'app-algo-trading',
+  selector: 'tl-algo-trading-page',
   templateUrl: './algo-trading.component.html',
   styleUrls: ['./algo-trading.component.scss'],
 })
-export class AlgoTradingComponent implements OnInit, OnDestroy {
-  // ======== tab state ========
-  public tabs = [
-    { key: 'discover', label: 'Discover' },
-    { key: 'running', label: 'Running' },
-  ];
-  public activeTab: 'discover' | 'running' = 'discover';
-
-  // ======== tables ========
-  public rows: StrategyRow[] = [];
-  public running: RunningRow[] = [];
-
-  // ======== filters (stub UI in your HTML) ========
-  public filters!: FormGroup;
-
-  // ======== allocate dialog ========
-  public showAllocate = false;
-  public allocationForm!: FormGroup;
-  private allocationTargetId: string | null = null;
-
-  // ======== withdraw dialog ========
-  public showWithdraw = false;
-  public withdrawForm!: FormGroup;
-  private withdrawTargetId: string | null = null;
+export class AlgoTradingPageComponent implements OnInit, OnDestroy {
+  discovery: StrategyRow[] = [];
+  running: RunningRow[] = [];
+  logs: { systemId: string; args: any[] }[] = [];
 
   private subs: Subscription[] = [];
 
-  constructor(
-    private algo: AlgoTradingService,
-    private fb: FormBuilder,
-  ) {}
+  constructor(private svc: AlgoTradingService) {}
 
-  ngOnInit() {
-    // build forms
-    this.filters = this.fb.group({
-      market: ['All'],
-      runningTime: ['All'],
-      roi: ['All'],
-      category: ['All'],
-      sort: ['Recommended'],
-    });
-
-    this.allocationForm = this.fb.group({
-      amount: [100],
-      apiKey: [''],
-      apiSecret: [''],
-    });
-
-    this.withdrawForm = this.fb.group({
-      amount: [0],
-    });
-
-    // subscribe to discovery list
+  ngOnInit(): void {
     this.subs.push(
-      this.algo.discovery$.subscribe(list => {
-        this.rows = list;
+      this.svc.discovery$.subscribe((d) => (this.discovery = d)),
+      this.svc.running$.subscribe((r) => (this.running = r)),
+      this.svc.logs$.subscribe((log) => {
+        this.logs.unshift(log);
+        if (this.logs.length > 200) this.logs.pop();
       })
     );
-
-    // subscribe to running list
-    this.subs.push(
-      this.algo.running$.subscribe(list => {
-        this.running = list;
-      })
-    );
-
-    // init data
-    this.algo.fetchDiscovery();
-    this.algo.fetchRunning();
+    this.svc.fetchDiscovery();
+    this.svc.fetchRunning();
   }
 
-  ngOnDestroy() {
-    this.subs.forEach(s => s.unsubscribe());
+  ngOnDestroy(): void {
+    for (const s of this.subs) s.unsubscribe();
   }
 
-  // ======== tabs ========
-  public setTab(tabKey: 'discover' | 'running') {
-    this.activeTab = tabKey;
+  onUpload(files: FileList | null) {
+    if (!files || !files.length) return;
+    const file = files[0];
+    this.svc.registerStrategy(file);
   }
 
-  // ======== upload button in header ========
-  // this HTML just calls openUploadSystemDialog(); you can evolve this into a modal
-  public openUploadSystemDialog() {
-    console.log('[ALGO UI] Upload system clicked');
-    // TODO: wire real upload modal if you want inline upload like desktop,
-    // or reuse the upload flow we sketched earlier.
-    // For now this is just a stub to not break template bindings.
+  runSystem(id: string, amount?: number) {
+    this.svc.runSystem(id, { amount });
   }
 
-  // ======== Allocate flow ("Copy" / "Allocate" button in discovery table) ========
-  // HTML calls (click)="onCopy(r)"
-  public onCopy(r: StrategyRow) {
-    this.allocationTargetId = r.id || null;
-    this.allocationForm.patchValue({
-      amount: r.amount ?? 100,
-      apiKey: '',
-      apiSecret: '',
-    });
-    this.showAllocate = true;
+  stopSystem(id: string) {
+    this.svc.stopSystem(id);
   }
 
-  public closeAllocate() {
-    this.showAllocate = false;
-    this.allocationTargetId = null;
+  copyId(id: string) {
+    try {
+      navigator.clipboard?.writeText(id);
+      console.log('Copied', id);
+    } catch {}
   }
 
-  public allocateConfirm() {
-    if (!this.allocationTargetId) {
-      this.closeAllocate();
-      return;
-    }
-    const { amount, apiKey } = this.allocationForm.value;
-
-    this.algo.runSystem(this.allocationTargetId, {
-      amount,
-      counterVenueKey: apiKey || '',
-      hedgeMode: 'mirror',
-    });
-
-    // switch to running tab so user sees it live
-    this.activeTab = 'running';
-
-    this.closeAllocate();
+  fmtUsd(n?: number): string {
+    const v = n ?? 0;
+    return (v < 0 ? '-' : '') + '$' + Math.abs(v).toFixed(2);
   }
 
-  // ======== Withdraw / Stop flow ========
-  // HTML running table calls openWithdraw(s)
-  public openWithdraw(s: RunningRow) {
-    this.withdrawTargetId = s.id;
-    this.withdrawForm.patchValue({
-      amount: s.allocated,
-    });
-    this.showWithdraw = true;
+  fmtPct(n?: number): string {
+    const v = n ?? 0;
+    return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
   }
 
-  public closeWithdraw() {
-    this.showWithdraw = false;
-    this.withdrawTargetId = null;
-  }
-
-  // HTML running table stop button calls stopSystem(s.id)
-  public stopSystem(id: string) {
-    this.algo.stopSystem(id);
-  }
-
-  public confirmWithdraw() {
-    if (!this.withdrawTargetId) {
-      this.closeWithdraw();
-      return;
-    }
-
-    // Right now withdraw == stop. Later you can do partial withdraw logic here.
-    this.algo.stopSystem(this.withdrawTargetId);
-
-    this.closeWithdraw();
+  startedAgo(ms?: number): string {
+    if (!ms) return '-';
+    const secs = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${h}h ${m}m ${s}s`;
   }
 }
