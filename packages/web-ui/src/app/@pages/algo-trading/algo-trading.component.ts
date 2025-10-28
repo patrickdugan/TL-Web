@@ -1,9 +1,19 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { AlgoTradingService, StrategyRow, RunningRow } from '../../@core/algo-trading.service';
+import { AlgoTradingService, StrategyRow } from 'src/app/@core/services/algo-trading.service';
+
+interface RunningRow {
+  systemId: string;
+  name: string;
+  amount: number;
+  pnlUsd: number;
+  startedAt: number;
+  status: 'running' | 'stopped';
+}
+
 
 @Component({
-  selector: 'tl-algo-trading-page',
+  selector: 'app-algo-trading-page',
   templateUrl: './algo-trading.component.html',
   styleUrls: ['./algo-trading.component.scss'],
 })
@@ -20,10 +30,6 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
     this.subs.push(
       this.svc.discovery$.subscribe((d) => (this.discovery = d)),
       this.svc.running$.subscribe((r) => (this.running = r)),
-      this.svc.logs$.subscribe((log) => {
-        this.logs.unshift(log);
-        if (this.logs.length > 200) this.logs.pop();
-      })
     );
     this.svc.fetchDiscovery();
     this.svc.fetchRunning();
@@ -32,6 +38,26 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     for (const s of this.subs) s.unsubscribe();
   }
+
+  tabs = ['discovery', 'running'];
+  activeTab = 'discovery';
+  showAllocate = false;
+  showWithdraw = false;
+
+  openUploadSystemDialog() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.js';
+    input.onchange = async (e: any) => {
+      const file = e.target.files[0];
+      if (file) await this.svc.registerStrategy(file);
+    };
+    input.click();
+  }
+
+  closeAllocate() { this.showAllocate = false; }
+  closeWithdraw() { this.showWithdraw = false; }
+
 
   onUpload(files: FileList | null) {
     if (!files || !files.length) return;
