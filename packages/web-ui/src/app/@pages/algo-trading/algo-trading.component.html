@@ -21,6 +21,25 @@
       Upload system
     </button>
   </nav>
+  <!-- Upload dialog -->
+<div class="dialog-backdrop" *ngIf="showUpload" (click)="closeUpload()"></div>
+<div class="dialog" *ngIf="showUpload" (click)="$event.stopPropagation()">
+  <h3>Upload system</h3>
+
+  <div class="dropzone"
+       (dragover)="onDragOver($event)"
+       (drop)="onDrop($event)">
+    <p>Drag & drop a <strong>.js</strong> strategy here</p>
+    <p>or</p>
+    <button mat-stroked-button (click)="browseUpload(filePick)">Choose file</button>
+    <input #filePick type="file" accept=".js" style="display:none" (change)="onFilePicked($event)">
+  </div>
+
+  <div class="actions">
+    <button mat-button (click)="closeUpload()">Close</button>
+  </div>
+</div>
+
 
   <!-- DISCOVERY (default) -->
   <section class="discovery" *ngIf="activeTab!=='running'">

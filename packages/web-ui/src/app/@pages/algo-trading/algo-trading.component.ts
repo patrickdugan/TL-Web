@@ -51,10 +51,29 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
     for (const s of this.subs) s.unsubscribe();
   }
 
+// state + handlers
+showUpload = false;
+
+openUploadSystemDialog() { this.showUpload = true; }
+closeUpload() { this.showUpload = false; }
+
+onDragOver(e: DragEvent) { e.preventDefault(); e.stopPropagation(); }
+onDrop(e: DragEvent) {
+  e.preventDefault(); e.stopPropagation();
+  const f = e.dataTransfer?.files?.[0];
+  if (f) this.svc.registerStrategy(f).finally(() => this.showUpload = false);
+}
+browseUpload(fileInput: HTMLInputElement) { fileInput.click(); }
+onFilePicked(ev: Event) {
+  const f = (ev.target as HTMLInputElement).files?.[0];
+  if (f) this.svc.registerStrategy(f).finally(() => this.showUpload = false);
+}
+
+
   showAllocate = false;
   showWithdraw = false;
 
-  openUploadSystemDialog() {
+/*  openUploadSystemDialog() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.js';
@@ -63,7 +82,7 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
       if (file) await this.svc.registerStrategy(file);
     };
     input.click();
-  }
+  }*/
 
   closeAllocate() { this.showAllocate = false; }
   closeWithdraw() { this.showWithdraw = false; }
