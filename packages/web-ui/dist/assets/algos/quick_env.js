@@ -2,7 +2,7 @@
 require('dotenv').config(); // optional: reads .env if present
 
 // prefer local ./tl, fall back to npm 'tradelayer'
-let ApiWrapper; try { ApiWrapper = require('./tl'); } catch { ApiWrapper = require('tradelayer'); }
+let ApiWrapper = require('./tl/algoAPI.js'); // catch { ApiWrapper = require('tradelayer'); }
 
 const toBool = (v, d=false) =>
   v === undefined ? d :
@@ -22,7 +22,7 @@ const required = (name, def) => {
 const HOST     = required('TL_HOST', '172.81.181.19'); // includes ws:// ws://172.26.37.103
 const PORT     = Number(process.env.TL_PORT ?? 3001);
 const TESTNET  = toBool(process.env.TL_TEST, true);          // true | false
-const TL_ON    = toBool(process.env.TL_TLON, true);          // your "tlAlreadyOn"
+const TL_ON    = toBool(process.env.TL_TLON, false);          // your "tlAlreadyOn"
 const ADDRESS  = 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf' //required('TL_ADDRESS', 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf');
 const PUBKEY   = '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677' //required('TL_PUBKEY',  '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677');
 const NETWORK  = required('TL_NETWORK', 'LTCTEST');          // e.g., LTCTEST | BTCTEST | LTC
@@ -33,7 +33,7 @@ console.log('env config '+HOST+' '+PORT+' '+TESTNET+' '+TL_ON+' '+ADDRESS+' '+PU
 const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
 (async () => {
-  console.log('[cfg]', { HOST, PORT, TESTNET, TL_ON, ADDRESS, NETWORK });
+  //console.log('[cfg]', { HOST, PORT, TESTNET, TL_ON, ADDRESS, NETWORK });
 
   await api.delay(1500);
 
