@@ -260,15 +260,12 @@ export class AlgoTradingService {
     }
     this.running$.next(live);
   }
-constructor() {
-  // fire and forget (don’t refresh early with empty state)
-  void this.bootstrapFromManifest();
-}
-
+  
 private async bootstrapFromManifest() {
   try {
     const url = new URL('assets/algos/manifest.json', document.baseURI).toString();
     const res = await fetch(url);
+    console.log('res '+JSON.stringify(res))
     if (!res.ok) {
       console.warn('[ALGO] manifest fetch failed', res.status, url);
       this.refreshDiscovery();
