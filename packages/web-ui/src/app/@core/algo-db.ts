@@ -69,3 +69,54 @@ export async function dbGetFile(fileName: string): Promise<string | null> {
     r.onerror = () => reject(r.error);
   });
 }
+
+// add to top with the others
+const STORE_MANIFEST_DELTA = 'manifest_delta';
+
+// extend onupgradeneeded
+if (!db.objectStoreNames.contains(STORE_MANIFEST_DELTA)) {
+  db.createObjectStore(STORE_MANIFEST_DELTA, { keyPath: 'fileName' }); // key by fileName
+}
+
+export type ManifestRow = {
+  id: string;
+  name: string;
+  fileName: string;
+  size: number;
+  createdAt: number;
+  status: 'running' | 'stopped';
+  amount: number;
+};
+
+export async function dbManifestDeltaPut(row: ManifestRow): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_MANIFEST_DELTA, 'readwrite');
+    const store = tx.objectStore(STORE_MANIFEST_DELTA);
+    const w = store.put(row);
+    w.onsuccess = () => resolve();
+    w.onerror = () => reject(w.error);
+  });
+}
+
+export async function dbManifestDeltaAll(): Promise<ManifestRow[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_MANIFEST_DELTA, 'readonly');
+    const store = tx.objectStore(STORE_MANIFEST_DELTA);
+    const r = store.getAll();
+    r.onsuccess = () => resolve((r.result as ManifestRow[]) || []);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+export async function dbManifestDeltaClear(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_MANIFEST_DELTA, 'readwrite');
+    const store = tx.objectStore(STORE_MANIFEST_DELTA);
+    const c = store.clear();
+    c.onsuccess = () => resolve();
+    c.onerror = () => reject(c.error);
+  });
+}

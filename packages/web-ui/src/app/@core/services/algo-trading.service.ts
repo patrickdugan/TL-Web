@@ -85,7 +85,7 @@ export class AlgoTradingService {
   private workers: Map<string, WorkerHandle> = new Map();
 
   constructor() {
-    this.seedDefaults();
+    this.bootstrapFromManifest();
     this.refreshDiscovery();
     this.refreshRunning();
   }
@@ -136,6 +136,17 @@ export class AlgoTradingService {
     const index = Array.from(this.catalog.values());
     index.push(item);
     await dbPutIndex(index.map(toIndexItem));
+
+    await dbManifestDeltaPut({
+      id,
+      name: item.name,
+      fileName: item.fileName!,     // you set this above
+      size: item.size ?? source.length,
+      createdAt: item.createdAt ?? Date.now(),
+      status: 'stopped',
+      amount: item.amount ?? 0,
+    });
+
 
     this.catalog.set(id, item);
     this.refreshDiscovery();
@@ -317,43 +328,76 @@ export class AlgoTradingService {
     }
     this.running$.next(live);
   }
-    
-  private async seedDefaults() {
-    const defaults = ['quick_env.js', 'run_bbo_tracker.js'];
-    for (const name of defaults) {
-      try {
-        const res = await fetch(`assets/algos/${name}`);
-        const code = await res.text();
-        const meta = parseAlgoMetaFromSource(code);
-        const id = this.genId();
 
-        const row: StrategyRow = {
-          id,
-          name: meta?.name ?? name.replace('.js', ''),
-          symbol: meta?.symbol ?? '3-PERP',
-          mode: meta?.mode ?? 'FUTURES',
-          leverage: meta?.leverage ?? 5,
-          fileName: name,
-          size: code.length,
-          createdAt: Date.now(),
-          status: 'stopped',
-          amount: 0,
-          pnlUsd: 0,
-          roiPct: 0,
-          copiers: 0,
-          runtime: '0h',
-          code,
-        };
+// types for manifest rows (matches your index.json)
+type ManifestItem = {
+  id: string;
+  name: string;
+  fileName: string;
+  size: number;
+  createdAt: number;
+  status: 'running' | 'stopped';
+  amount: number;
+};
 
-        this.catalog.set(id, row);
-        await dbPutFile(id, code);
-      } catch (e) {
-        console.warn('seed load failed', name, e);
-      }
+private async bootstrapFromManifest() {
+  // 1) load base manifest.json shipped with app
+  const baseUrl = new URL('assets/algos/manifest.json', document.baseURI).toString();
+  let base: any[] = [];
+  try {
+    const res = await fetch(baseUrl);
+    if (res.ok) base = await res.json();
+  } catch {}
+
+  // 2) load delta rows persisted from prior uploads
+  const delta = await dbManifestDeltaAll(); // [] if none
+
+  // 3) merge by fileName (delta overwrites/extends base)
+  const byFile = new Map<string, any>();
+  for (const r of base) byFile.set(r.fileName, r);
+  for (const r of delta) byFile.set(r.fileName, r);
+
+  // 4) hydrate catalog/IDB files
+  for (const m of byFile.values()) {
+    const srcUrl = new URL(`assets/algos/${m.fileName}`, document.baseURI).toString();
+    let code = '';
+    try {
+      const res = await fetch(srcUrl);
+      if (res.ok) code = await res.text();
+    } catch {}
+    // If not found in assets (e.g., upload only), try loading the file body you saved keyed by id
+    if (!code) {
+      // you already save sources keyed by id -> retrieve fallback
+      const maybe = await dbGetFile(m.id);
+      if (maybe) code = maybe;
     }
-    await dbPutIndex(Array.from(this.catalog.values()).map(toIndexItem));
+
+    const row: StrategyRow = {
+      id: m.id,
+      name: m.name ?? m.fileName.replace(/\.js$/i, ''),
+      symbol: '3-PERP',
+      mode: 'FUTURES',
+      leverage: 5,
+      fileName: m.fileName,
+      size: m.size ?? code.length,
+      createdAt: m.createdAt ?? Date.now(),
+      status: m.status ?? 'stopped',
+      amount: m.amount ?? 0,
+      pnlUsd: 0,
+      roiPct: 0,
+      copiers: 0,
+      runtime: '0h',
+      code,
+    };
+    this.catalog.set(row.id, row);
+    if (code) await dbPutFile(row.id, code);
+  }
+
+    await dbPutIndex(Array.from(this.catalog.values()).map(toIndexItem)); // aligns with your current index writing
     this.refreshDiscovery();
   }
+}
+
 
   private genId(): string {
     // quick local unique-ish id
