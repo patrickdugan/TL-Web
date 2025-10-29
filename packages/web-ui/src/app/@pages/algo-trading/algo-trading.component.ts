@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { AlgoTradingService, StrategyRow } from 'src/app/@core/services/algo-trading.service';
+import { FormBuilder, FormGroup } from '@angular/forms';
 
 interface RunningRow {
   systemId: string;
@@ -33,10 +34,10 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
   // streams (wire to service)
   discovery$ = this.svc.discovery$;
   running$   = this.svc.running$;
-
+  selected?: StrategyRow;
   private subs: Subscription[] = [];
 
-  constructor(private svc: AlgoTradingService) {}
+  constructor(private svc: AlgoTradingService, private fb: FormBuilder) {}
 
   ngOnInit(): void {
     void this.svc.init();
@@ -64,12 +65,48 @@ onDrop(e: DragEvent) {
   const f = e.dataTransfer?.files?.[0];
   if (f) this.svc.registerStrategy(f).finally(() => this.showUpload = false);
 }
+
 browseUpload(fileInput: HTMLInputElement) { fileInput.click(); }
 onFilePicked(ev: Event) {
   const f = (ev.target as HTMLInputElement).files?.[0];
   if (f) this.svc.registerStrategy(f).finally(() => this.showUpload = false);
 }
 
+
+  // simple forms
+  allocationForm: FormGroup = this.fb.group({
+    amount: [0],
+    apiKey: [''],
+    apiSecret: [''],
+  });
+
+  withdrawForm: FormGroup = this.fb.group({
+    amount: [0],
+  });
+
+  openAllocate(r: StrategyRow) {
+    this.selected = r;
+    this.allocationForm.patchValue({ amount: r.amount ?? 0 });
+    this.showAllocate = true;
+  }
+
+  allocateConfirm() {
+    const amt = Number(this.allocationForm.value?.amount) || 0;
+    if (this.selected) this.svc.runSystem(this.selected.id, { amount: amt });
+    this.showAllocate = false;
+  }
+
+  openWithdraw(r: StrategyRow | RunningRow) {
+    this.selected = this.discovery.find(d => d.id === (r as any).systemId) ?? (r as any);
+    this.withdrawForm.patchValue({ amount: (this.selected?.amount ?? 0) });
+    this.showWithdraw = true;
+  }
+
+  confirmWithdraw() {
+    const id = (this.selected as any)?.id || (this.selected as any)?.systemId;
+    if (id) this.svc.stopSystem(id);
+    this.showWithdraw = false;
+  }
 
   showAllocate = false;
   showWithdraw = false;
