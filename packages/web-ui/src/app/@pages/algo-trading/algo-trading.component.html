@@ -125,38 +125,46 @@
   </section>
 
   <!-- RUNNING -->
-  <section class="running" *ngIf="activeTab==='running'">
-    <div class="table">
-      <div class="thead">
-        <div class="th">Strategy</div>
-        <div class="th w-140 right">Allocated</div>
-        <div class="th w-140 right">P&amp;L</div>
-        <div class="th w-220">Started</div>
-        <div class="th w-160 right">Action</div>
+<section class="running" *ngIf="activeTab==='running'">
+  <div class="table">
+    <div class="thead">
+      <div class="th">Strategy</div>
+      <div class="th w-140 right">Allocated</div>
+      <div class="th w-140 right">P&amp;L</div>
+      <div class="th w-220">Started</div>
+      <div class="th w-160 right">Action</div>
+    </div>
+
+    <div class="tbody">
+      <!-- bind to service stream -->
+      <div class="tr" *ngFor="let s of (running$ | async) ?? []">
+        <div class="td">{{ s.name || '—' }}</div>
+
+        <!-- amount -> allocated -->
+        <div class="td w-140 right">{{ s.amount ?? 0 }}</div>
+
+        <!-- pnlUsd -> pnl -->
+        <div class="td w-140 right"
+             [class.positive]="(s.pnlUsd ?? 0) >= 0"
+             [class.negative]="(s.pnlUsd ?? 0) < 0">
+          {{ s.pnlUsd ?? 0 }}
+        </div>
+
+        <div class="td w-220">{{ s.startedAt | date:'yyyy-MM-dd HH:mm' }}</div>
+
+        <!-- systemId -> runId -->
+        <div class="td w-160 right">
+          <button mat-stroked-button color="primary" (click)="stopSystem(s.systemId)">Stop</button>
+          <button mat-stroked-button (click)="openWithdraw(s)" style="margin-left:8px;">Withdraw</button>
+        </div>
       </div>
 
-      <div class="tbody">
-        <div class="tr" *ngFor="let s of running">
-          <div class="td">{{ s.name || '—' }}</div>
-          <div class="td w-140 right">{{ s.allocated ?? 0 }}</div>
-          <div class="td w-140 right"
-               [class.positive]="(s.pnl ?? 0) >= 0"
-               [class.negative]="(s.pnl ?? 0) < 0">
-            {{ s.pnl ?? 0 }}
-          </div>
-          <div class="td w-220">{{ s.startedAt | date:'yyyy-MM-dd HH:mm' }}</div>
-          <div class="td w-160 right">
-            <button mat-stroked-button color="primary" (click)="stopSystem(s.runId)">Stop</button>
-            <button mat-stroked-button (click)="openWithdraw(s)" style="margin-left:8px;">Withdraw</button>
-          </div>
-        </div>
-
-        <div class="empty" *ngIf="!running?.length">
-          No systems running yet.
-        </div>
+      <div class="empty" *ngIf="!((running$ | async)?.length)">
+        No systems running yet.
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
   <!-- Inline allocate dialog -->
   <div class="dialog-backdrop" *ngIf="showAllocate" (click)="closeAllocate()"></div>

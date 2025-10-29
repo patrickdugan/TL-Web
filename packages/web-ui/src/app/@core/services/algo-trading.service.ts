@@ -317,101 +317,43 @@ export class AlgoTradingService {
     }
     this.running$.next(live);
   }
+    
+  private async seedDefaults() {
+    const defaults = ['quick_env.js', 'run_bbo_tracker.js'];
+    for (const name of defaults) {
+      try {
+        const res = await fetch(`assets/algos/${name}`);
+        const code = await res.text();
+        const meta = parseAlgoMetaFromSource(code);
+        const id = this.genId();
 
-private seedDefaults() {
-  // You can blow these away later; this is just to have 1-2 visible rows in the UI.
-  const id1 = this.genId();
-  const id2 = this.genId();
+        const row: StrategyRow = {
+          id,
+          name: meta?.name ?? name.replace('.js', ''),
+          symbol: meta?.symbol ?? '3-PERP',
+          mode: meta?.mode ?? 'FUTURES',
+          leverage: meta?.leverage ?? 5,
+          fileName: name,
+          size: code.length,
+          createdAt: Date.now(),
+          status: 'stopped',
+          amount: 0,
+          pnlUsd: 0,
+          roiPct: 0,
+          copiers: 0,
+          runtime: '0h',
+          code,
+        };
 
-  const scalperCode = `
-    // Example strategy code injected into the worker sandbox
-    // Required: define onTick(ctx)
-    // Optional: start(api, config, meta), stop()
-    function start(api, config, meta) {
-      api.log('Starting Scalper-1 on', meta.symbol, 'alloc', config.amount);
-    }
-
-    function onTick(ctx) {
-      // pretend pnl drifts
-      if (!self._pnl) self._pnl = 0;
-      self._pnl += Math.sin(ctx.t / 5) * 0.5;
-      api.metric(self._pnl);
-
-      // demo order request every ~30 ticks
-      if (ctx.t % 30 === 0) {
-        api.placeOrder({
-          side: 'BUY',
-          size: 1,
-          price: 100 + (ctx.t % 10),
-        });
+        this.catalog.set(id, row);
+        await dbPutFile(id, code);
+      } catch (e) {
+        console.warn('seed load failed', name, e);
       }
     }
-
-    function stop() {
-      // cleanup if needed
-    }
-  `;
-
-  const trendCode = `
-    function start(api, config, meta) {
-      api.log('TrendFollower booted', meta);
-    }
-
-    function onTick(ctx) {
-      if (!self._pnl2) self._pnl2 = 50;
-      self._pnl2 += (Math.random() - 0.5) * 0.2;
-      api.metric(self._pnl2);
-    }
-
-    function stop() {
-      // tidy up
-    }
-  `;
-
-  this.catalog.set(id1, {
-    id: id1,
-    name: 'Scalper-1',
-    symbol: '3-PERP',
-    mode: 'FUTURES',
-    leverage: 10,
-
-    // REQUIRED by StrategyRow:
-    fileName: `${id1}.js`,
-    size: scalperCode.length,
-    createdAt: Date.now(),
-
-    roiPct: 0,
-    pnlUsd: 0,
-    copiers: 12,
-    runtime: '0h',
-    status: 'stopped',
-    amount: 100,
-    code: scalperCode,
-  });
-
-  this.catalog.set(id2, {
-    id: id2,
-    name: 'TrendFollower',
-    symbol: '5-PERP',
-    mode: 'FUTURES',
-    leverage: 5,
-
-    // REQUIRED by StrategyRow:
-    fileName: `${id2}.js`,
-    size: trendCode.length,
-    createdAt: Date.now(),
-
-    roiPct: 0,
-    pnlUsd: 0,
-    copiers: 4,
-    runtime: '0h',
-    status: 'stopped',
-    amount: 250,
-    code: trendCode,
-  });
-}
-
-
+    await dbPutIndex(Array.from(this.catalog.values()).map(toIndexItem));
+    this.refreshDiscovery();
+  }
 
   private genId(): string {
     // quick local unique-ish id

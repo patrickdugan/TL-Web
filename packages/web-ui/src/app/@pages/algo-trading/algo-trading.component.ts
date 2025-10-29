@@ -11,6 +11,7 @@ interface RunningRow {
   status: 'running' | 'stopped';
 }
 
+type TabKey = 'discover' | 'running';
 
 @Component({
   selector: 'app-algo-trading-page',
@@ -21,6 +22,17 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
   discovery: StrategyRow[] = [];
   running: RunningRow[] = [];
   logs: { systemId: string; args: any[] }[] = [];
+  tabs: { key: TabKey; label: string }[] = [
+    { key: 'discover', label: 'Discover' },
+    { key: 'running',  label: 'Running'  },
+  ];
+
+  activeTab: TabKey = 'discover';
+  setTab(t: TabKey) { this.activeTab = t; }
+
+  // streams (wire to service)
+  discovery$ = this.svc.discovery$;
+  running$   = this.svc.running$;
 
   private subs: Subscription[] = [];
 
@@ -39,8 +51,6 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
     for (const s of this.subs) s.unsubscribe();
   }
 
-  tabs = ['discovery', 'running'];
-  activeTab = 'discovery';
   showAllocate = false;
   showWithdraw = false;
 

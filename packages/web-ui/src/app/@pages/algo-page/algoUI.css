@@ -1,8 +1,0 @@
-.animate-flicker {
-  animation: flicker 1.5s infinite alternate;
-}
-
-@keyframes flicker {
-  0%   { opacity: 1; }
-  100% { opacity: 0.8; }
-}
