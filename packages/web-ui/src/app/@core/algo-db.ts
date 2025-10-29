@@ -4,17 +4,31 @@ const DB_NAME = 'tl-algos';
 const DB_VERSION = 1;
 const STORE_INDEX = 'index';
 const STORE_FILES = 'files';
+const STORE_MANIFEST_DELTA = 'manifest_delta';
 
-function openDb(): Promise<IDBDatabase> {
+export async function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const r = indexedDB.open(DB_NAME, DB_VERSION);
+    const r = indexedDB.open('algoTrading', 1);
+
     r.onupgradeneeded = () => {
       const db = r.result;
-      if (!db.objectStoreNames.contains(STORE_INDEX)) db.createObjectStore(STORE_INDEX, { keyPath: 'id' });
-      if (!db.objectStoreNames.contains(STORE_FILES)) db.createObjectStore(STORE_FILES, { keyPath: 'fileName' });
+
+      if (!db.objectStoreNames.contains('index')) {
+        db.createObjectStore('index', { keyPath: 'id' });
+      }
+
+      if (!db.objectStoreNames.contains('files')) {
+        db.createObjectStore('files', { keyPath: 'id' });
+      }
+
+      // 👇 Add your new manifest delta store here
+      if (!db.objectStoreNames.contains('manifest_delta')) {
+        db.createObjectStore('manifest_delta', { keyPath: 'fileName' });
+      }
     };
-    r.onsuccess = () => resolve(r.result);
+
     r.onerror = () => reject(r.error);
+    r.onsuccess = () => resolve(r.result);
   });
 }
 
@@ -68,14 +82,6 @@ export async function dbGetFile(fileName: string): Promise<string | null> {
     r.onsuccess = () => resolve(r.result?.source ?? null);
     r.onerror = () => reject(r.error);
   });
-}
-
-// add to top with the others
-const STORE_MANIFEST_DELTA = 'manifest_delta';
-
-// extend onupgradeneeded
-if (!db.objectStoreNames.contains(STORE_MANIFEST_DELTA)) {
-  db.createObjectStore(STORE_MANIFEST_DELTA, { keyPath: 'fileName' }); // key by fileName
 }
 
 export type ManifestRow = {
