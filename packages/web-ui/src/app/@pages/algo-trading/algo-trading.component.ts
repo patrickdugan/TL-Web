@@ -39,6 +39,7 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
   constructor(private svc: AlgoTradingService) {}
 
   ngOnInit(): void {
+    void this.svc.init();
     this.subs.push(
       this.svc.discovery$.subscribe((d) => (this.discovery = d)),
       this.svc.running$.subscribe((r) => (this.running = r)),

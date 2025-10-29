@@ -80,17 +80,30 @@ export class AlgoTradingService {
 
   private catalog = new Map<string, StrategyRow>();
   private workers = new Map<string, WorkerHandle>();
+  // NEW: explicit init gate
+  private inited = false;
 
   constructor() {
-    // Boot from base manifest + delta overlay, then refresh views
-    void this.bootstrapFromManifest()
-      this.refreshDiscovery();
-      this.refreshRunning(); 
+    // Do NOT bootstrap in the ctor anymore (hard to observe in prod).
+    console.log('[ALGO] service constructed');
   }
 
-  // ---------- Public API ----------
+  /** Call once from component */
+  public async init(): Promise<void> {
+    if (this.inited) { console.log('[ALGO] init() already done'); return; }
+    this.inited = true;
+    console.log('[ALGO] init() start');
+    await this.bootstrapFromManifest();
+    console.log('[ALGO] init() done; catalog size =', this.catalog.size);
+    this.refreshDiscovery();
+    this.refreshRunning();
+  }
+
+  // -------------------------------------------------
+  // PUBLIC API
+  // -------------------------------------------------
   fetchDiscovery() { this.refreshDiscovery(); }
-  fetchRunning() { this.refreshRunning(); }
+  fetchRunning()   { this.refreshRunning(); }
 
   async registerStrategy(file: File) {
     const source = await file.text();
