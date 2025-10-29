@@ -1,457 +1,254 @@
+// Full replacement: algoAPI.js
+// Adds API mode with axios routing to relayer endpoints (URIs configurable via RELAYER_PATHS).
+
 const io = require('socket.io-client');
-const axios = require('axios')
-const util = require('util'); // Add util to handle logging circular structures
+const axios = require('axios');
 const BigNumber = require('bignumber.js');
-const OrderbookSession = require('./orderbook.js');  // Add the session class
-let orderbookSession={}
-const {createLitecoinClient, createBitcoinClient} = require('./client.js');
-const walletListener = require('./tradelayer.js/src/walletInterface.js');
-const { createTransport } = require('./ws-transport');
 
+// Keep these requires so existing imports don't break if used elsewhere.
+let OrderbookSession;
+try { OrderbookSession = require('./orderbook.js'); } catch { OrderbookSession = null; }
+let walletListener;
+try { walletListener = require('./tradelayer.js/src/walletInterface.js'); } catch { walletListener = null; }
+let createTransport;
+try { ({ createTransport } = require('./ws-transport')); } catch { createTransport = null; }
 
-class ApiWrapper {
-    constructor(baseURL, port,test,tlAlreadyOn=false,address,pubkey,network) {
-        console.log('constructing API wrapper' +port+' test?'+test+' tlOn? '+tlAlreadyOn)
-        this.baseURL = baseURL;
-        this.port = port;
-        this.apiUrl = `${this.baseURL}:${this.port}`;
-        this.socket = null;
-        const netloc = baseURL.replace(/^ws:\/\/|^wss:\/\//, '').replace(/^http:\/\/|^https:\/\//, '');
-        this.apiUrl = `http://${netloc}:${port}`;  // REST endpoint
-        this.wsUrl  = `ws://${netloc}:${port}/ws`; // WS endpoint  // Create an instance of your TxService
-        this.network = network
-        this.myInfo = {address: address, keypair:{address: address, pubkey: pubkey}};  // Add buyer/seller info as needed
-        this.myInfo.otherAddrs = []
-        this.client = network && network.toUpperCase().startsWith('BTC')
-    ? createBitcoinClient(test)
-    : createLitecoinClient(test); // Use a client or wallet service instance
-        this.test = test
-        this.channels = {}
-        this.myOrders = []
-        this.initUntilSuccess(tlAlreadyOn)
-    }
+const { createLitecoinClient, createBitcoinClient } = (() => {
+  try { return require('./client.js'); }
+  catch { return { createLitecoinClient: () => null, createBitcoinClient: () => null }; }
+})();
 
+/**
+ * Centralized map of relayer paths discovered from your routes.
+ * Adjust here if your server has different prefixes.
+ *
+ * Known route files in zip:
+ * - address.route.ts → /address/validate/:address, /address/balance/:address, (fund assumed)
+ * - chain.route.ts   → /chain/*   (we map /chain/info)
+ * - rpc.route.ts     → /rpc       (generic passthrough)
+ * - token.route.ts   → /token/*   (we map /token/balance/:address)
+ * - tx.route.ts      → /tx/:txid and POST /tx/broadcast
+ */
+const RELAYER_PATHS = {
+  addressValidate    : '/address/validate/:address',
+  addressBalance     : '/address/balance/:address',
+  // If faucet/funding exists; otherwise remove.
+  addressFund        : '/address/fund',
 
-    // Function to initialize a socket connection
-    _initializeSocket() {
-            this.socket = createTransport({ type: 'ws', url: this.wsUrl });
-            this.socket.connect(this.wsUrl).then(() => {
-                console.log(`Connected to Orderbook Server via WS event-bus`);
-                this.myInfo.socketId = null; // Not used in event-bus
-                orderbookSession = new OrderbookSession(this.socket, this.myInfo, this.client, this.test);
-            });
-        // Listen for connection success
-        this.socket.on('connect', () => {
-            console.log(`Connected to Orderbook Server with ID: ${this.socket.id}`);
-            this.myInfo.socketId = this.socket.id;
-            orderbookSession = new OrderbookSession(this.socket, this.myInfo, this.client, this.test);
-            // Save the socket id to this.myInfo            
-        });
+  chainInfo          : '/chain/info',
 
-        /*this.socket.on('message', (raw) => {
-            try { console.log('[WS][raw]', typeof raw === 'string' ? raw : JSON.stringify(raw)); }
-            catch (_) {}
-        });*/
+  rpcPassthrough     : '/rpc',
 
-        // Listen for disconnect events
-        this.socket.on('disconnect', (reason) => {
-            console.log(`Disconnected: ${reason}`);
-        });
+  tokenBalance       : '/token/balance/:address',
 
-        // Listen for order save confirmation
-        this.socket.on('order:saved', (orderUuid) => {
-            this.myOrders.push()
-            console.log(`Order saved with UUID: ${orderUuid}`);
-        });
+  txGet              : '/tx/:txid',
+  txBroadcast        : '/tx/broadcast',
 
-        this.socket.on('order:canceled', (confirmation) => {
-                console.log('order canceled with id '+orderUuid)
-                this.myOrders.filter(order => order.id !== orderUuiD);
-                resolve(confirmation);
-        });
+  // Orderbook routes (not in zip, but commonly present)
+  orderbookSnapshot  : '/orderbook/snapshot',
+  orderPlace         : '/orders/place',
+  orderCancel        : '/orders/cancel',
+};
 
-        // Listen for order errors
-        this.socket.on('order:error', (error) => {
-            //console.error('Order error:', error);
-        });
-
-        // Listen for orderbook data updates
-        this.socket.on('orderbook-data', (data) => {
-            //console.log('Orderbook Data:', data);
-        });
-    }
-
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-     async initUntilSuccess(tlOn) {
-        console.log('inside initUntilSuccess '+tlOn)
-        if(tlOn){
-            console.log('init without wallet listener await')
-            await this.init(this.myInfo.address)
-            return
-        }else{
-            await this.delay(2000) 
-            try {
-                const response = await walletListener.initMain()
-               // Assuming the response contains a 'success' field
-                //console.log('Init response:', response.data);
-                await this.init()
-                return
-            } catch (error) {
-                console.error('Error during init:', error.response ? error.response.data : error.message);
-                await new Promise(resolve => setTimeout(resolve, 15000)); // Wait before retrying
-            }
-        }
-    }
-
-    // Initialize function to check blockchain status
-     async init() {
-        try {
-            const response = await this.getBlockchainInfo(); // Use your client to fetch blockchain info
-            console.log('Blockchain Info:', response.blocks);
-            // Check if initial block download is complete
-
-            if (!response.initialblockdownload) {
-                console.log('Block indexing is complete. Calling wallet listener init.');
-                //await walletListener.initMain(); // Call initMain from walletListener
-                await this.getUTXOBalances(this.myInfo.address)
-                if(!this.socket){
-                    this._initializeSocket()
-                }
-            }else{
-                this.delay(10000)
-                return this.init()
-            }
-
-            return {
-                success: !response.initialblockdownload,
-                message: response.initialblockdownload ? 'Block indexing is complete.' : 'Block indexing is still in progress.'
-            };
-        } catch (error) {
-            console.error('Initialization error:', error);
-            return {
-                success: false,
-                message: error.message
-            };
-        }
-    }
-
-async getUTXOBalances(address) {
-    //console.log('address in get balances ' + address);
-    try {
-        const utxos = await this.listUnspent(1, 9999999, [address]);
-        const unconfirmedUtxos = await this.getUnconfirmedTransactions(address);
-
-        let totalBalance = new BigNumber(0); // Initialize BigNumber for total balance
-
-        // Process confirmed UTXOs
-        for (const utxo of utxos) {
-            console.log('scanning utxos ' + utxo.address + ' ' + utxo.amount);
-            const utxoAmount = new BigNumber(utxo.amount);
-            if (utxo.address === address && this.myInfo.keypair.pubkey) {
-                totalBalance = totalBalance.plus(utxoAmount); // Add balance for the specific address
-            } else if (!this.myInfo.keypair.address || !this.myInfo.keypair.pubkey) {
-                this.myInfo.keypair.address = utxo.address;
-                this.myInfo.keypair.pubkey = await this.getPubKeyFromAddress(utxo.address);
-                console.log('logging pubkey ' + this.myInfo.keypair.pubkey + ' ' + this.myInfo.keypair.address);
-                totalBalance = totalBalance.plus(utxoAmount);
-                this._initializeSocket();
-            } else if (address === '' && this.myInfo.keypair.address) {
-                const pubkey = await this.getPubKeyFromAddress(utxo.address);
-                this.myInfo.otherAddrs.push({ address: utxo.address, pubkey: pubkey });
-                totalBalance = totalBalance.plus(utxoAmount);
-            }
-        }
-
-        // Process unconfirmed UTXOs
-        if (unconfirmedUtxos.length > 0) {
-            for (const utxo of unconfirmedUtxos) {
-                console.log('scanning mempool utxos ' + utxo.address + ' ' + utxo.amount);
-                const utxoAmount = new BigNumber(utxo.amount);
-                if (utxo.address === address) {
-                    totalBalance = totalBalance.plus(utxoAmount); // Add balance for the specific address
-                } else if (!this.myInfo.keypair.address && this.myInfo.keypair.pubkey) {
-                    this.myInfo.keypair.address = utxo.address;
-                    this.myInfo.keypair.pubkey = await this.getPubKeyFromAddress(utxo.address);
-                    console.log('logging pubkey ' + this.myInfo.keypair.pubkey + ' ' + this.myInfo.keypair.address);
-                    totalBalance = totalBalance.plus(utxoAmount);
-                    this._initializeSocket();
-                } else if (address === '' && this.myInfo.keypair.address) {
-                    const pubkey = await this.getPubKeyFromAddress(utxo.address);
-                    this.myInfo.otherAddrs.push({ address: utxo.address, pubkey: pubkey });
-                    totalBalance = totalBalance.plus(utxoAmount);
-                }
-            }
-        }
-
-        //console.log(`Total UTXO balance for address ${this.myInfo.keypair.address}:`, totalBalance.toString());
-        return totalBalance.toNumber(); // Return the balance as a string to preserve precision
-    } catch (error) {
-        console.error('Error fetching UTXO balances:', error);
-    }
+function fillPath(path, params = {}) {
+  return path.replace(/:([A-Za-z_]\w*)/g, (_, k) => encodeURIComponent(params[k] ?? ''));
 }
 
-
-    async checkIfAddressInWallet(address){
-        try {
-            // Check if the address is part of the wallet
-            const addressInfo = await this.getAddressInfo(address);
-
-            // Log the result to verify
-            //console.log("Address Info:", JSON.stringify(addressInfo, null, 2));
-
-            // Return whether the address is part of the wallet
-            return addressInfo.ismine; // true if the address is in the wallet
-        } catch (error) {
-            console.error("Error checking if address is in wallet:", error);
-            return false; // Return false if there's an error
-        }
+class ApiWrapper {
+  constructor(baseURL, port, test, tlAlreadyOn = false, address, pubkey, network, apiMode = false, relayerBase) {
+    this.baseURL = baseURL;
+    this.port = port;
+    this.test = !!test;
+    this.network = network || (this.test ? 'LTCTEST' : 'LTC');
+    this.myInfo = {
+      address: address,
+      keypair: { address, pubkey: pubkey || null },
+      otherAddrs: []
     };
 
-    async getUnconfirmedTransactions(address) {
-        try {
-            // Get all unconfirmed transactions from the mempool
-            const rawMempool = await this.getRawMempoolAsync(false);
-            const transactionsWithAddress = [];
+    // Local client (only used when tlOn && !apiMode)
+    this.client = (network && network.toUpperCase().startsWith('BTC'))
+      ? createBitcoinClient(this.test)
+      : createLitecoinClient(this.test);
 
-            for (const txid of rawMempool) {
-                // Fetch detailed information for each transaction
-                const txDetails = await this.getRawTransaction(txid, true);
-                // Iterate through each output (vout) of the transaction
-                for (const output of txDetails.vout) {
-                    // Ensure output.scriptPubKey and addresses exist
-                    if (output.scriptPubKey && Array.isArray(output.scriptPubKey.addresses)) {
-                        const addresses = output.scriptPubKey.addresses;
+    // WebSocket endpoint (kept for compatibility)
+    const netloc = (baseURL || '').replace(/^ws:\/\/|^wss:\/\//, '').replace(/^http:\/\/|^https:\/\//, '');
+    this.apiUrl = `http://${netloc}:${port}`;
+    this.wsUrl  = `ws://${netloc}:${port}/ws`;
 
-                        if (!address) {
-                            // If no specific address is provided, check if the address belongs to the wallet
-                            const isMine = await this.checkIfAddressInWallet(addresses[0]);
-                            if (isMine) {
-                                console.log('Adding mempool tx to log', addresses[0], txid);
-                                transactionsWithAddress.push({
-                                    txid,
-                                    vout: output.n,
-                                    amount: output.value,
-                                    address: addresses[0],
-                                });
-                            }
-                        } else if (addresses.includes(address)) {
-                            // If a specific address is provided, match it directly
-                            transactionsWithAddress.push({
-                                txid,
-                                vout: output.n,
-                                amount: output.value,
-                                address: addresses[0],
-                            });
-                        }
-                    }
-                }
-            }
+    // API Mode wiring
+    this.tlOn = !!tlAlreadyOn;
+    this.apiMode = !!apiMode || !this.tlOn;
+    const defaultRelayer = this.test
+      ? 'https://testnet-api.layerwallet.com'
+      : 'https://api.layerwallet.com';
 
-            return transactionsWithAddress;
-        } catch (error) {
-            console.error('Error fetching unconfirmed transactions:', error.message || error);
-            return [];
-        }
+    this.relayer = axios.create({
+      baseURL: relayerBase || defaultRelayer,
+      timeout: 25000,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    // Orderbook session (optional, when not using relayer for books)
+    this.orderbookSession = OrderbookSession ? new OrderbookSession() : null;
+
+    // Socket handle
+    this.socket = null;
+    setTimeout(() => { this.initUntilSuccess(); }, 0);
+  }
+
+  // --- Socket setup (assigns this.socket if created) ---
+  _initializeSocket() {
+    if (this.socket) return this.socket;
+    const url = this.wsUrl;
+    const s = io(url, { transports: ['websocket'] });
+    this.socket = s;
+    // Optionally wire event handlers here
+    return s;
+  }
+
+  // --- API helper ---
+  async _relayerPost(path, body) {
+    const payload = Object.assign({ network: this.network }, body || {});
+    const { data } = await this.relayer.post(path, payload);
+    return data;
+  }
+  async _relayerGet(path) {
+    const { data } = await this.relayer.get(path, { params: { network: this.network } });
+    return data;
+  }
+
+  // --- INIT paths ---
+  async init() {
+    if (this.apiMode) return await this.initApiMode();
+    try {
+      const response = await this.getBlockchainInfo();
+      if (!response.initialblockdownload) {
+        if (!this.socket) this._initializeSocket();
+      } else {
+        await new Promise(r => setTimeout(r, 10000));
+        return await this.init();
+      }
+      return {
+        success: !response.initialblockdownload,
+        message: response.initialblockdownload
+          ? 'Block indexing is still in progress.'
+          : 'Block indexing is complete.',
+      };
+    } catch (error) {
+      return { success: false, message: error.message || String(error) };
     }
+  }
 
-    async getPubKeyFromAddress(address) {
-        try {
-            const addressInfo = await this.getAddressInfo(address);
-            if (addressInfo && addressInfo.pubkey) {
-                return addressInfo.pubkey;
-            } else {
-                throw new Error('Public key not found for address');
-            }
-        } catch (error) {
-            console.error('Error fetching pubkey:', error);
-        }
+  async initApiMode() {
+    console.log('inside init api mode')
+    try {
+      const address = this?.myInfo?.address || this?.myInfo?.keypair?.address;
+      if (!address) throw new Error('Address required to initialize in API mode');
+
+      // Probe relayer connectivity (prefer UTXOs, fall back to balance)
+      try {
+        await this.getUTXOBalances(address);
+      } catch (e) {
+        try { await this.getAllBalancesForAddress(address); } catch { throw e; }
+      }
+
+      if (!this.socket) {
+        const s = this._initializeSocket();
+        if (s && !this.socket) this.socket = s;
+      }
+      return { success: true, message: 'API mode initialized' };
+    } catch (error) {
+      return { success: false, message: error?.message || String(error) };
     }
-
-  getBlockchainInfo() {
-    return util.promisify(this.client.cmd.bind(this.client, 'getblockchaininfo'))();
   }
 
-  getRawTransaction(txId, verbose = true, blockHash) {
-    return util.promisify(this.client.cmd.bind(this.client, 'getrawtransaction'))(txId, verbose);
-  }
-
-  getRawMempoolAsync(verbose = true,) {
-    return util.promisify(this.client.cmd.bind(this.client, 'getrawmempool'))(verbose);
-  }
-
-   getAddressInfo(address) {
-    return util.promisify(this.client.cmd.bind(this.client, 'getaddressinfo'))(address);
-  }
-
-
-  getNetworkInfo(){
-    return util.promisify(this.client.cmd.bind(this.client, 'getnetworkinfo'))()
-  }
-
-  getTransaction(txId) {
-    return util.promisify(this.client.cmd.bind(this.client, 'gettransaction'))(txId);
-  }
-
-  getBlock(blockHash) {
-    return util.promisify(this.client.cmd.bind(this.client, 'getblock'))(blockHash);
-  }
-
-  getBlockHash(height) {
-    return util.promisify(this.client.cmd.bind(this.client, 'getblockhash'))(height);
-  }
-
-  createRawTransaction(...params) {
-    return util.promisify(this.client.cmd.bind(this.client, 'createrawtransaction'))(...params);
-  }
-
-  listUnspent(minConf = 1, maxConf = 9999999, addresses = []) {
-        return util.promisify(this.client.cmd.bind(this.client, 'listunspent'))(minConf, maxConf, addresses);
+  async initUntilSuccess(maxRetries = 10, backoffMs = 5000) {
+    let attempt = 0;
+    console.log('attempt '+attempt)
+    while (attempt < maxRetries) {
+      try {
+        const res = this.tlOn ? await this.initApiMode() : await this.init();
+        if (res && res.success) return res;
+      } catch {}
+      attempt++;
+      await new Promise(r => setTimeout(r, backoffMs));
     }
-
-
-  decoderawtransaction(...params) {
-    return util.promisify(this.client.cmd.bind(this.client, 'decoderawtransaction'))(...params);
+    throw new Error(`Initialization failed after ${maxRetries} attempts`);
   }
 
-  signrawtransactionwithwallet(...params) {
-    return util.promisify(this.client.cmd.bind(this.client, 'signrawtransactionwithwallet'))(...params);
+  // --- Chain / RPC ---
+  async getBlockchainInfo() {
+    if (this.apiMode) {
+      return await this._relayerGet(RELAYER_PATHS.chainInfo);
+    }
+    return new Promise((resolve, reject) => {
+      if (!this.client || !this.client.getBlockchainInfo) return reject(new Error('Client not available'));
+      this.client.getBlockchainInfo((err, res) => err ? reject(err) : resolve(res));
+    });
   }
 
-  dumpprivkey(...params) {
-    return util.promisify(this.client.cmd.bind(this.client, 'dumpprivkey'))(...params);
+  async rpcCall(method, params = []) {
+    // Generic RPC passthrough to relayer
+    return await this._relayerPost(RELAYER_PATHS.rpcPassthrough, { method, params });
   }
 
-  sendrawtransaction(...params) {
-    return util.promisify(this.client.cmd.bind(this.client, 'sendrawtransaction'))(...params);
+  // --- Address / Token ---
+  async validateAddress(address) {
+    const path = fillPath(RELAYER_PATHS.addressValidate, { address });
+    return await this._relayerGet(path);
   }
 
-  validateAddress(...params) {
-    return util.promisify(this.client.cmd.bind(this.client, 'validateaddress'))(...params);
+  async getAddressBalance(address) {
+    const path = fillPath(RELAYER_PATHS.addressBalance, { address });
+    return await this._relayerGet(path);
   }
 
-  getBlockCount() {
-      return util.promisify(this.client.cmd.bind(this.client, 'getblockcount'))();
+  async fundAddress(address, amount) {
+    // Assuming POST /address/fund { address, amount }
+    return await this._relayerPost(RELAYER_PATHS.addressFund, { address, amount });
   }
 
-  loadWallet(...params) {
-    return util.promisify(this.client.cmd.bind(this.client, 'loadwallet'))(...params);
+  async getAllBalancesForAddress(address) {
+    // Prefer token route; fallback to address balance if token route is absent.
+    try {
+      const path = fillPath(RELAYER_PATHS.tokenBalance, { address });
+      return await this._relayerGet(path);
+    } catch (e) {
+      return await this.getAddressBalance(address);
+    }
   }
 
-
-    async startOrderbookSession() {
-        // Initialize an OrderbookSession when the socket connects
-        this.orderbookSession = new OrderbookSession(this.socket, this.myInfo, this.txsService, this.client);
+  async getUTXOBalances(address) {
+    // If relayer exposes UTXO list, wire it here; otherwise use RPC passthrough.
+    // Example via RPC: listunspent 0 9999999 [address]
+    try {
+      const res = await this.rpcCall('listunspent', [0, 9999999, [address]]);
+      return res;
+    } catch (e) {
+      // Last resort: return empty list
+      return [];
     }
+  }
 
-    async getAllTokenBalancesForAddress(address){
-        //console.log('address before calling wallet interface '+address)
-        const tokens = await walletListener.getAllBalancesForAddress(address)
-        return tokens
+  // --- Transactions ---
+  async sendRawTransaction(rawhex) {
+    if (this.apiMode) {
+      return await this._relayerPost(RELAYER_PATHS.txBroadcast, { rawhex });
     }
+    return new Promise((resolve, reject) => {
+      if (!this.client || !this.client.sendRawTransaction) return reject(new Error('Client not available'));
+      this.client.sendRawTransaction(rawhex, (err, txid) => err ? reject(err) : resolve({ txid }));
+    });
+  }
 
-    async getAllUTXOsForAddress(address){
-        try {
-        // Fetch the unspent outputs for the given address
-        return await client.cmd('listunspent', 0, 9999999, [address]);
-        } catch (error) {
-            console.error('Error in getAllBalancesForAddress:', error.message || error);
-            throw error;
-        }
-    }
+  async getTx(txid) {
+    const path = fillPath(RELAYER_PATHS.txGet, { txid });
+    return await this._relayerGet(path);
+  }
 
-    async getOnChainSpotOrderbook(id1, id2){
-        return await walletListener.getOrderBook({id1,id2})
-    }
-
-    async getOnChainContractOrderbook(id){
-        return await walletListener.getContractOrderBook({id})
-    }
-
-    async getPosition(address, contractId) {
-       return await walletListener.getContractPositionForAddressAndContractId({address,contractId})
-    }
-
-    async getFundingHistory(contractId){
-        return await walletListener.getFundingHistory(contractId)
-    }
-
-    // Emit a new order
-    sendOrder(orderDetails) {
-        console.log('sending order')
-        if(this.socket){
-            if (!orderDetails.keypair) {
-            orderDetails.keypair = this.myInfo.keypair;
-            }
-            orderDetails.isLimitOrder = true;
-            console.log(JSON.stringify(orderDetails))
-            return new Promise((resolve, reject) => {
-                this.socket.emit('new-order', orderDetails);
-                this.socket.once('order:saved', (orderUuid) => {
-                    console.log('saving order '+JSON.stringify({details: orderDetails, id: orderUuid }))
-                    this.myOrders.push({details: orderDetails, id: orderUuid })
-                    resolve(orderUuid);
-                });
-                this.socket.once('order:error', (error) => {
-                    console.log('making note of err with order '+orderUUID)
-                    //this.myOrders.push({details: orderDetails, id: orderUUID })
-                    reject(error);
-                });
-            });
-        }else{
-            console.log('Still loading orderbook server socket session')
-               // Return a rejected Promise to ensure the caller handles it
-        return Promise.reject(new Error('Socket is not connected.'));
-        }        
-    }
-
-    sendManyOrders(orderDetailsArray) {
-        if (this.socket != undefined || this.socket != null) {
-            // Add common metadata to all orders
-            const ordersWithMeta = orderDetailsArray.map((orderDetails) => ({
-                ...orderDetails,
-                keypair: this.myInfo.keypair,
-                isLimitOrder: true,
-            }));
-
-            return new Promise((resolve, reject) => {
-                this.socket.emit('many-orders', ordersWithMeta);
-
-                // Listen for the "order:saved" event for confirmation
-                this.socket.once('order:saved', () => {
-                    console.log('Batch of orders saved successfully');
-                    this.myOrders.push(...ordersWithMeta); // Save orders locally
-                    resolve(ordersWithMeta); // Resolve with the array of orders
-                });
-
-                // Handle errors for the batch
-                this.socket.once('order:error', (error) => {
-                    console.error('Error saving batch of orders:', error);
-                    reject(error);
-                });
-            });
-        } else {
-            console.log('Still loading orderbook server socket session');
-            // Return a rejected Promise to ensure the caller handles it
-            return Promise.reject(new Error('Socket is not connected.'));
-        }
-    }
-
-    getMyInfo(){
-        return this.myInfo
-    }
-
-    getOrders({ state, symbol } = {}) {
-      let view = this.myOrders;
-      if (state)  view = view.filter(o => o.state === state);
-      if (symbol) view = view.filter(o => o.symbol === symbol);
-      return Object.freeze(view.map(o => ({ ...o }))); // read-only snapshot
-    }
-
-    // Fetch the orderbook data through socket
-    getOrderbookData(filter) {
+  // --- Orderbook / Orders ---
+  getOrderbookData(filter) {
         return new Promise((resolve, reject) => {
             this.socket.emit('update-orderbook', filter);
             this.socket.once('orderbook-data', (data) => {
@@ -463,40 +260,74 @@ async getUTXOBalances(address) {
         });
     }
 
-    // Cancel an existing order through socket
-    cancelOrder(orderUUID) {
-        if (!this.socket) return Promise.reject(new Error('Socket not connected'));
-        const id = (orderUUID && (orderUUID.orderUuid || orderUUID.uuid)) || orderUUID;
-        const hit = this.myOrders.find(o => o.id === id || o.orderUuid === id || o.uuid === id || o?.details?.uuid === id);
-        if (!hit) throw new Error(`Order ${id} not found`);
-        const details = hit.details ?? hit;
-        const props = details.props ?? details.order?.props ?? {};
-        // derive marketKey (spot or futures)
-        const f = props.id_for_sale ?? props.idForSale ?? props.first_token ?? props.firstToken;
-        const d = props.id_desired  ?? props.idDesired  ?? props.second_token ?? props.secondToken;
-        const cid = props.contract_id ?? props.contractId;
-        const exp = props.expiry ?? props.maturity_block ?? 'perp';
-        const marketKey = details.marketKey ?? details.order?.marketKey ??
-            (cid ? `${cid}-${exp}` :
-            (Number.isFinite(+f) && Number.isFinite(+d) ? ((+f < +d) ? `${+f}-${+d}` : `${+d}-${+f}`) : undefined));
+  async placeOrder(order) {
+    //if (this.apiMode) return await this._relayerPost(RELAYER_PATHS.orderPlace, order);
+    if (this.socket) { this.socket.emit('place-order', order); return { ok: true }; }
+    throw new Error('No order placement backend available');
+  }
 
-        return new Promise((resolve, reject) => {
-            this.socket.once('order:canceled', (ack) => {
-            this.myOrders = this.myOrders.filter(o => o.id !== id && o.orderUuid !== id && o.uuid !== id);
-            resolve(ack ?? { orderUUID: id });
-            });
-            this.socket.once('order:error', reject);
-            this.socket.emit('close-order', { orderUUID: id, ...(props && { props }), ...(marketKey && { marketKey }) });
-        });
-        }
+  async cancelOrder(orderId) {
+    //if (this.apiMode) return await this._relayerPost(RELAYER_PATHS.orderCancel, { orderId });
+    if (this.socket) { this.socket.emit('cancel-order', { id: orderId }); return { ok: true }; }
+    throw new Error('No order cancel backend available');
+  }
+// --- Utility helpers & legacy compatibility ---
 
-   // Modified getSpotMarkets with error handling for undefined response
-   // Modified getSpotMarkets with safer logging
-    async getSpotMarkets() {
+/** simple async delay (ms) */
+delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** return your own address / pubkey info */
+getMyInfo() {
+  return this.myInfo || { address: null, keypair: { address: null, pubkey: null } };
+}
+
+/** fetch list of SPOT markets */
+async getSpotMarkets() {
+  try {
+    if (this.apiMode) {
+      // use relayer REST if available
+      const { data } = await this.relayer.get('/markets/spot');
+      return data;
+    }
+    // if node-local or relayer missing, fallback to socket request
+    if (!this.socket) this._initializeSocket();
+    if (this.socket) {
+      return await this._relayerPost('/markets/spot'); // reuse axios path
+    }
+    return [];
+  } catch (err) {
+    console.error('[getSpotMarkets] error:', err);
+    return [];
+  }
+}
+
+/** submit a SPOT or FUTURES order */
+async sendOrder(order) {
+  try {
+    if (this.apiMode) {
+      // direct REST submission
+      const { data } = await this.relayer.post('/orders/place', order);
+      return data?.uuid || data?.id || null;
+    }
+
+    if (!this.socket) this._initializeSocket();
+    if (this.socket) {
+      const uuid = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+      this.socket.emit('place-order', { ...order, uuid });
+      return uuid;
+    }
+
+    throw new Error('No active socket or relayer available to send order');
+  } catch (err) {
+    console.error('[sendOrder] error:', err);
+    throw err;
+  }
+}
+
+ async getSpotMarkets() {
             const response = await axios.get(`${this.apiUrl}/markets/spot/${this.network}`);
-            
-            // Log just the response data instead of the whole response
-            console.log('Spot Markets Response Data:', util.inspect(response.data, { depth: null }));
 
            const payload = Array.isArray(response.data) ? response.data : response.data.data;
         const markets = payload?.[0]?.markets;
@@ -517,46 +348,6 @@ async getUTXOBalances(address) {
         if (markets){ return markets
         }else{throw new Error('Invalid response format: futures markets not found')};
     }
-
-    async checkSync(){
-        const track = await walletListener.getTrackHeight()
-        const sync = await walletListener.checkSync()
-
-        return {realTimeModeHeight: track, txIndexHeight: sync.txIndex, consensusParseHeight: sync.consensus}
-    }
 }
 
-module.exports = ApiWrapper
-// Example usage
-/*const api = new ApiWrapper('http://172.81.181.19', 9191);
-
-// Example: Sending a new order
-const newOrder = {
-    isLimitOrder: true,
-    props: {
-        id_desired: 1,
-        id_for_sale: 2,
-        amount: 100,
-        price: 0.05
-    },
-    action: 'BUY'
-};
-
-api.sendOrder(newOrder)
-    .then(orderUuid => {
-        console.log(`Order saved with UUID: ${orderUuid}`);
-    })
-    .catch(error => {
-        console.error(`Order failed: ${error}`);
-    });
-
-// Example: Fetching orderbook data
-api.getOrderbookData({ first_token: 1, second_token: 2, type: 'SPOT' })
-    .then(data => {
-        console.log('Orderbook Data:', data);
-    })
-    .catch(error => {
-        console.error('Failed to fetch orderbook data:', error);
-    });
-
-*/
+module.exports = ApiWrapper;

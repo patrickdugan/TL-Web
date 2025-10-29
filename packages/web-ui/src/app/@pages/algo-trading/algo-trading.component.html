@@ -119,8 +119,8 @@
             {{ ((r.meta?.size ?? r.size) / 1024) | number:'1.0-0' }} KB
           </div>
 
-          <div class="td w-220">
-            {{ (r.meta?.createdAt ?? r.createdAt) | date:'yyyy-MM-dd HH:mm' }}
+          <div class="td w-260 nowrap" title="{{ (r.meta?.createdAt ?? r.createdAt) | date:'yyyy-MM-dd HH:mm:ss Z' }}">
+             {{ (r.meta?.createdAt ?? r.createdAt) | date:'yy-MM-dd · HH:mm' }}
           </div>
 
           <div class="td w-120">

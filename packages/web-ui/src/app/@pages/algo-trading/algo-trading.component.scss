@@ -389,3 +389,9 @@
   text-align: center; user-select: none; background: rgba(0,0,0,0.03);
 }
 .dropzone:hover { border-color: #555; }
+
+.w-260 { width: 260px; }
+.td.nowrap {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums; /* keeps columns aligned */
+}
