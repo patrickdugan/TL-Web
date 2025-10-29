@@ -83,10 +83,10 @@ export class AlgoTradingService {
 
   constructor() {
     // Boot from base manifest + delta overlay, then refresh views
-    void this.bootstrapFromManifest().then(() => {
+    void this.bootstrapFromManifest()
       this.refreshDiscovery();
       this.refreshRunning();
-    });
+    
   }
 
   // ---------- Public API ----------
@@ -260,59 +260,100 @@ export class AlgoTradingService {
     }
     this.running$.next(live);
   }
+constructor() {
+  // fire and forget (don’t refresh early with empty state)
+  void this.bootstrapFromManifest();
+}
 
-  private async bootstrapFromManifest() {
-    // 1) base manifest shipped with app
-    const baseUrl = new URL('assets/algos/manifest.json', document.baseURI).toString();
-    let base: ManifestItem[] = [];
-    try {
-      const res = await fetch(baseUrl);
-      if (res.ok) base = await res.json();
-    } catch {}
+private async bootstrapFromManifest() {
+  try {
+    const url = new URL('assets/algos/manifest.json', document.baseURI).toString();
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn('[ALGO] manifest fetch failed', res.status, url);
+      this.refreshDiscovery();
+      this.refreshRunning();
+      return;
+    }
 
-    // 2) overlay with delta (uploads)
-    const delta = await dbManifestDeltaAll(); // [] if none
+    const base = await res.json();
+    // Accept either an array or {files:[...]}
+    const rows: any[] = Array.isArray(base)
+      ? base
+      : (Array.isArray(base?.files) ? base.files : []);
 
-    const byFile = new Map<string, ManifestItem>();
-    for (const r of base) byFile.set(r.fileName, r);
-    for (const r of delta) byFile.set(r.fileName, r);
+    if (!rows.length) {
+      console.warn('[ALGO] manifest parsed but empty');
+      this.refreshDiscovery();
+      this.refreshRunning();
+      return;
+    }
 
-    // 3) hydrate
-    for (const m of byFile.values()) {
-      const srcUrl = new URL(`assets/algos/${m.fileName}`, document.baseURI).toString();
+    for (const m of rows) {
+      // accept fileName OR filename OR name; add .js if missing
+      let fname = (m.fileName ?? m.filename ?? m.name ?? '').toString();
+      if (!fname) {
+        console.warn('[ALGO] skip manifest row without name/fileName', m);
+        continue;
+      }
+      if (!/\.js$/i.test(fname)) fname += '.js';
+
+      // try to fetch code, but do NOT block listing if it fails
       let code = '';
       try {
-        const res = await fetch(srcUrl);
-        if (res.ok) code = await res.text();
-      } catch {}
-      if (!code) {
-        const maybe = await dbGetFile(m.id);
-        if (maybe) code = maybe;
+        const jsUrl = new URL(`assets/algos/${fname}`, document.baseURI).toString();
+        const s = await fetch(jsUrl);
+        if (s.ok) code = await s.text();
+        else console.warn('[ALGO] strategy file missing', fname, s.status);
+      } catch (e) {
+        console.warn('[ALGO] fetch error for', fname, e);
       }
 
+      const id: string = (m.id ?? 'sys-' + Math.random().toString(36).slice(2, 9)).toString();
+      const name: string = (m.name ?? fname.replace(/\.js$/i, '')).toString();
+
       const row: StrategyRow = {
-        id: m.id,
-        name: m.name ?? m.fileName.replace(/\.js$/i, ''),
-        symbol: '3-PERP',
-        mode: 'FUTURES',
-        leverage: 5,
-        fileName: m.fileName,
-        size: m.size ?? code.length,
-        createdAt: m.createdAt ?? Date.now(),
-        status: m.status ?? 'stopped',
-        amount: m.amount ?? 0,
+        id,
+        name,
+        symbol: (m.symbol ?? '3-PERP').toString(),
+        mode: ((m.mode as 'SPOT' | 'FUTURES') ?? 'FUTURES'),
+        leverage: (typeof m.leverage === 'number' ? m.leverage : 5),
+        fileName: fname,
+        size: (typeof m.size === 'number' ? m.size : (code ? code.length : 0)),
+        createdAt: (typeof m.createdAt === 'number' ? m.createdAt : Date.now()),
+        status: (m.status === 'running' ? 'running' : 'stopped'),
+        amount: (typeof m.amount === 'number' ? m.amount : 0),
         pnlUsd: 0,
         roiPct: 0,
         copiers: 0,
         runtime: '0h',
-        code,
+        code, // may be ''
       };
+
       this.catalog.set(row.id, row);
-      if (code) await dbPutFile(row.id, code);
+      if (code) {
+        try { await dbPutFile(row.id, code); } catch {}
+      }
     }
 
-    await dbPutIndex(Array.from(this.catalog.values()).map(toIndexItem));
+    // snapshot to index (best-effort)
+    try {
+      await dbPutIndex(Array.from(this.catalog.values()).map(toIndexItem));
+    } catch (e) {
+      console.warn('[ALGO] dbPutIndex failed (non-fatal)', e);
+    }
+
+    console.debug('[ALGO] bootstrap complete; discovered', this.catalog.size, 'algos');
+    this.refreshDiscovery();
+    this.refreshRunning();
+
+  } catch (e) {
+    console.warn('[ALGO] bootstrapFromManifest fatal', e);
+    this.refreshDiscovery();
+    this.refreshRunning();
   }
+}
+
 
   private genId(): string {
     return 'sys-' + Math.random().toString(36).slice(2, 9);
