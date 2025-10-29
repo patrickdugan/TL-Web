@@ -85,8 +85,7 @@ export class AlgoTradingService {
     // Boot from base manifest + delta overlay, then refresh views
     void this.bootstrapFromManifest()
       this.refreshDiscovery();
-      this.refreshRunning();
-    
+      this.refreshRunning(); 
   }
 
   // ---------- Public API ----------
@@ -260,9 +259,9 @@ export class AlgoTradingService {
     }
     this.running$.next(live);
   }
-  
+
 private async bootstrapFromManifest() {
-  try {
+  //try {
     const url = new URL('assets/algos/manifest.json', document.baseURI).toString();
     const res = await fetch(url);
     console.log('res '+JSON.stringify(res))
@@ -344,11 +343,11 @@ private async bootstrapFromManifest() {
     this.refreshDiscovery();
     this.refreshRunning();
 
-  } catch (e) {
+  /*} catch (e) {
     console.warn('[ALGO] bootstrapFromManifest fatal', e);
     this.refreshDiscovery();
     this.refreshRunning();
-  }
+  }*/
 }
 
 
