@@ -42,13 +42,13 @@ export class HeaderComponent implements OnInit {
       needAuthToShow: false,
       needFullSynced: false,
     },
-    // {
-    //   id: 5,
-    //   name: 'Node Reward',
-    //   link: '/node-reward',
-    //   needAuthToShow: false,
-    //   needFullSynced: true,
-    // },
+    {
+       id: 5,
+       name: 'Algo Trading',
+       link: '/algo',
+       needAuthToShow: false,
+       needFullSynced: false,
+     },
     // {
     //   id: 6,
     //   name: 'Tx Builder',
