@@ -1,9 +1,4 @@
 // runAlgo.js  — browser/worker-safe version
-
-// load the API wrapper (ensure tl/algoAPI.js exists in same assets/algos folder)
-const ApiWrapper = require('./tl/algoAPI.js')
-
-// simple logger that streams to the UI and browser console
 function uiLog(...args) {
   const msg = args
     .map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
@@ -17,6 +12,20 @@ function uiLog(...args) {
     console.log('[node]', msg);
   }
 }
+
+// load the API wrapper (ensure tl/algoAPI.js exists in same assets/algos folder)
+self.addEventListener('error', e => {
+  self.postMessage({ type: 'log', msg: '[WorkerError] ' + e.message });
+  console.error(e);
+});
+self.addEventListener('unhandledrejection', e => {
+  self.postMessage({ type: 'log', msg: '[UnhandledRejection] ' + e.reason });
+  console.error(e.reason);
+});
+uiLog('[debug] worker booted');
+
+// simple logger that streams to the UI and browser console
+const ApiWrapper = require('./tl/algoAPI.js')
 
 // ---- CONFIG ----
 const HOST     = '172.81.181.19';
