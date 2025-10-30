@@ -1,12 +1,27 @@
-const litecore = require('bitcore-lib-ltc');
-const util = require('util');
+//const litecore = require('bitcore-lib-ltc');
+import { getEphemeralKey } from './keyStore.js';
+// use key.wif for signing
+
 const BigNumber = require('bignumber.js');
-const { payments, Psbt, Transaction } = require('bitcoinjs-lib');
-const { ECPairFactory } = require('ecpair');
+const {
+  signPsbtLocal,
+  makeNewAddress,
+  addMultisigAddress,
+  sendRawTransaction,
+  createRawTransaction,
+  createPsbt,
+  decodeRawTransaction,
+  decodePsbt,
+  ensureBitcoin,
+} = require('./util');
+//const { payments, Psbt, Transaction } = require('bitcoinjs-lib');
+//const { ECPairFactory } = require('ecpair');
 const ecc = require('tiny-secp256k1');
-const ECPair = ECPairFactory(ecc);
+//const ECPair = ECPairFactory(ecc);
 const networks = require('./networks.js');
 const minFeeLtcPerKb = 0.00002;
+const fetch = require('node-fetch'); 
+const 
 
 const NETWORKS = {
     LTCTEST: {
@@ -42,24 +57,40 @@ const getNetworkConfig = (networkCode) => {
 };
 
 
-const initializePromisifiedMethods = (client) => ({
-    walletCreateFundedPsbtAsync: util.promisify(client.cmd.bind(client, 'walletcreatefundedpsbt')),
-    createPsbtAsync: util.promisify(client.cmd.bind(client, 'createpsbt')),
-    decodeRawTransactionAsync: util.promisify(client.cmd.bind(client, 'decoderawtransaction')),
-    createRawTransactionAsync: util.promisify(client.cmd.bind(client, 'createrawtransaction')),
-    listUnspentAsync: util.promisify(client.cmd.bind(client, 'listunspent')),
-    decoderawtransactionAsync: util.promisify(client.cmd.bind(client, 'decoderawtransaction')),
-    dumpprivkeyAsync: util.promisify(client.cmd.bind(client, 'dumpprivkey')),
-    sendrawtransactionAsync: util.promisify(client.cmd.bind(client, 'sendrawtransaction')),
-    validateAddress: util.promisify(client.cmd.bind(client, 'validateaddress')),
-    getBlockCountAsync: util.promisify(client.cmd.bind(client, 'getblockcount')),
-    loadWalletAsync: util.promisify(client.cmd.bind(client, 'loadwallet')),
-    addMultisigAddressAsync: util.promisify(client.cmd.bind(client, 'addmultisigaddress')),
-    signrawtransactionwithwalletAsync: util.promisify(client.cmd.bind(client, 'signrawtransactionwithwallet')),
-    signpsbtAsync: util.promisify(client.cmd.bind(client, 'walletprocesspsbt')),
-    decodepsbtAsync: util.promisify(client.cmd.bind(client, 'decodepsbt')),
-    finalizeAsync: util.promisify(client.cmd.bind(client, 'finalizepsbt')),
-});
+
+
+function initializeLocalTxHelpers(network = 'LTCTEST') {
+  const btc = ensureBitcoin();
+
+  return {
+    createPsbtAsync: async (inputs, outputs) =>
+      createPsbt(inputs, outputs, network),
+
+    decodeRawTransactionAsync: async (rawtx) =>
+      decodeRawTransaction(rawtx, network),
+
+    signrawtransactionwithwalletAsync: async (rawtxHex, wif) =>
+     signRawTransaction(rawtxHex, wif, network),
+
+
+    decodepsbtAsync: async (psbtBase64) =>
+      decodePsbt(psbtBase64, network),
+
+    createRawTransactionAsync: async (inputs, outputs) =>
+      createRawTransaction(inputs, outputs, network),
+
+    signpsbtAsync: async (psbtBase64, wif) =>
+      signPsbtLocal(psbtBase64, wif, network),
+
+    getNewAddressAsync: async () => makeNewAddress(network),
+
+    addMultisigAddressAsync: async (pubkeys, m = 2) =>
+      addMultisigAddress(pubkeys, m, network),
+
+    sendrawtransactionAsync: async (rawtx) =>
+      sendRawTransaction(rawtx, network),
+  };
+}
 
 function formatAmount(amt) {
   // Work in satoshis and back to LTC string
@@ -78,13 +109,19 @@ const buildLitecoinTransaction = async (txConfig, client) => {
             network = 'LTCTEST',
         } = txConfig;
 
-        const { listUnspentAsync, createRawTransactionAsync } = initializePromisifiedMethods(client);
+        let relayerUrl= "api.layerwallet.com"
+        if(network=='LTCTEST'){
+            relayerUrl= "testnet-api.layerwallet.com"
+        }
+
+        const { createRawTransactionAsync } = initializeLocalTxHelpers(client);
 
         const buyerAddress = buyerKeyPair.address;
         const sellerAddress = sellerKeyPair.address;
 
         // Fetch unspent UTXOs for the buyer
-        const luRes = await listUnspentAsync(); 
+        const utxoRes = await fetch(`${relayerUrl}/api/utxo/${buyerAddress}`);
+        const luRes = await utxoRes.json();7
         const _utxos = luRes
             .map((i) => ({ ...i, pubkey: buyerKeyPair.pubkey }))
             .sort((a, b) => b.amount - a.amount);   
@@ -155,7 +192,7 @@ async function buildPsbtViaRpc(buildPsbtOptions, client, networkCode) {
     createPsbtAsync,
     decodeRawTransactionAsync,
     decodepsbtAsync
-  } = initializePromisifiedMethods(client);
+  } = initializeLocalTxHelpers(client);
 
   //try {
     const { rawtx, inputs } = buildPsbtOptions;
@@ -361,7 +398,7 @@ const signPsbtRawTx = (signOptions, client) => {
     const signPsbtRawTx = async (signOptions, client) => {
         try {
             const { wif, network, psbtHex } = signOptions;
-            const { signpsbtAsync } = initializePromisifiedMethods(client);
+            const { signpsbtAsync } = initializeLocalTxHelpers(client);
 
             // Convert PSBT to Base64 for RPC
             const psbt = Psbt.fromHex(psbtHex); // Load the PSBT from hex
@@ -369,8 +406,10 @@ const signPsbtRawTx = (signOptions, client) => {
 
             console.log('PSBT in Base64:', psbt64);
 
+            const key = getEphemeralKey();
+            if (!key?.wif) throw new Error('No ephemeral key available for signing');
             // Use RPC to sign the PSBT
-            const signResult = await signpsbtAsync(psbt64);
+            const signResult = await signpsbtAsync(psbt64,key.wif);
 
             console.log('RPC Sign Result:', signResult);
 
@@ -423,7 +462,11 @@ const buildTokenTradeTransaction = async (trade, buyerKeyPair, sellerKeyPair, co
         const rawTxHex = transaction.serialize();
 
         // Sign the transaction using the Litecoin wallet
-        const signResult = await signrawtransactionwithwalletAsync(rawTxHex);
+
+        const key = getEphemeralKey();
+        if (!key?.wif) throw new Error('No ephemeral key available for signing');
+
+        const signResult = await signrawtransactionwithwalletAsync(rawTxHex,key.wif);
         if (!signResult || !signResult.hex) {
             throw new Error('Signing transaction failed');
         }
@@ -472,7 +515,7 @@ const buildFuturesTransaction = async (trade, buyerKeyPair, sellerKeyPair, commi
 const getUTXOFromCommit = async (rawtx, multySigChannelData, client, network) => {
     try {
         // Initialize promisified methods for the client
-        const { decoderawtransactionAsync } = initializePromisifiedMethods(client);
+        const { decoderawtransactionAsync } = initializeLocalTxHelpers(client);
 
         // Decode the raw transaction
         const decodedTx = await decoderawtransactionAsync(rawtx);

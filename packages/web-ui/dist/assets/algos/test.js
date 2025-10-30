@@ -23,7 +23,10 @@ try {
     uiLog('[boot] entering main logic');
     try {
       // your existing logic goes here
-      const ApiWrapper =(importScripts('/assets/algos/tl/algoAPI.js'), self.ApiWrapper);
+      const ApiWrapper =
+        typeof require !== 'undefined'
+          ? require('./tl/algoAPI.js')
+          : (importScripts('tl/algoAPI.js'), self.ApiWrapper);
 
       const api = new ApiWrapper(
         '172.81.181.19',

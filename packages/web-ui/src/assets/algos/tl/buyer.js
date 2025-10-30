@@ -1,49 +1,100 @@
-const litecore = require('bitcore-lib-ltc');
-const Encode = require('./tradelayer.js/src/txEncoder.js'); // Use encoder.js for payload generation
-const BigNumber = require('bignumber.js');
-const { buildLitecoinTransaction, buildTokenTradeTransaction, buildFuturesTransaction, getUTXOFromCommit, signPsbtRawTx } = require('./litecoreTxBuilder');
-const WalletListener = require('./tradelayer.js/src/walletInterface.js'); // Import WalletListener to use tl_getChannelColumn
-const util = require('util');
-const {Psbt}= require('bitcoinjs-lib')
+//const litecore/ buyer.js
+// NOTE: this version is webpack/browser safe (no util.promisify RPCs)
+const Encode = require('./tradelayer.js/src/txEncoder.js');
+const {
+  ensureBitcoin,
+  getExtensionSigner,
+  makeEphemeralKey,
+  signPsbtLocal,
+  getUnifiedSigner,
+  BigNumber,
+  // new
+  makeNewAddress,
+  makeMultisig,
+  makeLocalRpc,
+  createRawTransaction,
+  createPsbtAsync, 
+  decodeRawTransactionAsync, 
+  decodepsbtAsync,
+  signRawTransaction
+} = require('./litecoreTxBuilder');
+const WalletListener = require('./tradelayer.js/src/walletInterface.js');
+const { getNewAddress, makeMultisig}= require('./util.js')
+
+/**
+ * Centralized map of relayer paths discovered from your routes.
+ * Adjust here if your server has different prefixes.
+ *
+ * Known route files in zip:
+ * - address.route.ts → /address/validate/:address, /address/balance/:address, (fund assumed)
+ * - chain.route.ts   → /chain/*   (we map /chain/info)
+ * - rpc.route.ts     → /rpc       (generic passthrough)
+ * - token.route.ts   → /token/*   (we map /token/balance/:address)
+ * - tx.route.ts      → /tx/:txid and POST /tx/broadcast
+ */
+const RELAYER_PATHS = {
+  addressValidate    : '/address/validate/:address',
+  addressBalance     : '/address/balance/:address',
+  // If faucet/funding exists; otherwise remove.
+  addressFund        : '/address/fund',
+
+  chainInfo          : '/chain/info',
+
+  rpcPassthrough     : '/rpc',
+
+  tokenBalance       : '/token/balance/:address',
+
+  txGet              : '/tx/:txid',
+  txBroadcast        : '/tx/broadcast',
+
+  // Orderbook routes (not in zip, but commonly present)
+  orderbookSnapshot  : '/orderbook/snapshot',
+  orderPlace         : '/orders/place',
+  orderCancel        : '/orders/cancel',
+};
+
+function fillPath(path, params = {}) {
+  return path.replace(/:([A-Za-z_]\w*)/g, (_, k) => encodeURIComponent(params[k] ?? ''));
+}
+
+
+// 👇 our new shared util
+const {
+  getUnifiedSigner,
+  BigNumber,
+  ensureBitcoin,
+} = require('./util');
 
 class BuySwapper {
-    constructor(
-        typeTrade, // New parameter for trade type ('BUY')
-        tradeInfo, // Trade information
-        buyerInfo, // Buyer information
-        sellerInfo, // Seller information
-        client, // Litecoin client or another client service
-        socket, // Socket for communication
-        test
-    ) {
-        this.typeTrade = typeTrade;  // 'BUY' or 'SELL'
-        this.tradeInfo = tradeInfo;  // Trade information (e.g., amount, price, etc.)
-        this.myInfo = buyerInfo;  // Information about the buyer
-        this.cpInfo = sellerInfo;  // Information about the seller
-        this.socket = socket;  // Socket connection for real-time events
-        this.client = client;  // Client for making RPC calls
-        this.test= test        
-        this.multySigChannelData = null;  // Initialize multisig channel data
-
- // Promisify methods for the given client
-        this.getRawTransactionAsync = util.promisify(this.client.getRawTransaction.bind(this.client));
-        this.getBlockDataAsync = util.promisify(this.client.getBlock.bind(this.client));
-        this.createRawTransactionAsync = util.promisify(this.client.createRawTransaction.bind(this.client));
-        this.listUnspentAsync = util.promisify(this.client.cmd.bind(this.client, 'listunspent'));
-        this.decoderawtransactionAsync = util.promisify(this.client.cmd.bind(this.client, 'decoderawtransaction'));
-        this.dumpprivkeyAsync = util.promisify(this.client.cmd.bind(this.client, 'dumpprivkey'));
-        this.sendrawtransactionAsync = util.promisify(this.client.cmd.bind(this.client, 'sendrawtransaction'));
-        this.validateAddress = util.promisify(this.client.cmd.bind(this.client, 'validateaddress'));
-        this.getBlockCountAsync = util.promisify(this.client.cmd.bind(this.client, 'getblockcount'));
-        this.addMultisigAddressAsync = util.promisify(this.client.cmd.bind(this.client, 'addmultisigaddress'));
-        this.signrawtransactionwithwalletAsync = util.promisify(this.client.cmd.bind(this.client, 'signrawtransactionwithwallet'));
-        this.signrawtransactionwithkeyAsync = util.promisify(this.client.cmd.bind(this.client, 'signrawtransactionwithkey'));   
-        this.importmultiAsync = util.promisify(client.cmd.bind(client, 'importmulti'));
-        
-        this.handleOnEvents();  // Set up event listeners
-        this.onReady();  // Prepare for trade execution
-        this.tradeStartTime = Date.now();
-    }
+  constructor(
+    typeTrade,   // 'BUY'
+    tradeInfo,
+    buyerInfo,
+    sellerInfo,
+    client,      // may be null/undefined in browser
+    socket,
+    test
+  ) {
+    this.typeTrade = typeTrade;
+    this.tradeInfo = tradeInfo;
+    this.myInfo = buyerInfo;
+    this.cpInfo = sellerInfo;
+    this.socket = socket;
+    this.client = client;  // kept for compatibility but not promisified
+    this.test = test;
+    this.multySigChannelData = null;
+    this.tradeStartTime = Date.now();
+    this.getNewAddressAsync       = makeNewAddress;       // local key generation
+    this.addMultisigAddressAsync      = makeMultisig;         // 2-of-2 multisig builder
+    this.createRawTransactionAsync    = createRawTransaction; // pure-lib tx builder
+    this.createPsbtAsync              = createPsbtAsync;      // PSBT creator
+    this.decodeRawTransactionAsync    = decodeRawTransactionAsync; // decode hex tx
+    this.decodepsbtAsync              = decodepsbtAsync;      // decode psbt hex
+    this.signrawtransactionwithwalletAsync = signRawTransaction;   // local signer
+    this.signpsbtAsync                = signPsbtLocal;  
+    this.handleOnEvents();
+    this.onReady();
+  }
 
     // Other methods for the BuySwapper class (e.g., handleOnEvents, onReady, etc.)
     onReady() {

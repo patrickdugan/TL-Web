@@ -2,8 +2,63 @@ const litecore = require('bitcore-lib-ltc');
 const Encode = require('./tradelayer.js/src/txEncoder.js');
 const { buildLitecoinTransaction, buildTokenTradeTransaction, buildFuturesTransaction, getUTXOFromCommit,signPsbtRawTx } = require('./litecoreTxBuilder');
 const WalletListener = require('./tradelayer.js/src/walletInterface.js');
-const util = require('util');
 const BigNumber = require('bignumber.js');
+{
+  // original
+  ensureBitcoin,
+  getExtensionSigner,
+  makeEphemeralKey,
+  signPsbtLocal,
+  getUnifiedSigner,
+  BigNumber,
+  // new
+  makeNewAddress,
+  makeMultisig,
+  makeLocalRpc,
+  createRawTransaction,
+  createPsbtAsync, 
+  decodeRawTransactionAsync, 
+  decodepsbtAsync,
+  signRawTransaction,
+  getPubkeyFromWif
+} = require('util');
+
+/**
+ * Centralized map of relayer paths discovered from your routes.
+ * Adjust here if your server has different prefixes.
+ *
+ * Known route files in zip:
+ * - address.route.ts → /address/validate/:address, /address/balance/:address, (fund assumed)
+ * - chain.route.ts   → /chain/*   (we map /chain/info)
+ * - rpc.route.ts     → /rpc       (generic passthrough)
+ * - token.route.ts   → /token/*   (we map /token/balance/:address)
+ * - tx.route.ts      → /tx/:txid and POST /tx/broadcast
+ */
+const RELAYER_PATHS = {
+  addressValidate    : '/address/validate/:address',
+  addressBalance     : '/address/balance/:address',
+  // If faucet/funding exists; otherwise remove.
+  addressFund        : '/address/fund',
+
+  chainInfo          : '/chain/info',
+
+  rpcPassthrough     : '/rpc',
+
+  tokenBalance       : '/token/balance/:address',
+
+  txGet              : '/tx/:txid',
+  txBroadcast        : '/tx/broadcast',
+
+  // Orderbook routes (not in zip, but commonly present)
+  orderbookSnapshot  : '/orderbook/snapshot',
+  orderPlace         : '/orders/place',
+  orderCancel        : '/orders/cancel',
+};
+
+function fillPath(path, params = {}) {
+  return path.replace(/:([A-Za-z_]\w*)/g, (_, k) => encodeURIComponent(params[k] ?? ''));
+}
+
 
 class SellSwapper {
     constructor(typeTrade, tradeInfo, sellerInfo, buyerInfo, client, socket,test) {
@@ -19,19 +74,15 @@ class SellSwapper {
         this.multySigChannelData = null
         this.tradeStartTime = Date.now();
          // Promisify methods for the given client
-        this.getRawTransactionAsync = util.promisify(this.client.getRawTransaction.bind(this.client));
-        this.getBlockDataAsync = util.promisify(this.client.getBlock.bind(this.client));
-        this.createRawTransactionAsync = util.promisify(this.client.createRawTransaction.bind(this.client));
-        this.listUnspentAsync = util.promisify(this.client.cmd.bind(this.client, 'listunspent'));
-        this.decoderawtransactionAsync = util.promisify(this.client.cmd.bind(this.client, 'decoderawtransaction'));
-        this.dumpprivkeyAsync = util.promisify(this.client.cmd.bind(this.client, 'dumpprivkey'));
-        this.sendrawtransactionAsync = util.promisify(this.client.cmd.bind(this.client, 'sendrawtransaction'));
-        this.validateAddress = util.promisify(this.client.cmd.bind(this.client, 'validateaddress'));
-        this.getBlockCountAsync = util.promisify(this.client.cmd.bind(this.client, 'getblockcount'));
-        this.addMultisigAddressAsync = util.promisify(this.client.cmd.bind(this.client, 'addmultisigaddress'));
-        this.signrawtransactionwithwalletAsync = util.promisify(this.client.cmd.bind(this.client, 'signrawtransactionwithwallet'));
-        this.signrawtransactionwithkeyAsync = util.promisify(this.client.cmd.bind(this.client, 'signrawtransactionwithkey'));
-
+       this.getNewAddressAsync           = makeNewAddress;       // local key generation
+       this.addMultisigAddressAsync      = makeMultisig;         // 2-of-2 multisig builder
+       this.createRawTransactionAsync    = createRawTransaction; // pure-lib tx builder
+       this.createPsbtAsync              = createPsbtAsync;      // PSBT creator
+       this.decodeRawTransactionAsync    = decodeRawTransactionAsync; // decode hex tx
+       this.decodepsbtAsync              = decodepsbtAsync;      // decode psbt hex
+       this.signrawtransactionwithwalletAsync= signRawTransaction;   // local signer
+       this.signpsbtAsync                = signPsbtLocal;
+       this.validateAddress= getPubkeyFromWif  
         this.handleOnEvents();
         this.onReady();
         this.initTrade();

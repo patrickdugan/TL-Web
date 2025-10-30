@@ -4,7 +4,20 @@
 const io = require('socket.io-client');
 const axios = require('axios');
 const BigNumber = require('bignumber.js');
-
+const {ensureBitcoin,
+  getExtensionSigner,
+  makeEphemeralKey,
+  signPsbtLocal,
+  getUnifiedSigner,
+  BigNumber,
+  makeNewAddress,
+  makeMultisig,
+  makeLocalRpc,
+  createRawTransaction,
+  createPsbtAsync, 
+  decodeRawTransactionAsync, 
+  decodepsbtAsync,
+  signRawTransaction}= require('./util');
 // Keep these requires so existing imports don't break if used elsewhere.
 let OrderbookSession;
 try { OrderbookSession = require('./orderbook.js'); } catch { OrderbookSession = null; }
@@ -12,6 +25,8 @@ let walletListener;
 try { walletListener = require('./tradelayer.js/src/walletInterface.js'); } catch { walletListener = null; }
 let createTransport;
 try { ({ createTransport } = require('./ws-transport')); } catch { createTransport = null; }
+import { getEphemeralKey, setEphemeralKey } from './keyStore.js';
+
 
 const { createLitecoinClient, createBitcoinClient } = (() => {
   try { return require('./client.js'); }
@@ -49,6 +64,7 @@ const RELAYER_PATHS = {
   orderPlace         : '/orders/place',
   orderCancel        : '/orders/cancel',
 };
+
 
 function fillPath(path, params = {}) {
   return path.replace(/:([A-Za-z_]\w*)/g, (_, k) => encodeURIComponent(params[k] ?? ''));
@@ -91,10 +107,26 @@ class ApiWrapper {
 
     // Orderbook session (optional, when not using relayer for books)
     this.orderbookSession = OrderbookSession ? new OrderbookSession() : null;
-
+    this.sessionKey = loadEphemeralKey();
     // Socket handle
     this.socket = null;
     setTimeout(() => { this.initUntilSuccess(); }, 0);
+  }
+
+  getEphemeralKey() {
+    return this.sessionKey;
+  }
+
+  async generateEphemeralKey(network = 'LTCTEST') {
+    const keyObj = makeNewAddress(network);
+    this.sessionKey = keyObj;
+    saveEphemeralKey(keyObj);
+    return keyObj;
+  }
+
+  clearEphemeralKey() {
+    this.sessionKey = null;
+    clearEphemeralKey();
   }
 
   // --- Socket setup (assigns this.socket if created) ---
@@ -261,10 +293,25 @@ class ApiWrapper {
     }
 
   async placeOrder(order) {
-    //if (this.apiMode) return await this._relayerPost(RELAYER_PATHS.orderPlace, order);
-    if (this.socket) { this.socket.emit('place-order', order); return { ok: true }; }
+    if (!this.sessionKey) {
+      const keyObj = makeNewAddress(this.network || 'LTCTEST');
+      this.sessionKey = keyObj;
+      setEphemeralKey(keyObj);
+    }
+
+    order.keypair = {
+      address: this.sessionKey.address,
+      pubkey: this.sessionKey.pubkey,
+    };
+
+    if (this.socket) {
+      this.socket.emit('place-order', order);
+      return { ok: true };
+    }
+
     throw new Error('No order placement backend available');
   }
+
 
   async cancelOrder(orderId) {
     //if (this.apiMode) return await this._relayerPost(RELAYER_PATHS.orderCancel, { orderId });

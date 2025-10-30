@@ -9,7 +9,7 @@ const BigNumber = require('bignumber.js');
 let OrderbookSession;
 try { OrderbookSession = require('./orderbook.js'); } catch { OrderbookSession = null; }
 let walletListener;
-try { walletListener = require('./tradelayer.js/src/walletInterface.js'); } catch { walletListener = null; }
+//try { walletListener = require('./tradelayer.js/src/walletInterface.js'); } catch { walletListener = null; }
 let createTransport;
 try { ({ createTransport } = require('./ws-transport')); } catch { createTransport = null; }
 
