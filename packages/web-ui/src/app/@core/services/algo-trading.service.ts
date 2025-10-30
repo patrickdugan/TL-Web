@@ -183,8 +183,8 @@ export class AlgoTradingService {
 
       switch (msg.type) {
         case 'log':
-          this.logs$.next({ systemId: msg.systemId, args: msg.args || [] });
-          break;
+          const text = msg.msg || (Array.isArray(msg.args) ? msg.args.join(' ') : String(msg));
+          this.logs$.next({ systemId: msg.systemId || 'worker', args: [text] });break;
         case 'metric': {
           const h = this.workers.get(msg.systemId);
           if (h && typeof msg.pnl === 'number') {
