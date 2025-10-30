@@ -171,6 +171,12 @@ export class AlgoTradingService {
     };
     this.workers.set(systemId, handle);
 
+    worker.onmessage = e => {
+  if (e.data?.type === 'log') {
+   
+  }
+};
+
     worker.onmessage = (ev: MessageEvent) => {
       const msg = ev.data;
       if (!msg || typeof msg !== 'object') return;

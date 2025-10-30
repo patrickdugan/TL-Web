@@ -39,15 +39,30 @@ export class AlgoTradingPageComponent implements OnInit, OnDestroy {
 
   constructor(private svc: AlgoTradingService, private fb: FormBuilder) {}
 
-  ngOnInit(): void {
-    void this.svc.init();
-    this.subs.push(
-      this.svc.discovery$.subscribe((d) => (this.discovery = d)),
-      this.svc.running$.subscribe((r) => (this.running = r)),
-    );
-    this.svc.fetchDiscovery();
-    this.svc.fetchRunning();
-  }
+ngOnInit(): void {
+  void this.svc.init();
+
+  this.subs.push(
+    this.svc.discovery$.subscribe((d) => (this.discovery = d)),
+    this.svc.running$.subscribe((r) => (this.running = r)),
+    this.svc.logs$.subscribe((entry: any) => {
+      let line: string;
+
+      if (Array.isArray(entry)) {
+        line = entry.join(' ');
+      } else if (entry && typeof entry === 'object' && 'systemId' in entry) {
+        line = `[${entry.systemId}] ${(entry.args || []).join(' ')}`;
+      } else {
+        line = String(entry);
+      }
+
+      this.appendLog(line);
+    })
+  ); // <-- only one closing paren here
+
+  this.svc.fetchDiscovery();
+  this.svc.fetchRunning();
+}
 
   ngOnDestroy(): void {
     for (const s of this.subs) s.unsubscribe();
