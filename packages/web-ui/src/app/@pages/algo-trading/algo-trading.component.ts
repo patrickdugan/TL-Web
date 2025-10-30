@@ -81,12 +81,14 @@ appendLog(line: string): void {
   if (lines.length > 300) this.workerLog = lines.slice(-300).join('\n');
 }
 
-clearWorkerConsole() {
-  this.workerLog = '';
+clearWorkerConsole(preserveTail: boolean = false): void {
+  if (preserveTail && this.workerLog) {
+    const tail = this.workerLog.split('\n').slice(-20).join('\n');
+    this.workerLog = `\n--- previous run tail ---\n${tail}\n--- new run ---\n`;
+  } else {
+    this.workerLog = '';
+  }
 }
-
-
-
 
   // simple forms
   allocationForm: FormGroup = this.fb.group({
