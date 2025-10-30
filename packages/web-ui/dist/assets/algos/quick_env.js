@@ -1,67 +1,78 @@
-// runAlgo.js
-require('dotenv').config(); // optional: reads .env if present
+// runAlgo.js  — browser/worker-safe version
 
-// prefer local ./tl, fall back to npm 'tradelayer'
-let ApiWrapper = require('./tl/algoAPI.js'); // catch { ApiWrapper = require('tradelayer'); }
+// load the API wrapper (ensure tl/algoAPI.js exists in same assets/algos folder)
+importScripts('tl/algoAPI.js');
+const ApiWrapper = self.ApiWrapper || ApiWrapper;
 
-const toBool = (v, d=false) =>
-  v === undefined ? d :
-  ['1','true','yes','on'].includes(String(v).trim().toLowerCase());
-
-const required = (name, def) => {
-  const v = process.env[name] ?? def;
-  if (v === undefined || v === '') {
-    throw new Error(`Missing required env: ${name}`);
-  }
-  return v;
-};
-
+// simple logger that streams to the UI and browser console
 function uiLog(...args) {
-  const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ');
+  const msg = args
+    .map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+    .join(' ');
   self.postMessage({ type: 'log', msg });
-  uiLog(...args); // still logs to worker console too
+  console.log('[worker]', msg);
 }
 
+// ---- CONFIG ----
+const HOST     = '172.81.181.19';
+const PORT     = 3001;
+const TESTNET  = true;
+const TL_ON    = false;
+const ADDRESS  = 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf';
+const PUBKEY   = '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677';
+const NETWORK  = 'LTCTEST';
+const SIZE     = 0.1;
 
-// ---- ENV CONFIG ----
-const HOST     = required('TL_HOST', '172.81.181.19'); // includes ws:// ws://172.26.37.103
-const PORT     = Number(process.env.TL_PORT ?? 3001);
-const TESTNET  = toBool(process.env.TL_TEST, true);          // true | false
-const TL_ON    = toBool(process.env.TL_TLON, false);          // your "tlAlreadyOn"
-const ADDRESS  = 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf' //required('TL_ADDRESS', 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf');
-const PUBKEY   = '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677' //required('TL_PUBKEY',  '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677');
-const NETWORK  = required('TL_NETWORK', 'LTCTEST');          // e.g., LTCTEST | BTCTEST | LTC
-const SIZE = required('SIZE', 0.1)
-uiLog('env config '+HOST+' '+PORT+' '+TESTNET+' '+TL_ON+' '+ADDRESS+' '+PUBKEY+' '+NETWORK)
+uiLog('[env]', HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
 // ---- INIT ----
 const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
+// ---- MAIN ----
 (async () => {
-  //uiLog('[cfg]', { HOST, PORT, TESTNET, TL_ON, ADDRESS, NETWORK });
+  try {
+    await api.delay(1500);
 
-  await api.delay(1500);
+    const me = api.getMyInfo();
+    uiLog('me:', me.address);
 
-  const me = api.getMyInfo();
-  uiLog('me:', me.address);
+    const spot = await api.getSpotMarkets();
+    uiLog('spot markets:', Array.isArray(spot) ? spot.length : 0);
 
-  const spot = await api.getSpotMarkets();
-  uiLog('spot:', Array.isArray(spot) ? spot.length : 0);
+    const ob = await api.getOrderbookData({
+      type: 'SPOT',
+      first_token: 0,
+      second_token: 5
+    });
+    uiLog('orderbook levels:', {
+      bids: ob?.bids?.length || 0,
+      asks: ob?.asks?.length || 0
+    });
 
-  const ob = await api.getOrderbookData({ type: 'SPOT', first_token: 0, second_token: 5 });
-  uiLog('orderbook levels:', { bids: ob?.bids?.length || 0, asks: ob?.asks?.length || 0 });
+    const order = {
+      type: 'SPOT',
+      action: 'BUY',
+      isLimitOrder: true,
+      keypair: {
+        address: ADDRESS,
+        pubkey: PUBKEY
+      },
+      props: {
+        id_for_sale: 0,
+        id_desired: 5,
+        price: 100,
+        amount: SIZE,
+        transfer: false
+      }
+    };
 
-  const order = {
-    type: 'SPOT',
-    action: 'BUY',
-    isLimitOrder: true,
-    keypair: { address: 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf' /*ADDRESS*/, pubkey: '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677'/*PUBKEY*/ },
-    props: { id_for_sale: 0, id_desired: 5, price: 100, amount: SIZE, transfer: false }
-  };
+    const uuid = await api.sendOrder(order);
+    uiLog('order sent:', uuid);
 
-  const uuid = await api.sendOrder(order);
-  uiLog('order sent:', uuid);
-})().catch(e => {
-  console.error('[fatal]', e);
-  process.exit(1);
-});
+    uiLog('[done]');
+    self.close();
+  } catch (e) {
+    uiLog('[fatal]', e.message || e);
+    console.error(e);
+  }
+})();
