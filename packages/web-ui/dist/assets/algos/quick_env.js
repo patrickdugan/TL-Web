@@ -1,16 +1,21 @@
 // runAlgo.js  — browser/worker-safe version
 
 // load the API wrapper (ensure tl/algoAPI.js exists in same assets/algos folder)
-importScripts('tl/algoAPI.js');
-const ApiWrapper = self.ApiWrapper || ApiWrapper;
+const ApiWrapper = require('./tl/algoAPI.js')
 
 // simple logger that streams to the UI and browser console
 function uiLog(...args) {
   const msg = args
     .map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
     .join(' ');
-  self.postMessage({ type: 'log', msg });
-  console.log('[worker]', msg);
+
+  if (typeof self !== 'undefined' && self.postMessage) {
+    // running inside WebWorker
+    self.postMessage({ type: 'log', msg });
+  } else {
+    // running under Node (quick_env.js CLI test)
+    console.log('[node]', msg);
+  }
 }
 
 // ---- CONFIG ----
