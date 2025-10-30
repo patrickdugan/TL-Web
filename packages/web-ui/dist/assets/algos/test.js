@@ -1,46 +1,50 @@
-// test_run.js — dummy algo that runs for 60 seconds
-
 function uiLog(...args) {
   const msg = args.map(a =>
-    typeof a === 'object' ? JSON.stringify(a) : a
+    typeof a === 'object' ? JSON.stringify(a) : String(a)
   ).join(' ');
-  self.postMessage({ type: 'log', msg });
-  console.log(...args); // still shows if you open the worker console
+  if (typeof self !== 'undefined' && self.postMessage) {
+    self.postMessage({ type: 'log', msg });
+  }
+  console.log('[worker]', msg);
 }
 
-uiLog('[test] worker started');
+// global catch for any unhandled crash
+self.addEventListener('error', e => {
+  uiLog('[worker error]', e.message);
+});
+self.addEventListener('unhandledrejection', e => {
+  uiLog('[unhandled rejection]', e.reason?.message || e.reason);
+});
 
-let i = 0;
-const timer = setInterval(() => {
-  i++;
-  uiLog(`[test] tick ${i}`);
-  if (i >= 30) {
-    uiLog('[test] done');
-    clearInterval(timer);
-    self.close();
-  }
-}, 2000);
+try {
+  uiLog('[boot] worker starting…');
+  // put a long timeout so you can attach debugger
+  setTimeout(() => {
+    uiLog('[boot] entering main logic');
+    try {
+      // your existing logic goes here
+      const ApiWrapper =
+        typeof require !== 'undefined'
+          ? require('./tl/algoAPI.js')
+          : (importScripts('tl/algoAPI.js'), self.ApiWrapper);
 
+      const api = new ApiWrapper(
+        '172.81.181.19',
+        3001,
+        true,
+        false,
+        'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
+        '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
+        'LTCTEST'
+      );
 
-/*
-(async () => {
-  uiLog('[test_run] starting dummy algo');
-
-  const start = Date.now();
-  const duration = 60_000; // 60 seconds
-
-  const interval = setInterval(() => {
-    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    uiLog(`[test_run] alive ${elapsed}s`);
-    if (Date.now() - start >= duration) {
-      uiLog('[test_run] done — exiting');
-      clearInterval(interval);
-      if (typeof self !== 'undefined' && self.close) {
-        self.close(); // for webworker
-      } else if (typeof process !== 'undefined' && process.exit) {
-        process.exit(0); // for node
-      }
+      uiLog('[api] constructed');
+      // maybe call a safe method first
+      api.getMyInfo && uiLog('[me]', JSON.stringify(api.getMyInfo()));
+    } catch (inner) {
+      uiLog('[inner crash]', inner.message || inner);
     }
-  }, 2000);
-})();
-*/
+  }, 8000);
+} catch (outer) {
+  uiLog('[outer crash]', outer.message || outer);
+}
