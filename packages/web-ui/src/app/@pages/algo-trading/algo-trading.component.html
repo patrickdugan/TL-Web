@@ -183,6 +183,14 @@
       </div>
     </div>
   </div>
+   <!-- Console Dock -->
+  <div class="worker-console">
+    <div class="console-header">
+      <span>Algo Console</span>
+      <button class="clear-btn" (click)="clearWorkerConsole()">Clear</button>
+    </div>
+    <pre id="worker-console-output">{{ workerLog }}</pre>
+  </div>
 </section>
 
   <!-- Inline allocate dialog -->

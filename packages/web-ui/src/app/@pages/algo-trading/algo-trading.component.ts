@@ -72,6 +72,21 @@ onFilePicked(ev: Event) {
   if (f) this.svc.registerStrategy(f).finally(() => this.showUpload = false);
 }
 
+public workerLog = '';
+
+appendLog(line: string): void {
+  this.workerLog += line + '\n';
+  // optional: auto-trim after 300 lines
+  const lines = this.workerLog.split('\n');
+  if (lines.length > 300) this.workerLog = lines.slice(-300).join('\n');
+}
+
+clearWorkerConsole() {
+  this.workerLog = '';
+}
+
+
+
 
   // simple forms
   allocationForm: FormGroup = this.fb.group({

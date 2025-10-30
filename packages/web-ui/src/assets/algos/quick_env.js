@@ -16,6 +16,11 @@ const required = (name, def) => {
   return v;
 };
 
+function uiLog(...args) {
+  const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ');
+  self.postMessage({ type: 'log', msg });
+  uiLog(...args); // still logs to worker console too
+}
 
 
 // ---- ENV CONFIG ----
@@ -27,24 +32,24 @@ const ADDRESS  = 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf' //required('TL_A
 const PUBKEY   = '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677' //required('TL_PUBKEY',  '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677');
 const NETWORK  = required('TL_NETWORK', 'LTCTEST');          // e.g., LTCTEST | BTCTEST | LTC
 const SIZE = required('SIZE', 0.1)
-console.log('env config '+HOST+' '+PORT+' '+TESTNET+' '+TL_ON+' '+ADDRESS+' '+PUBKEY+' '+NETWORK)
+uiLog('env config '+HOST+' '+PORT+' '+TESTNET+' '+TL_ON+' '+ADDRESS+' '+PUBKEY+' '+NETWORK)
 
 // ---- INIT ----
 const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
 (async () => {
-  //console.log('[cfg]', { HOST, PORT, TESTNET, TL_ON, ADDRESS, NETWORK });
+  //uiLog('[cfg]', { HOST, PORT, TESTNET, TL_ON, ADDRESS, NETWORK });
 
   await api.delay(1500);
 
   const me = api.getMyInfo();
-  console.log('me:', me.address);
+  uiLog('me:', me.address);
 
   const spot = await api.getSpotMarkets();
-  console.log('spot:', Array.isArray(spot) ? spot.length : 0);
+  uiLog('spot:', Array.isArray(spot) ? spot.length : 0);
 
   const ob = await api.getOrderbookData({ type: 'SPOT', first_token: 0, second_token: 5 });
-  console.log('orderbook levels:', { bids: ob?.bids?.length || 0, asks: ob?.asks?.length || 0 });
+  uiLog('orderbook levels:', { bids: ob?.bids?.length || 0, asks: ob?.asks?.length || 0 });
 
   const order = {
     type: 'SPOT',
@@ -55,7 +60,7 @@ const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK)
   };
 
   const uuid = await api.sendOrder(order);
-  console.log('order sent:', uuid);
+  uiLog('order sent:', uuid);
 })().catch(e => {
   console.error('[fatal]', e);
   process.exit(1);
