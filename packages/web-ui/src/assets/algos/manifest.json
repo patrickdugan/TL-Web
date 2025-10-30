@@ -29,14 +29,15 @@
     "status": "stopped",
     "amount": 0.025
   },
-  {
-    "id": "4d1d9a03",
-    "name": "run_bbo_tracker",
-    "fileName": "run_bbo_tracker.js",
-    "fullPath": "C:\\Users\\patri\\tradelayer-wallet\\trading-algos\\run_bbo_tracker.js",
-    "size": 9822,
-    "createdAt": 1761490347624.3774,
-    "status": "stopped",
-    "amount": 0
-  }
+{
+  "id": "test_run_60s",
+  "name": "Dummy 60s Algo",
+  "fileName": "test.js",
+  "fullPath": "C:\\Users\\patri\\tradelayer-wallet\\trading-algos\\test_run.js",
+  "size": 600,
+  "createdAt": 1761500000000,
+  "status": "stopped",
+  "amount": 0
+}
+
 ]
