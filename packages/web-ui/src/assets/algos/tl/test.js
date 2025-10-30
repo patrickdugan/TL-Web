@@ -1,12 +1,28 @@
 // test_run.js — dummy algo that runs for 60 seconds
 
 function uiLog(...args) {
-  const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ');
+  const msg = args.map(a =>
+    typeof a === 'object' ? JSON.stringify(a) : a
+  ).join(' ');
   self.postMessage({ type: 'log', msg });
-  uiLog(...args); // still logs to worker console too
+  console.log(...args); // still shows if you open the worker console
 }
 
+uiLog('[test] worker started');
 
+let i = 0;
+const timer = setInterval(() => {
+  i++;
+  uiLog(`[test] tick ${i}`);
+  if (i >= 30) {
+    uiLog('[test] done');
+    clearInterval(timer);
+    self.close();
+  }
+}, 2000);
+
+
+/*
 (async () => {
   uiLog('[test_run] starting dummy algo');
 
@@ -27,3 +43,4 @@ function uiLog(...args) {
     }
   }, 2000);
 })();
+*/
