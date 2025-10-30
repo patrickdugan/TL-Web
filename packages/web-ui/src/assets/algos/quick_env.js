@@ -24,6 +24,7 @@ self.addEventListener('unhandledrejection', e => {
 });
 uiLog('[debug] worker booted');
 
+setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
 const ApiWrapper = require('./tl/algoAPI.js')
 
