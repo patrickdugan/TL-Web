@@ -2,14 +2,17 @@
 const path = require('path');
 
 module.exports = {
-  entry: './algoAPI.js',             // your current main file
+  entry: './algoAPI.js',
   output: {
-    filename: 'algoAPI.bundle.js',   // output bundle name
-    path: path.resolve(__dirname, '../'), // write one folder up: /assets/algos/
-    library: 'ApiWrapper',           // will become self.ApiWrapper
-    libraryTarget: 'self',           // exposes it in the WebWorker global
+    filename: 'algoAPI.bundle.js',
+    path: path.resolve(__dirname, './'),
+    library: {
+      name: 'ApiWrapper',       // exposed as self.ApiWrapper
+      type: 'umd',              // <-- allows import() and <script> usage
+    },
+    globalObject: 'self',       // <-- ensures it works in worker or window
   },
-  target: 'webworker',               // so no Node built-ins are assumed
+  target: 'webworker',          // builds for browser/worker environment
   mode: 'production',
   resolve: {
     fallback: {
@@ -17,7 +20,7 @@ module.exports = {
       path: false,
       net: false,
       tls: false,
-      http:  require.resolve('stream-http'),
+      http: require.resolve('stream-http'),
       https: require.resolve('https-browserify'),
       crypto: require.resolve('crypto-browserify'),
       stream: require.resolve('stream-browserify'),
