@@ -30134,7 +30134,7 @@ module.exports = desc && typeof desc.get === 'function'
 /***/ 4812:
 /***/ (function(module, exports, __webpack_require__) {
 
-var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;// Full replacement: algoAPI.js
+var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;// Full replacement: algoAPI.js
 // Adds API mode with axios routing to relayer endpoints (URIs configurable via RELAYER_PATHS).
 // ---- logging bridge (works in worker or node) -----------------
 const log = // if worker script already defined uiLog, use it
@@ -30724,19 +30724,30 @@ var ApiWrapper = class ApiWrapper {
 // --- Final guaranteed export (anti-tree-shake + global attach) ---
 // ---- UNIVERSAL EXPORT ----
 (function (root, factory) {
+  var lib = factory();
+
   if ( true && module.exports) {
-    // Node / CommonJS
-    module.exports = factory();
+    module.exports = lib;
   } else if (true) {
-    // AMD
-    !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
-		__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
-		(__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__),
+    !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_RESULT__ = (function () {
+      return lib;
+    }).apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__),
 		__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
   } else // removed by dead control flow
-{ var g; }
-})(this, function () {
-  return ApiWrapper;
+{}
+})(typeof self !== 'undefined' ? self : this, function () {
+  // assume `ApiWrapper` is defined above
+  function createApiWrapper() {
+    // <--- the only place we actually do `new`
+    return new ApiWrapper(...arguments);
+  }
+
+  return {
+    ApiWrapper,
+    // the class (for desktop / node)
+    createApiWrapper // safe ctor (for the worker)
+
+  };
 });
 
 /***/ }),
