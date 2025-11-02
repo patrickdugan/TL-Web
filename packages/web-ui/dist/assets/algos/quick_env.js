@@ -30,41 +30,73 @@ uiLog('[debug] worker booted');
 let ApiWrapper; // must be declared at top level
 
 (async () => {
+  uiLog('[worker] starting dynamic import sequence');
+
+  let mod;
   try {
-    // dynamic import that works in worker context
-    const mod = await import('/assets/algos/tl/algoAPI.bundle.js');
-    ApiWrapper = mod.default ?? mod;
-    uiLog('[bundle length]'+mod.length)
-    // Now safe to use
-    const api = new ApiWrapper(
+    mod = await import('/assets/algos/tl/algoAPI.bundle.js');
+    uiLog('[import ok]', Object.keys(mod), mod.default ? 'has default export' : 'no default export');
+  } catch (err) {
+    uiLog('[import fail]', String(err?.message || err));
+    return; // bail early; nothing else will work without the bundle
+  }
+
+  try {
+    ApiWrapper = mod.default ?? mod.ApiWrapper ?? mod;
+    uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
+  } catch (err) {
+    uiLog('[resolve fail]', String(err?.message || err));
+  }
+
+  let api;
+  try {
+    api = new ApiWrapper(
       '172.81.181.19', 3001, true, false,
       'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
       '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
       'LTCTEST'
     );
+    uiLog('[constructed ApiWrapper]', Object.getOwnPropertyNames(Object.getPrototypeOf(api)));
+  } catch (err) {
+    uiLog('[construct fail]', String(err?.message || err));
+    return;
+  }
 
-    // Example of async flow to confirm it’s alive
-    await api.delay(1500);
-    //const me = api.getMyInfo();
-    uilog('[worker] address');
+  const delay = ms => new Promise(res => setTimeout(res, ms));
 
-    const spot = await api.getSpotMarkets();
-    uilog('spot markets', Array.isArray(spot) ? spot.length : 0);
+  try {
+    await delay(1500);
+    uiLog('[worker] delay passed');
+  } catch (err) {
+    uiLog('[delay fail]', String(err?.message || err));
+  }
 
-    const uuid = await api.sendOrder({
+  try {
+    // const me = api.getMyInfo?.() ?? {};
+    uiLog('[worker] attempting getSpotMarkets');
+    const spot = await api.getSpotMarkets?.();
+    uiLog('[worker] spot markets result', Array.isArray(spot) ? spot.length : JSON.stringify(spot));
+  } catch (err) {
+    uiLog('[getSpotMarkets fail]', String(err?.message || err));
+  }
+
+  try {
+    uiLog('[worker] attempting sendOrder');
+    const uuid = await api.sendOrder?.({
       type: 'SPOT',
       action: 'BUY',
       isLimitOrder: true,
       keypair: { address: '', pubkey: '' },
       props: { id_for_sale: 0, id_desired: 5, price: 100, amount: 0.1, transfer: false },
     });
-
-    uilog('order sent:', uuid);
+    uiLog('[worker] order sent uuid:', uuid);
   } catch (err) {
-    console.error('[ALGO async import error]', err);
-    api?.log('[ALGO async import error]', String(err.message || err));
+    uiLog('[sendOrder fail]', String(err?.message || err));
   }
+
+  uiLog('[worker] dynamic import sequence complete');
 })();
+
 
 /*
 // ---- CONFIG ----
