@@ -1,4 +1,3 @@
-// webpack.config.js
 const path = require('path');
 
 module.exports = {
@@ -6,18 +5,31 @@ module.exports = {
   output: {
     filename: 'algoAPI.bundle.js',
     path: path.resolve(__dirname, './'),
-    library: {
-      name: 'ApiWrapper',       // exposed as self.ApiWrapper
-      type: 'umd',
-      export: 'default',              // <-- allows import() and <script> usage
-    },
-    globalObject: 'self',       // <-- ensures it works in worker or window
+    library: 'ApiWrapper',          // exported global name
+    libraryTarget: 'umd',           // forces webpackUniversalModuleDefinition wrapper
+    globalObject: 'self',           // works in workers + window
+    umdNamedDefine: true,           // ensure AMD name matches
   },
-  experiments: {
-    outputModule: false  // ✅ ensure it does NOT emit ESM syntax
-  },
-  target: 'webworker',          // builds for browser/worker environment
   mode: 'production',
+  devtool: false,
+  target: 'webworker',
+  experiments: {
+    outputModule: false,            // prevents ESM stub
+  },
+  module: {
+    rules: [
+      {
+        test: /\.m?js$/,
+        exclude: /(node_modules)/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env'],
+          },
+        },
+      },
+    ],
+  },
   resolve: {
     fallback: {
       fs: false,

@@ -94,14 +94,6 @@ function signPsbtLocal(psbtBase64, wif, network) {
   return psbt.extractTransaction().toHex();
 }
 
-// ---------------------------------------------------------------------
-// ORIGINAL STUFF
-// ---------------------------------------------------------------------
-function ensureBitcoin() {
-  if (!bitcoin) throw new Error('bitcoinjs bundle not loaded');
-  return bitcoin;
-}
-
 /*async function getUnifiedSigner(preferredNetwork) {
   const ext = await getExtensionSigner();
   if (ext) {

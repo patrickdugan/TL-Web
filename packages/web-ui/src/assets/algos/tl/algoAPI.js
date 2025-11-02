@@ -398,7 +398,13 @@ async sendOrder(order) {
     }
 }
 
-if (typeof module !== 'undefined') module.exports = ApiWrapper;
-if (typeof exports !== 'undefined') exports.default = ApiWrapper;
-if (typeof self !== 'undefined') self.ApiWrapper = ApiWrapper;
-if (typeof globalThis !== 'undefined') globalThis.ApiWrapper = ApiWrapper;
+// ✅ UMD-safe export footer
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = ApiWrapper;
+} else if (typeof define === 'function' && define.amd) {
+  define([], () => ApiWrapper);
+} else if (typeof self !== 'undefined') {
+  self.ApiWrapper = ApiWrapper;
+} else if (typeof globalThis !== 'undefined') {
+  globalThis.ApiWrapper = ApiWrapper;
+}
