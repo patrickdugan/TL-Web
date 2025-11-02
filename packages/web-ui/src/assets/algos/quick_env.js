@@ -28,13 +28,15 @@ setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
 
 let ApiWrapper;
-if (typeof importScripts === 'function') {
-  // WebWorker or browser context
-  ApiWrapper = (await import('./tl/algoAPI.bundle.js')).default;
-} else {
-  // Node CLI test (quick_env.js)
+try {
+  // Works in browser and worker contexts that support dynamic import
+  ApiWrapper = (await import('./tl/algoAPI.bundle.js')).default 
+            ?? (await import('./tl/algoAPI.bundle.js'));
+} catch (err) {
+  // Fallback for Node CLI
   ApiWrapper = require('./tl/algoAPI.bundle.js');
 }
+
 
 // ---- CONFIG ----
 const HOST     = '172.81.181.19';
