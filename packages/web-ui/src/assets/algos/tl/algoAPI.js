@@ -495,27 +495,25 @@ async sendOrder(order) {
 // --- Final guaranteed export (anti-tree-shake + global attach) ---
 // ---- UNIVERSAL EXPORT ----
 (function (root, factory) {
-  var lib = factory();
-
   if (typeof module === 'object' && module.exports) {
-    module.exports = lib;
+    // Node / CommonJS
+    module.exports = factory();
   } else if (typeof define === 'function' && define.amd) {
-    define([], function () { return lib; });
+    // AMD
+    define([], factory);
   } else {
-    // browser / worker
-    (root || (typeof self !== 'undefined' ? self : globalThis)).TLAlgoAPI = lib;
+    // Browser, WebWorker, ServiceWorker — attach globally
+    var g = (typeof self !== 'undefined')
+      ? self
+      : (typeof globalThis !== 'undefined'
+          ? globalThis
+          : (typeof window !== 'undefined'
+              ? window
+              : this));
+    g.ApiWrapper = factory();
   }
-})(typeof self !== 'undefined' ? self : this, function () {
-  // assume `ApiWrapper` is defined above
-
-  function createApiWrapper(/* ...args */) {
-    // <--- the only place we actually do `new`
-    return new ApiWrapper(...arguments);
-  }
-
-  return {
-    ApiWrapper,        // the class (for desktop / node)
-    createApiWrapper,  // safe ctor (for the worker)
-  };
+})(this, function () {
+  return ApiWrapper;
 });
+
 
