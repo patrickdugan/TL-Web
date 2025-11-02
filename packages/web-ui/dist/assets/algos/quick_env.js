@@ -1,72 +1,85 @@
-// runAlgo.js (worker)
+// runAlgo.js  — browser/worker-safe version
 function uiLog(...args) {
-  const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+  const msg = args
+    .map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+    .join(' ');
+
   if (typeof self !== 'undefined' && self.postMessage) {
+    // running inside WebWorker
     self.postMessage({ type: 'log', msg });
   } else {
+    // running under Node (quick_env.js CLI test)
     console.log('[node]', msg);
   }
 }
 
+// load the API wrapper (ensure tl/algoAPI.js exists in same assets/algos folder)
 self.addEventListener('error', e => {
-  uiLog('[WorkerError]', e.message);
+  self.postMessage({ type: 'log', msg: '[WorkerError] ' + e.message });
+  console.error(e);
 });
 self.addEventListener('unhandledrejection', e => {
-  uiLog('[UnhandledRejection]', e.reason && e.reason.message ? e.reason.message : String(e.reason));
+  self.postMessage({ type: 'log', msg: '[UnhandledRejection] ' + e.reason });
+  console.error(e.reason);
 });
-
 uiLog('[debug] worker booted');
 
 (async () => {
+  uiLog('[worker] start import (with fallback)');
+
   const BUNDLE_URL = '/assets/algos/tl/algoAPI.bundle.js';
 
-  // 1) try normal dynamic import
-  try {
-    await import(BUNDLE_URL);
-    uiLog('[worker] dynamic import ok');
-  } catch (err) {
-    uiLog('[worker] dynamic import failed:', err?.message || String(err));
-
-    // 2) fetch text and patch the bad shapes
+  async function tryDynamicImport() {
     try {
-      uiLog('[worker] fetching bundle to patch …');
-      const res = await fetch(BUNDLE_URL, { cache: 'no-store' });
-      let src = await res.text();
+      await import(BUNDLE_URL);
+      uiLog('[worker] dynamic import ok');
+      return true;
+    } catch (err) {
+      const msg = err?.message || String(err);
+      uiLog('[worker] dynamic import failed:', msg);
 
-      // (a) fix "return ApiWrapper()" → "return ApiWrapper"
-      src = src.replace(
-        /return\s+ApiWrapper\s*\(\s*\)\s*;?/g,
-        'return ApiWrapper;'
-      );
+      // this is the one you're seeing
+      const isCtorErr = msg.includes('Class constructor ApiWrapper cannot be invoked without \'new\'');
+      return isCtorErr ? false : false; // false = go to fallback
+    }
+  }
 
-      // (b) fix "g.ApiWrapper = factory();" → object export
-      src = src.replace(
-        /g\.ApiWrapper\s*=\s*factory\(\);\s*/g,
-        'g.TLAlgoAPI = (function(){' +
-          'const Api = factory();' +
-          'return { ApiWrapper: Api, createApiWrapper: function(){ return new Api(...arguments); } };' +
-        '})();'
-      );
+  async function evalPatchedBundle() {
+    uiLog('[worker] fetching bundle to patch …');
+    const res = await fetch(BUNDLE_URL, { cache: 'no-store' });
+    const src = await res.text();
 
-      // (c) also fix CommonJS form if present
-      src = src.replace(
-        /module\.exports\s*=\s*factory\(\);\s*/g,
-        'module.exports = (function(){' +
-          'const Api = factory();' +
-          'return { ApiWrapper: Api, createApiWrapper: function(){ return new Api(...arguments); } };' +
-        '})();'
-      );
+    // minimal patch: take the old "g.ApiWrapper = factory();" shape
+    // and make it export an object instead
+    const patched = src.replace(
+      /g\.ApiWrapper\s*=\s*factory\(\);\s*$/,
+      // ↓ this is what we actually wanted all along
+      'g.TLAlgoAPI = (function(){' +
+        'const Api = factory();' +
+        'return { ApiWrapper: Api, createApiWrapper: function(){ return new Api(...arguments); } };' +
+      '})();'
+    );
 
-      uiLog('[worker] evaluating patched bundle …');
-      (0, eval)(src);
-      uiLog('[worker] patched bundle evaluated');
+    uiLog('[worker] evaluating patched bundle …');
+    // run in worker scope
+    (0, eval)(patched);
+    uiLog('[worker] patched bundle evaluated');
+  }
+
+  // 1) try normal way
+  let imported = await tryDynamicImport();
+
+  // 2) if that blew up with the class-ctor thing, do the patch
+  if (!imported) {
+    try {
+      await evalPatchedBundle();
     } catch (e) {
       uiLog('[worker] fallback eval failed:', e?.message || String(e));
       return;
     }
   }
 
-  // 3) now try to read what the bundle left us
+  // 3) now normalize whatever we got on global
   const g = typeof self !== 'undefined' ? self : globalThis;
   const exported = g.TLAlgoAPI || g.ApiWrapper;
 
@@ -75,27 +88,29 @@ uiLog('[debug] worker booted');
     return;
   }
 
-  // shared hardcoded cfg (you can wire from FE later)
+  // single place for your env
   const cfg = [
-    'ws.layerwallet.com',
-    443,
-    true,
-    false,
-    'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
-    '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
+    'ws.layerwallet.com',                  // host
+    443,                                   // port
+    true,                                  // test
+    false,                                 // tlAlreadyOn
+    'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf', // address
+    '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677', // pubkey
     'LTCTEST'
   ];
 
   let api;
 
+  // preferred: patched shape
   if (typeof exported === 'object' && typeof exported.createApiWrapper === 'function') {
-    uiLog('[worker] using createApiWrapper');
+    uiLog('[worker] using createApiWrapper from patched export');
     api = exported.createApiWrapper(...cfg);
   } else if (typeof exported === 'function') {
+    // old shape, still works
     uiLog('[worker] using class export');
     api = new exported(...cfg);
   } else {
-    uiLog('[worker] using instance export');
+    // already-instantiated weird shape
     api = exported;
   }
 
@@ -104,7 +119,10 @@ uiLog('[debug] worker booted');
     return;
   }
 
-  uiLog('[ok] api ready', Object.getOwnPropertyNames(Object.getPrototypeOf(api)));
+  uiLog(
+    '[ok] api ready',
+    Object.getOwnPropertyNames(Object.getPrototypeOf(api))
+  );
 
   // smoke test
   try {
@@ -114,6 +132,7 @@ uiLog('[debug] worker booted');
     uiLog('[getSpotMarkets fail]', e?.message || String(e));
   }
 })();
+
 
 /*
 (async () => {
