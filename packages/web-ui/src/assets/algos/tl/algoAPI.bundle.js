@@ -30132,9 +30132,9 @@ module.exports = desc && typeof desc.get === 'function'
 /***/ }),
 
 /***/ 4812:
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+/***/ (function(module, exports, __webpack_require__) {
 
-// Full replacement: algoAPI.js
+var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;// Full replacement: algoAPI.js
 // Adds API mode with axios routing to relayer endpoints (URIs configurable via RELAYER_PATHS).
 // ---- logging bridge (works in worker or node) -----------------
 const log = // if worker script already defined uiLog, use it
@@ -30720,25 +30720,24 @@ var ApiWrapper = class ApiWrapper {
 
   }
 
-}; // --- Final hard export (no tree-shake, no closure loss) ---
+} // --- Final hard export (no tree-shake, no closure loss) ---
 // --- Final guaranteed export (anti-tree-shake + global attach) ---
-// keep methods alive
-
-const __keepApiWrapperMethods = [ApiWrapper.prototype.getSpotMarkets, ApiWrapper.prototype.getFuturesMarkets, ApiWrapper.prototype.initApiMode, ApiWrapper.prototype.sendOrder, ApiWrapper.prototype.getOrderbookData, ApiWrapper.prototype._initializeSocket, ApiWrapper.prototype.cancelOrder].filter(Boolean);
-
-if (typeof globalThis !== 'undefined') {
-  globalThis.ApiWrapper = ApiWrapper;
-}
-
-if ( true && module.exports) {
-  module.exports = ApiWrapper;
-} // bottom of algoAPI.js
-
-
-const exported = {
-  ApiWrapper
-};
-if ( true && module.exports) module.exports = exported;else if (typeof self !== 'undefined') self.tlApi = exported;else globalThis.tlApi = exported;
+// ---- UNIVERSAL EXPORT ----
+(function (root, factory) {
+  if ( true && module.exports) {
+    // Node / CommonJS
+    module.exports = factory();
+  } else if (true) {
+    // AMD
+    !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
+		__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
+		(__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__),
+		__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+  } else // removed by dead control flow
+{ var g; }
+})(this, function () {
+  return ApiWrapper;
+});
 
 /***/ }),
 
