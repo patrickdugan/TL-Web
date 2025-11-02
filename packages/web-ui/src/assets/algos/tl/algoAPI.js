@@ -445,26 +445,6 @@ getMyInfo() {
   return this.myInfo || { address: null, keypair: { address: null, pubkey: null } };
 }
 
-/** fetch list of SPOT markets */
-async getSpotMarkets() {
-  try {
-    if (this.apiMode) {
-      // use relayer REST if available
-      const { data } = await this.relayer.get('/markets/spot');
-      return data;
-    }
-    // if node-local or relayer missing, fallback to socket request
-    if (!this.socket) this._initializeSocket();
-    if (this.socket) {
-      return await this._relayerPost('/markets/spot'); // reuse axios path
-    }
-    return [];
-  } catch (err) {
-    console.error('[getSpotMarkets] error:', err);
-    return [];
-  }
-}
-
 /** submit a SPOT or FUTURES order */
 async sendOrder(order) {
   try {
@@ -513,31 +493,21 @@ async sendOrder(order) {
 }
 // --- Final hard export (no tree-shake, no closure loss) ---
 // --- Final guaranteed export (anti-tree-shake + global attach) ---
-try {
-  // Assign globally in all environments
-  const ref = ApiWrapper;
-  if (typeof globalThis !== 'undefined') globalThis.ApiWrapper = ref;
-  if (typeof window !== 'undefined') window.ApiWrapper = ref;
-  if (typeof self !== 'undefined') self.ApiWrapper = ref;
+// keep methods alive
+const __keepApiWrapperMethods = [
+  ApiWrapper.prototype.getSpotMarkets,
+  ApiWrapper.prototype.getFuturesMarkets,
+  ApiWrapper.prototype.initApiMode,
+  ApiWrapper.prototype.sendOrder,
+  ApiWrapper.prototype.getOrderbookData,
+  ApiWrapper.prototype._initializeSocket,
+  ApiWrapper.prototype.cancelOrder
+].filter(Boolean);
 
-  // Force property visibility even if sealed or minified
-  Object.defineProperty(globalThis, 'ApiWrapper', {
-    value: ref,
-    writable: true,
-    enumerable: true,
-    configurable: true,
-  });
-
-  // Make sure prototype isn’t lost to closure
-  Object.defineProperty(ref, '__preserve', { value: true });
-  Object.defineProperty(ref.prototype, '__preserve', { value: true });
-
-  // Export for Node + AMD
-  if (typeof module !== 'undefined' && module.exports) module.exports = ref;
-  else if (typeof define === 'function' && define.amd) define([], () => ref);
-
-  // Debug visibility
-  console.log('[export] ApiWrapper prototype keys:', Object.getOwnPropertyNames(ref.prototype || {}));
-} catch (e) {
-  console.error('[export] hard fail', e);
+if (typeof globalThis !== 'undefined') {
+  globalThis.ApiWrapper = ApiWrapper;
 }
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = ApiWrapper;
+}
+
