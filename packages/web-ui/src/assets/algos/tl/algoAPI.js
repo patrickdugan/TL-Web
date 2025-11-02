@@ -398,4 +398,5 @@ async sendOrder(order) {
     }
 }
 
-module.exports = ApiWrapper;
+if (typeof module !== 'undefined') module.exports = ApiWrapper;
+if (typeof self !== 'undefined') self.ApiWrapper = ApiWrapper;

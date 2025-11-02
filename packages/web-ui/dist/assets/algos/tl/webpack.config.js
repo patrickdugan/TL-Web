@@ -8,7 +8,8 @@ module.exports = {
     path: path.resolve(__dirname, './'),
     library: {
       name: 'ApiWrapper',       // exposed as self.ApiWrapper
-      type: 'umd',              // <-- allows import() and <script> usage
+      type: 'umd',
+      export: 'default',              // <-- allows import() and <script> usage
     },
     globalObject: 'self',       // <-- ensures it works in worker or window
   },
