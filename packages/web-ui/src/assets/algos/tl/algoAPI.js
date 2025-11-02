@@ -401,3 +401,4 @@ async sendOrder(order) {
 if (typeof module !== 'undefined') module.exports = ApiWrapper;
 if (typeof exports !== 'undefined') exports.default = ApiWrapper;
 if (typeof self !== 'undefined') self.ApiWrapper = ApiWrapper;
+if (typeof globalThis !== 'undefined') globalThis.ApiWrapper = ApiWrapper;

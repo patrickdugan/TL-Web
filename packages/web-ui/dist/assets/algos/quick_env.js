@@ -34,21 +34,20 @@ let ApiWrapper; // must be declared at top level
   let mod;
   try {
     mod = await import('/assets/algos/tl/algoAPI.bundle.js');
-    uiLog('[import ok]', 'typeof mod =', typeof mod);
+    uiLog('[import keys]', Object.keys(mod));
 
-    // dump keys and first-level structure
-    const keys = Object.keys(mod || {});
-    uiLog('[import keys]', JSON.stringify(keys));
-
-    // try inspecting nested values
-    for (const k of keys) {
-      const val = mod[k];
-      uiLog(`[inspect ${k}]`, typeof val, val && val.constructor && val.constructor.name);
-      if (typeof val === 'object') {
-        const innerKeys = Object.keys(val);
-        uiLog(`[${k} innerKeys]`, JSON.stringify(innerKeys.slice(0, 10)));
-      }
+    if (typeof mod.ApiWrapper === 'function') {
+      ApiWrapper = mod.ApiWrapper;
+      uiLog('[using named export]');
+    } else if (mod.default && typeof mod.default.ApiWrapper === 'function') {
+      ApiWrapper = mod.default.ApiWrapper;
+      uiLog('[using default.ApiWrapper]');
+    } else if (typeof mod.default === 'function') {
+      ApiWrapper = mod.default;
+      uiLog('[using default function]');
     }
+    uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
+
   } catch (err) {
     uiLog('[import fail]', String(err?.message || err));
     return;
