@@ -1,13 +1,17 @@
 <!DOCTYPE html><html lang="en"><head>
 <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: data:;
-    connect-src 'self' https: wss:;
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' data: https:;
+    img-src 'self' data: blob:;
+    media-src 'self' data: blob:;
     font-src 'self' data:;
+    script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'inline-speculation-rules';
+    style-src 'self' 'unsafe-inline';
+    connect-src 'self' https://api.layerwallet.com https://api-testnet.layerwallet.com wss://ws.layerwallet.com wss://ws-testnet.layerwallet.com;
+    worker-src 'self' blob:;
+    frame-src 'self';
+    object-src 'none';
   ">
- 
+
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-EFYGCSNN2S"></script>
 <script>

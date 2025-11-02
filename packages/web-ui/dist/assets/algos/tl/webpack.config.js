@@ -2,21 +2,21 @@
 const path = require('path');
 
 module.exports = {
-  mode: 'production',
-  target: 'webworker', // ensures no Node built-ins
   entry: './algoAPI.js',
-
   output: {
     filename: 'algoAPI.bundle.js',
-    path: path.resolve(__dirname, '../'),
+    path: path.resolve(__dirname, './'),
     library: {
-      name: 'ApiWrapper', // will expose as self.ApiWrapper
-      type: 'umd',        // <- crucial: UMD, not ESM
+      name: 'ApiWrapper',       // exposed as self.ApiWrapper
+      type: 'umd',              // <-- allows import() and <script> usage
     },
-    globalObject: 'self', // makes it work in Worker & Window
-    clean: true,
+    globalObject: 'self',       // <-- ensures it works in worker or window
   },
-
+  experiments: {
+    outputModule: false  // ✅ ensure it does NOT emit ESM syntax
+  },
+  target: 'webworker',          // builds for browser/worker environment
+  mode: 'production',
   resolve: {
     fallback: {
       fs: false,
@@ -28,9 +28,5 @@ module.exports = {
       crypto: require.resolve('crypto-browserify'),
       stream: require.resolve('stream-browserify'),
     },
-  },
-
-  experiments: {
-    outputModule: false, // make absolutely sure it doesn't emit `import`
   },
 };
