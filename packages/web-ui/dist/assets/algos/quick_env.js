@@ -26,7 +26,7 @@ uiLog('[debug] worker booted');
 
 //setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
-let ApiWrapper; // must be declared at top level
+let ApiWrapper;
 
 (async () => {
   uiLog('[worker] starting dynamic import sequence');
@@ -37,50 +37,44 @@ let ApiWrapper; // must be declared at top level
     uiLog('[import ok] typeof mod =', typeof mod);
     uiLog('[import keys]', Object.keys(mod));
 
-    if (typeof mod === 'object') {
-      for (const [k, v] of Object.entries(mod)) {
-        uiLog(`[mod entry] ${k}: ${typeof v}`);
-      }
-    }
+    // 🔍 inspect factory return
+    uiLog('[mod as string]', JSON.stringify(mod, null, 2));
 
-    // extra globals visibility
-    uiLog('[typeof globalThis.ApiWrapper]', typeof globalThis.ApiWrapper);
-    uiLog('[typeof self.ApiWrapper]', typeof self.ApiWrapper);
-
-    // smart resolution fallback chain
+    // 🔧 capture all plausible shapes
     ApiWrapper =
-      (typeof mod === 'function') ? mod :
-      (typeof mod.default === 'function') ? mod.default :
-      (typeof mod.ApiWrapper === 'function') ? mod.ApiWrapper :
-      (mod?.default?.ApiWrapper && typeof mod.default.ApiWrapper === 'function') ? mod.default.ApiWrapper :
-      (typeof globalThis.ApiWrapper === 'function') ? globalThis.ApiWrapper :
-      (globalThis.ApiWrapper && typeof globalThis.ApiWrapper.ApiWrapper === 'function') ? globalThis.ApiWrapper.ApiWrapper :
+      (mod && typeof mod === 'function') ? mod :
+      (mod && typeof mod.default === 'function') ? mod.default :
+      (mod && mod.ApiWrapper && typeof mod.ApiWrapper === 'function') ? mod.ApiWrapper :
+      (mod && typeof mod.default?.ApiWrapper === 'function') ? mod.default.ApiWrapper :
       (typeof self.ApiWrapper === 'function') ? self.ApiWrapper :
       (self.ApiWrapper && typeof self.ApiWrapper.ApiWrapper === 'function') ? self.ApiWrapper.ApiWrapper :
       undefined;
 
-    uiLog('[final ApiWrapper typeof]', typeof ApiWrapper);
-    uiLog('[ApiWrapper instanceof Function?]', ApiWrapper instanceof Function);
-
+    uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
   } catch (err) {
     uiLog('[import fail]', String(err?.message || err));
     return;
   }
 
-  // construct safely
+  // 🚀 test instantiation
   try {
-    if (typeof ApiWrapper !== 'function') throw new Error('ApiWrapper not a constructor');
+    if (typeof ApiWrapper !== 'function') {
+      uiLog('[construct skip] ApiWrapper not a function');
+      return;
+    }
+
     const api = new ApiWrapper(
       '172.81.181.19', 3001, true, false,
       'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
       '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
       'LTCTEST'
     );
-    uiLog('[construct ok]', api ? 'instance created' : 'none');
+    uiLog('[construct ok]', !!api);
   } catch (err) {
     uiLog('[construct fail]', err.message || err);
   }
 })();
+
 
 
 /*
