@@ -130,6 +130,36 @@ class ApiWrapper {
     clearEphemeralKey();
   }
 
+loadEphemeralKey() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('ephemeral_key');
+      if (raw){ 
+        return JSON.parse(raw);
+      }else{
+        generateEphemeralKey()
+      }
+
+    }
+  } catch (err) {
+    console.warn('[EphemeralKey] localStorage read failed', err);
+  }
+  return null;
+}
+
+saveEphemeralKey(eph) {
+  try {
+    if (typeof localStorage !== 'undefined' && eph) {
+      localStorage.setItem('ephemeral_key', JSON.stringify(eph));
+      return true;
+    }
+  } catch (err) {
+    console.warn('[EphemeralKey] localStorage save failed', err);
+  }
+  return false;
+}
+
+
   // --- Socket setup (assigns this.socket if created) ---
   _initializeSocket() {
     if (this.socket) return this.socket;
