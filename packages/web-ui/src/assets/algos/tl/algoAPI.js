@@ -512,19 +512,32 @@ async sendOrder(order) {
     }
 }
 // --- Final hard export (no tree-shake, no closure loss) ---
+// --- Final guaranteed export (anti-tree-shake + global attach) ---
 try {
-  // Force a reference so Terser keeps it
-  const _ApiWrapperRef = ApiWrapper;
-  // Attach everywhere possible
-  (typeof globalThis !== 'undefined' ? globalThis : self).ApiWrapper = _ApiWrapperRef;
-  if (typeof window !== 'undefined') window.ApiWrapper = _ApiWrapperRef;
-  if (typeof self !== 'undefined') self.ApiWrapper = _ApiWrapperRef;
-  if (typeof module !== 'undefined' && module.exports) module.exports = _ApiWrapperRef;
-  if (typeof define === 'function' && define.amd) define([], () => _ApiWrapperRef);
-  // expose name for diagnostics
-  log('[export] ApiWrapper prototype keys:', Object.keys(_ApiWrapperRef?.prototype || {}));
-} catch (err) {
-  log('[export] failed', err);
-}
+  // Assign globally in all environments
+  const ref = ApiWrapper;
+  if (typeof globalThis !== 'undefined') globalThis.ApiWrapper = ref;
+  if (typeof window !== 'undefined') window.ApiWrapper = ref;
+  if (typeof self !== 'undefined') self.ApiWrapper = ref;
 
-Object.defineProperty(globalThis, 'ApiWrapper', { value: ApiWrapper, writable: true });
+  // Force property visibility even if sealed or minified
+  Object.defineProperty(globalThis, 'ApiWrapper', {
+    value: ref,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+
+  // Make sure prototype isn’t lost to closure
+  Object.defineProperty(ref, '__preserve', { value: true });
+  Object.defineProperty(ref.prototype, '__preserve', { value: true });
+
+  // Export for Node + AMD
+  if (typeof module !== 'undefined' && module.exports) module.exports = ref;
+  else if (typeof define === 'function' && define.amd) define([], () => ref);
+
+  // Debug visibility
+  console.log('[export] ApiWrapper prototype keys:', Object.getOwnPropertyNames(ref.prototype || {}));
+} catch (e) {
+  console.error('[export] hard fail', e);
+}
