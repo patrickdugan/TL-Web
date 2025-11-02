@@ -303,7 +303,7 @@ function getPubkeyFromWif(wif, networkName = 'LTCTEST') {
 module.exports = {
   // original
   ensureBitcoin,
-  getExtensionSigner,
+  //getExtensionSigner,
   makeEphemeralKey,
   signPsbtLocal,
   getUnifiedSigner,

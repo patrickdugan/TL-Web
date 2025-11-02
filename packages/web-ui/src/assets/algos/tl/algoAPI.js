@@ -5,7 +5,7 @@ const io = require('socket.io-client');
 const axios = require('axios');
 const BigNumber = require('bignumber.js');
 const {ensureBitcoin,
-  getExtensionSigner,
+  //getExtensionSigner,
   makeEphemeralKey,
   signPsbtLocal,
   getUnifiedSigner,

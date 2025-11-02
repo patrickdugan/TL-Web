@@ -3,7 +3,7 @@
 const Encode = require('./tradelayer.js/src/txEncoder.js');
 const { buildLitecoinTransaction, buildTokenTradeTransaction, buildFuturesTransaction, getUTXOFromCommit,signPsbtRawTx } = require('./litecoreTxBuilder');
 const { getNewAddress, makeMultisig, getUnifiedSigner, ensureBitcoin,
-  getExtensionSigner,
+  //getExtensionSigner,
   makeEphemeralKey,
   signPsbtLocal,
   BigNumber,
