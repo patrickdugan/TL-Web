@@ -34,43 +34,38 @@ let ApiWrapper; // must be declared at top level
   let mod;
   try {
     mod = await import('/assets/algos/tl/algoAPI.bundle.js');
-uiLog('[import ok] typeof mod =', typeof mod);
-uiLog('[import keys]', Object.keys(mod));
-uiLog('[mod dump]', JSON.stringify(mod, null, 2));
+    uiLog('[import ok] typeof mod =', typeof mod);
+    uiLog('[import keys]', Object.keys(mod));
 
-  ApiWrapper =
-  (typeof mod === 'function' ? mod :
-   mod?.default && typeof mod.default === 'function' ? mod.default :
-   mod?.ApiWrapper && typeof mod.ApiWrapper === 'function' ? mod.ApiWrapper :
-   globalThis.ApiWrapper ||
-   self.ApiWrapper);
-uiLog('[ApiWrapper resolved via typeof]', typeof ApiWrapper);
-uiLog('[ApiWrapper is function?]', ApiWrapper instanceof Function);
+    if (typeof mod === 'object') {
+      for (const [k, v] of Object.entries(mod)) {
+        uiLog(`[mod entry] ${k}: ${typeof v}`);
+      }
+    }
+
+    // extra globals visibility
+    uiLog('[typeof globalThis.ApiWrapper]', typeof globalThis.ApiWrapper);
+    uiLog('[typeof self.ApiWrapper]', typeof self.ApiWrapper);
+
+    // smart resolution fallback chain
+    ApiWrapper =
+      (typeof mod === 'function') ? mod :
+      (typeof mod.default === 'function') ? mod.default :
+      (typeof mod.ApiWrapper === 'function') ? mod.ApiWrapper :
+      (mod?.default?.ApiWrapper && typeof mod.default.ApiWrapper === 'function') ? mod.default.ApiWrapper :
+      (typeof globalThis.ApiWrapper === 'function') ? globalThis.ApiWrapper :
+      (globalThis.ApiWrapper && typeof globalThis.ApiWrapper.ApiWrapper === 'function') ? globalThis.ApiWrapper.ApiWrapper :
+      (typeof self.ApiWrapper === 'function') ? self.ApiWrapper :
+      (self.ApiWrapper && typeof self.ApiWrapper.ApiWrapper === 'function') ? self.ApiWrapper.ApiWrapper :
+      undefined;
+
+    uiLog('[final ApiWrapper typeof]', typeof ApiWrapper);
+    uiLog('[ApiWrapper instanceof Function?]', ApiWrapper instanceof Function);
 
   } catch (err) {
     uiLog('[import fail]', String(err?.message || err));
     return;
   }
-
-  // choose best candidate for ApiWrapper
-  if (typeof mod.ApiWrapper === 'function') {
-    ApiWrapper = mod.ApiWrapper;
-    uiLog('[using named export] ApiWrapper');
-  } else if (typeof mod.default === 'function') {
-    ApiWrapper = mod.default;
-    uiLog('[using default export]');
-  } else if (mod && mod.default && typeof mod.default.ApiWrapper === 'function') {
-    ApiWrapper = mod.default.ApiWrapper;
-    uiLog('[using nested default.ApiWrapper]');
-  } else {
-    // last-ditch search
-    const nested = Object.values(mod).find(v => v && typeof v.ApiWrapper === 'function');
-    ApiWrapper = nested?.ApiWrapper;
-    uiLog('[using nested ApiWrapper path]', nested ? 'found' : 'none');
-  }
-
-  // diagnostic
-  uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
 
   // construct safely
   try {
