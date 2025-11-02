@@ -511,15 +511,19 @@ async sendOrder(order) {
         }else{throw new Error('Invalid response format: futures markets not found')};
     }
 }
-// --- Robust export footer (browser, worker, Node safe) ---
-if (typeof ApiWrapper === 'function') {
-  if (typeof self !== 'undefined') self.ApiWrapper = ApiWrapper;
-  if (typeof globalThis !== 'undefined') globalThis.ApiWrapper = ApiWrapper;
-  if (typeof window !== 'undefined') window.ApiWrapper = ApiWrapper;
-  if (typeof module !== 'undefined' && module.exports) module.exports = ApiWrapper;
-  if (typeof define === 'function' && define.amd) define([], () => ApiWrapper);
-  void ApiWrapper; // keep symbol alive during minification
-} else {
-  console.error('[export] ApiWrapper not found at bundle bottom');
+// --- Final hard export (no tree-shake, no closure loss) ---
+try {
+  // Force a reference so Terser keeps it
+  const _ApiWrapperRef = ApiWrapper;
+  // Attach everywhere possible
+  (typeof globalThis !== 'undefined' ? globalThis : self).ApiWrapper = _ApiWrapperRef;
+  if (typeof window !== 'undefined') window.ApiWrapper = _ApiWrapperRef;
+  if (typeof self !== 'undefined') self.ApiWrapper = _ApiWrapperRef;
+  if (typeof module !== 'undefined' && module.exports) module.exports = _ApiWrapperRef;
+  if (typeof define === 'function' && define.amd) define([], () => _ApiWrapperRef);
+  // expose name for diagnostics
+  log('[export] ApiWrapper prototype keys:', Object.keys(_ApiWrapperRef?.prototype || {}));
+} catch (err) {
+  log('[export] failed', err);
 }
 
