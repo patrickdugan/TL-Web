@@ -6,7 +6,7 @@ const axios = require('axios');
 const BigNumber = require('bignumber.js');
 const {ensureBitcoin,
   //getExtensionSigner,
-  makeEphemeralKey,
+  //makeEphemeralKey,
   signPsbtLocal,
   getUnifiedSigner,
   makeNewAddress,

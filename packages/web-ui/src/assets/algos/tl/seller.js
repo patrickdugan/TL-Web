@@ -6,7 +6,7 @@ const {
   // original
   ensureBitcoin,
   //getExtensionSigner,
-  makeEphemeralKey,
+  //makeEphemeralKey,
   signPsbtLocal,
   getUnifiedSigner,
   // new

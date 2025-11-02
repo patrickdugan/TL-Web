@@ -304,7 +304,7 @@ module.exports = {
   // original
   ensureBitcoin,
   //getExtensionSigner,
-  makeEphemeralKey,
+  //makeEphemeralKey,
   signPsbtLocal,
   getUnifiedSigner,
   BigNumber,
