@@ -31,38 +31,28 @@ let ApiWrapper;
 (async () => {
   uiLog('[worker] starting dynamic import sequence');
 
-  let mod;
   try {
-    mod = await import('/assets/algos/tl/algoAPI.bundle.js');
-    uiLog('[import ok] typeof mod =', typeof mod);
-    uiLog('[import keys]', Object.keys(mod));
-
-    // 🔍 inspect factory return
-    uiLog('[mod as string]', JSON.stringify(mod, null, 2));
-
-    // 🔧 capture all plausible shapes
-    ApiWrapper =
-      (mod && typeof mod === 'function') ? mod :
-      (mod && typeof mod.default === 'function') ? mod.default :
-      (mod && mod.ApiWrapper && typeof mod.ApiWrapper === 'function') ? mod.ApiWrapper :
-      (mod && typeof mod.default?.ApiWrapper === 'function') ? mod.default.ApiWrapper :
-      (typeof self.ApiWrapper === 'function') ? self.ApiWrapper :
-      (self.ApiWrapper && typeof self.ApiWrapper.ApiWrapper === 'function') ? self.ApiWrapper.ApiWrapper :
-      undefined;
-
-    uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
+    // Dynamically load the script — forces execution and populates globalThis.ApiWrapper
+    await import('/assets/algos/tl/algoAPI.bundle.js');
   } catch (err) {
     uiLog('[import fail]', String(err?.message || err));
     return;
   }
 
-  // 🚀 test instantiation
-  try {
-    if (typeof ApiWrapper !== 'function') {
-      uiLog('[construct skip] ApiWrapper not a function');
-      return;
-    }
+  // ✅ Diagnostic: check global scope directly
+  uiLog('[typeof globalThis.ApiWrapper]', typeof globalThis.ApiWrapper);
+  uiLog('[typeof self.ApiWrapper]', typeof self.ApiWrapper);
 
+  // ✅ Use whichever environment provided it
+  ApiWrapper = globalThis.ApiWrapper ?? self.ApiWrapper;
+  uiLog('[final resolved ApiWrapper]', typeof ApiWrapper);
+
+  if (typeof ApiWrapper !== 'function') {
+    uiLog('[fatal] ApiWrapper not defined or not a constructor');
+    return;
+  }
+
+  try {
     const api = new ApiWrapper(
       '172.81.181.19', 3001, true, false,
       'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
@@ -74,6 +64,7 @@ let ApiWrapper;
     uiLog('[construct fail]', err.message || err);
   }
 })();
+
 
 
 
