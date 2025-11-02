@@ -1,5 +1,5 @@
 //const litecore = require('bitcore-lib-ltc');
-import { getEphemeralKey } from './keyStore.js';
+const { getEphemeralKey } = require('./keyStore.js')
 // use key.wif for signing
 
 const BigNumber = require('bignumber.js');
@@ -21,7 +21,6 @@ const ecc = require('tiny-secp256k1');
 const networks = require('./networks.js');
 const minFeeLtcPerKb = 0.00002;
 const fetch = require('node-fetch'); 
-const 
 
 const NETWORKS = {
     LTCTEST: {

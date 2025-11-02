@@ -1,9 +1,79 @@
-const litecore = require('bitcore-lib-ltc');
+//const litecore = require('bitcore-lib-ltc');
 const Encode = require('./tradelayer.js/src/txEncoder.js');
 const { buildLitecoinTransaction, buildTokenTradeTransaction, buildFuturesTransaction, getUTXOFromCommit,signPsbtRawTx } = require('./litecoreTxBuilder');
-const WalletListener = require('./tradelayer.js/src/walletInterface.js');
-const util = require('util');
 const BigNumber = require('bignumber.js');
+const {
+  // original
+  ensureBitcoin,
+  getExtensionSigner,
+  makeEphemeralKey,
+  signPsbtLocal,
+  getUnifiedSigner,
+  // new
+  makeNewAddress,
+  makeMultisig,
+  makeLocalRpc,
+  createRawTransaction,
+  createPsbtAsync, 
+  decodeRawTransactionAsync, 
+  decodepsbtAsync,
+  signRawTransaction,
+  getPubkeyFromWif
+} = require('./util.js');
+
+/**
+ * Centralized map of relayer paths discovered from your routes.
+ * Adjust here if your server has different prefixes.
+ *
+ * Known route files in zip:
+ * - address.route.ts → /address/validate/:address, /address/balance/:address, (fund assumed)
+ * - chain.route.ts   → /chain/*   (we map /chain/info)
+ * - rpc.route.ts     → /rpc       (generic passthrough)
+ * - token.route.ts   → /token/*   (we map /token/balance/:address)
+ * - tx.route.ts      → /tx/:txid and POST /tx/broadcast
+ */
+const RELAYER_PATHS = {
+  addressValidate    : '/address/validate/:address',
+  addressBalance     : '/address/balance/:address',
+  // If faucet/funding exists; otherwise remove.
+  addressFund        : '/address/fund',
+
+  chainInfo          : '/chain/info',
+
+  rpcPassthrough     : '/rpc',
+
+  tokenBalance       : '/token/balance/:address',
+
+  txGet              : '/tx/:txid',
+  txBroadcast        : '/tx/broadcast',
+
+  // Orderbook routes (not in zip, but commonly present)
+  orderbookSnapshot  : '/orderbook/snapshot',
+  orderPlace         : '/orders/place',
+  orderCancel        : '/orders/cancel',
+};
+
+function fillPath(path, params = {}) {
+  return path.replace(/:([A-Za-z_]\w*)/g, (_, k) => encodeURIComponent(params[k] ?? ''));
+}
+
+const axios = require('axios');
+
+// Wrapper to replace WalletListener.getColumn
+async function getChannelColumn(channelAddress, buyerAddress, cpAddress, relayerUrl = 'http://localhost:3000') {
+  try {
+    const res = await axios.post(`${relayerUrl}/tl_getChannelColumn`, {
+      channelAddress,
+      buyerAddress,
+      cpAddress
+    });
+    return res?.data ?? null;
+  } catch (err) {
+    console.error('Error fetching channel column:', err.message);
+    return null;
+  }
+}
+
 
 class SellSwapper {
     constructor(typeTrade, tradeInfo, sellerInfo, buyerInfo, client, socket,test) {
@@ -18,20 +88,20 @@ class SellSwapper {
         this.test = test
         this.multySigChannelData = null
         this.tradeStartTime = Date.now();
-         // Promisify methods for the given client
-        this.getRawTransactionAsync = util.promisify(this.client.getRawTransaction.bind(this.client));
-        this.getBlockDataAsync = util.promisify(this.client.getBlock.bind(this.client));
-        this.createRawTransactionAsync = util.promisify(this.client.createRawTransaction.bind(this.client));
-        this.listUnspentAsync = util.promisify(this.client.cmd.bind(this.client, 'listunspent'));
-        this.decoderawtransactionAsync = util.promisify(this.client.cmd.bind(this.client, 'decoderawtransaction'));
-        this.dumpprivkeyAsync = util.promisify(this.client.cmd.bind(this.client, 'dumpprivkey'));
-        this.sendrawtransactionAsync = util.promisify(this.client.cmd.bind(this.client, 'sendrawtransaction'));
-        this.validateAddress = util.promisify(this.client.cmd.bind(this.client, 'validateaddress'));
-        this.getBlockCountAsync = util.promisify(this.client.cmd.bind(this.client, 'getblockcount'));
-        this.addMultisigAddressAsync = util.promisify(this.client.cmd.bind(this.client, 'addmultisigaddress'));
-        this.signrawtransactionwithwalletAsync = util.promisify(this.client.cmd.bind(this.client, 'signrawtransactionwithwallet'));
-        this.signrawtransactionwithkeyAsync = util.promisify(this.client.cmd.bind(this.client, 'signrawtransactionwithkey'));
+        this.relayerUrl = test
+  ? 'https://testnet-api.layerwallet.com'
+  : 'https://api.layerwallet.com';
 
+         // Promisify methods for the given client
+       this.getNewAddressAsync           = makeNewAddress;       // local key generation
+       this.addMultisigAddressAsync      = makeMultisig;         // 2-of-2 multisig builder
+       this.createRawTransactionAsync    = createRawTransaction; // pure-lib tx builder
+       this.createPsbtAsync              = createPsbtAsync;      // PSBT creator
+       this.decodeRawTransactionAsync    = decodeRawTransactionAsync; // decode hex tx
+       this.decodepsbtAsync              = decodepsbtAsync;      // decode psbt hex
+       this.signrawtransactionwithwalletAsync= signRawTransaction;   // local signer
+       this.signpsbtAsync                = signPsbtLocal;
+       this.validateAddress= getPubkeyFromWif  
         this.handleOnEvents();
         this.onReady();
         this.initTrade();
@@ -170,24 +240,18 @@ class SellSwapper {
 
       // --- Column A/B detection (use RPC if available; otherwise default 'A') ---
       let isColumnA = true;
-      try {
-        if (typeof WalletListener?.getColumn === 'function') {
-          const col = await WalletListener.getColumn(
-            this.sellerInfo?.keypair?.address,
-            this.buyerInfo?.keypair?.address
-          );
-          const tag = col?.data ?? col; // some impls return {data:'A'|'B'}
-          isColumnA = (tag === 'A');
-        } else {
-          // your original hardcode
-          const columnRes = 'A';
-          // NOTE: your old code used columnRes.data; that would always be undefined.
-          isColumnA = (columnRes === 'A');
-        }
-      } catch (_) {
-        // fall back to A, no crash
-        isColumnA = true;
-      }
+         try {
+            const col = await getChannelColumn(
+              this.multySigChannelData?.address,
+              this.myInfo?.keypair?.address,
+              this.cpInfo?.keypair?.address,
+              this.relayerUrl || 'https://api.layerwallet.com'
+            );
+            const tag = col?.data ?? col;
+            if (tag) isColumnA = (tag === 'A') ? 1 : 0;
+          } catch (err) {
+            console.warn('Fallback to default column A:', err.message);
+          }
 
       // --- build TL payload (commit/transfer; spot vs futures) ---
       let payload;

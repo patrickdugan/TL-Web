@@ -1,25 +1,20 @@
 //const litecore/ buyer.js
 // NOTE: this version is webpack/browser safe (no util.promisify RPCs)
 const Encode = require('./tradelayer.js/src/txEncoder.js');
-const {
-  ensureBitcoin,
+const { buildLitecoinTransaction, buildTokenTradeTransaction, buildFuturesTransaction, getUTXOFromCommit,signPsbtRawTx } = require('./litecoreTxBuilder');
+const { getNewAddress, makeMultisig, getUnifiedSigner, ensureBitcoin,
   getExtensionSigner,
   makeEphemeralKey,
   signPsbtLocal,
-  getUnifiedSigner,
   BigNumber,
   // new
   makeNewAddress,
-  makeMultisig,
   makeLocalRpc,
   createRawTransaction,
   createPsbtAsync, 
   decodeRawTransactionAsync, 
   decodepsbtAsync,
-  signRawTransaction
-} = require('./litecoreTxBuilder');
-const WalletListener = require('./tradelayer.js/src/walletInterface.js');
-const { getNewAddress, makeMultisig}= require('./util.js')
+  signRawTransaction}= require('./util.js')
 
 /**
  * Centralized map of relayer paths discovered from your routes.
@@ -57,13 +52,25 @@ function fillPath(path, params = {}) {
   return path.replace(/:([A-Za-z_]\w*)/g, (_, k) => encodeURIComponent(params[k] ?? ''));
 }
 
+const axios = require('axios');
+
+// Wrapper to replace WalletListener.getColumn
+async function getChannelColumn(channelAddress, buyerAddress, cpAddress, relayerUrl = 'http://localhost:3000') {
+  try {
+    const res = await axios.post(`${relayerUrl}/tl_getChannelColumn`, {
+      channelAddress,
+      buyerAddress,
+      cpAddress
+    });
+    return res?.data ?? null;
+  } catch (err) {
+    console.error('Error fetching channel column:', err.message);
+    return null;
+  }
+}
+
 
 // 👇 our new shared util
-const {
-  getUnifiedSigner,
-  BigNumber,
-  ensureBitcoin,
-} = require('./util');
 
 class BuySwapper {
   constructor(
@@ -84,6 +91,10 @@ class BuySwapper {
     this.test = test;
     this.multySigChannelData = null;
     this.tradeStartTime = Date.now();
+this.relayerUrl = test
+  ? 'https://testnet-api.layerwallet.com'
+  : 'https://api.layerwallet.com';
+
     this.getNewAddressAsync       = makeNewAddress;       // local key generation
     this.addMultisigAddressAsync      = makeMultisig;         // 2-of-2 multisig builder
     this.createRawTransactionAsync    = createRawTransaction; // pure-lib tx builder
@@ -283,14 +294,18 @@ class BuySwapper {
     // --- column A/B (prefer RPC if available) ---
     let isA = 1; // default A
     try {
-      if (typeof WalletListener?.getColumn === 'function') {
-        const col = await WalletListener.getColumn(this.myInfo?.keypair?.address, this.cpInfo?.keypair?.address);
-        const tag = col?.data ?? col;
-        isA = (tag === 'A') ? 1 : 0;
-      }
-    } catch (_) {
-      // keep default isA = 1
-    }
+  const col = await getChannelColumn(
+    this.multySigChannelData?.address,
+    this.myInfo?.keypair?.address,
+    this.cpInfo?.keypair?.address,
+    this.relayerUrl || 'https://api.layerwallet.com'
+  );
+  const tag = col?.data ?? col;
+  if (tag) isA = (tag === 'A') ? 1 : 0;
+} catch (err) {
+  console.warn('Fallback to default column A:', err.message);
+}
+
     console.log('inside step 3'+isSpot+' '+JSON.stringify(props))
     // =========================
     // SPOT

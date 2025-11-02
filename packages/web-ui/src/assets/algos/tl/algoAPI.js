@@ -9,7 +9,6 @@ const {ensureBitcoin,
   makeEphemeralKey,
   signPsbtLocal,
   getUnifiedSigner,
-  BigNumber,
   makeNewAddress,
   makeMultisig,
   makeLocalRpc,
@@ -21,11 +20,9 @@ const {ensureBitcoin,
 // Keep these requires so existing imports don't break if used elsewhere.
 let OrderbookSession;
 try { OrderbookSession = require('./orderbook.js'); } catch { OrderbookSession = null; }
-let walletListener;
-try { walletListener = require('./tradelayer.js/src/walletInterface.js'); } catch { walletListener = null; }
 let createTransport;
 try { ({ createTransport } = require('./ws-transport')); } catch { createTransport = null; }
-import { getEphemeralKey, setEphemeralKey } from './keyStore.js';
+const { getEphemeralKey, setEphemeralKey } = require('./keyStore.js');
 
 
 const { createLitecoinClient, createBitcoinClient } = (() => {
