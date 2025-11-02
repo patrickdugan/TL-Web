@@ -493,27 +493,28 @@ async sendOrder(order) {
 }
 // --- Final hard export (no tree-shake, no closure loss) ---
 // --- Final guaranteed export (anti-tree-shake + global attach) ---
-// ---- UNIVERSAL EXPORT ----
-(function (root, factory) {
-  if (typeof module === 'object' && module.exports) {
-    // Node / CommonJS
-    module.exports = factory();
-  } else if (typeof define === 'function' && define.amd) {
-    // AMD
-    define([], factory);
-  } else {
-    // Browser, WebWorker, ServiceWorker — attach globally
-    var g = (typeof self !== 'undefined')
-      ? self
-      : (typeof globalThis !== 'undefined'
-          ? globalThis
-          : (typeof window !== 'undefined'
-              ? window
-              : this));
-    g.ApiWrapper = factory();
-  }
-})(this, function () {
-  return ApiWrapper;
-});
+// keep methods alive
+const __keepApiWrapperMethods = [
+  ApiWrapper.prototype.getSpotMarkets,
+  ApiWrapper.prototype.getFuturesMarkets,
+  ApiWrapper.prototype.initApiMode,
+  ApiWrapper.prototype.sendOrder,
+  ApiWrapper.prototype.getOrderbookData,
+  ApiWrapper.prototype._initializeSocket,
+  ApiWrapper.prototype.cancelOrder
+].filter(Boolean);
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.ApiWrapper = ApiWrapper;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = ApiWrapper;
+}
+
+// bottom of algoAPI.js
+const exported = { ApiWrapper };
+if (typeof module !== 'undefined' && module.exports) module.exports = exported;
+else if (typeof self !== 'undefined') self.tlApi = exported;
+else globalThis.tlApi = exported;
 
 
