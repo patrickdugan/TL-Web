@@ -511,3 +511,10 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = ApiWrapper;
 }
 
+// bottom of algoAPI.js
+const exported = { ApiWrapper };
+if (typeof module !== 'undefined' && module.exports) module.exports = exported;
+else if (typeof self !== 'undefined') self.tlApi = exported;
+else globalThis.tlApi = exported;
+
+

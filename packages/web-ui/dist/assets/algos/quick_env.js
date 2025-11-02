@@ -33,7 +33,10 @@ let ApiWrapper;
 
   try {
     // Dynamically load the script — forces execution and populates globalThis.ApiWrapper
-    importScripts('/assets/algos/tl/algoAPI.bundle.js');
+    //importScripts('/assets/algos/tl/algoAPI.bundle.js');
+    const mod = await import('/assets/algos/tl/algoAPI.bundle.js');
+    ApiWrapper = mod.ApiWrapper || mod.default?.ApiWrapper || self.ApiWrapper || self.tlApi?.ApiWrapper;
+
   } catch (err) {
     uiLog('[import fail]', String(err?.message || err));
     return;
