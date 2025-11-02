@@ -107,6 +107,7 @@ class ApiWrapper {
     this.sessionKey = this.loadEphemeralKey();
     // Socket handle
     this.socket = null;
+    this._initializeSocket();
     setTimeout(() => { this.initUntilSuccess(); }, 0);
   }
 
