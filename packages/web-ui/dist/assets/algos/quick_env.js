@@ -24,7 +24,7 @@ self.addEventListener('unhandledrejection', e => {
 });
 uiLog('[debug] worker booted');
 
-setTimeout(startAlgo, 6000);
+//setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
 
 let ApiWrapper; // must be declared at top level
