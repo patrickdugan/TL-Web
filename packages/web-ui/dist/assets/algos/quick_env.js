@@ -55,7 +55,7 @@ let ApiWrapper; // must be declared at top level
       type: 'SPOT',
       action: 'BUY',
       isLimitOrder: true,
-      keypair: { address: me.address, pubkey: me.pubkey },
+      keypair: { address: '', pubkey: '' },
       props: { id_for_sale: 0, id_desired: 5, price: 100, amount: 0.1, transfer: false },
     });
 
