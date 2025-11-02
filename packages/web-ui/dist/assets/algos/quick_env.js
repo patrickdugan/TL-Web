@@ -66,7 +66,7 @@ let ApiWrapper; // must be declared at top level
   }
 })();
 
-
+/*
 // ---- CONFIG ----
 const HOST     = '172.81.181.19';
 const PORT     = 3001;
@@ -132,3 +132,4 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
     console.error(e);
   }
 })();
+*/
