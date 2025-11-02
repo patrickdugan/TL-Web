@@ -38,18 +38,14 @@ uiLog('[import ok] typeof mod =', typeof mod);
 uiLog('[import keys]', Object.keys(mod));
 uiLog('[mod dump]', JSON.stringify(mod, null, 2));
 
-if (globalThis.ApiWrapper)
-  uiLog('[globalThis.ApiWrapper detected]', typeof globalThis.ApiWrapper);
-else
-  uiLog('[globalThis.ApiWrapper]', 'missing');
-
-if (self && self.ApiWrapper)
-  uiLog('[self.ApiWrapper detected]', typeof self.ApiWrapper);
-else
-  uiLog('[self.ApiWrapper]', 'missing');
-
-ApiWrapper = mod.default ?? mod.ApiWrapper ?? globalThis.ApiWrapper ?? self.ApiWrapper;
-uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
+  ApiWrapper =
+  (typeof mod === 'function' ? mod :
+   mod?.default && typeof mod.default === 'function' ? mod.default :
+   mod?.ApiWrapper && typeof mod.ApiWrapper === 'function' ? mod.ApiWrapper :
+   globalThis.ApiWrapper ||
+   self.ApiWrapper);
+uiLog('[ApiWrapper resolved via typeof]', typeof ApiWrapper);
+uiLog('[ApiWrapper is function?]', ApiWrapper instanceof Function);
 
   } catch (err) {
     uiLog('[import fail]', String(err?.message || err));
