@@ -285,7 +285,7 @@ class WsTransport extends EventEmitter {
 function createTransport(opts) {
   // callers do createTransport({ type:'ws', url: 'ws://...' })
   const url = (opts && typeof opts === 'object') ? opts.url : opts;
-  return new WsTransport(url || null, opts || {});
+  return new WsTransport(url);
 }
 
 module.exports = {
