@@ -306,7 +306,7 @@ module.exports = {
   //getExtensionSigner,
   //makeEphemeralKey,
   signPsbtLocal,
-  getUnifiedSigner,
+  //getUnifiedSigner,
   BigNumber,
   // new
   makeNewAddress,

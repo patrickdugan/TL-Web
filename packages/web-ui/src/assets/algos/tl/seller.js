@@ -8,7 +8,7 @@ const {
   //getExtensionSigner,
   //makeEphemeralKey,
   signPsbtLocal,
-  getUnifiedSigner,
+  //getUnifiedSigner,
   // new
   makeNewAddress,
   makeMultisig,
