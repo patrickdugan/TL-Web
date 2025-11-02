@@ -30132,9 +30132,9 @@ module.exports = desc && typeof desc.get === 'function'
 /***/ }),
 
 /***/ 4812:
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+/***/ ((module, exports, __webpack_require__) => {
 
-// Full replacement: algoAPI.js
+var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;// Full replacement: algoAPI.js
 // Adds API mode with axios routing to relayer endpoints (URIs configurable via RELAYER_PATHS).
 // ---- logging bridge (works in worker or node) -----------------
 const log = // if worker script already defined uiLog, use it
@@ -30657,6 +30657,32 @@ var ApiWrapper = class ApiWrapper {
       }
     };
   }
+  /** fetch list of SPOT markets */
+
+
+  async getSpotMarkets() {
+    try {
+      if (this.apiMode) {
+        // use relayer REST if available
+        const {
+          data
+        } = await this.relayer.get('/markets/spot');
+        return data;
+      } // if node-local or relayer missing, fallback to socket request
+
+
+      if (!this.socket) this._initializeSocket();
+
+      if (this.socket) {
+        return await this._relayerPost('/markets/spot'); // reuse axios path
+      }
+
+      return [];
+    } catch (err) {
+      console.error('[getSpotMarkets] error:', err);
+      return [];
+    }
+  }
   /** submit a SPOT or FUTURES order */
 
 
@@ -30722,16 +30748,34 @@ var ApiWrapper = class ApiWrapper {
 
 }; // --- Final hard export (no tree-shake, no closure loss) ---
 // --- Final guaranteed export (anti-tree-shake + global attach) ---
-// keep methods alive
 
-const __keepApiWrapperMethods = [ApiWrapper.prototype.getSpotMarkets, ApiWrapper.prototype.getFuturesMarkets, ApiWrapper.prototype.initApiMode, ApiWrapper.prototype.sendOrder, ApiWrapper.prototype.getOrderbookData, ApiWrapper.prototype._initializeSocket, ApiWrapper.prototype.cancelOrder].filter(Boolean);
+try {
+  // Assign globally in all environments
+  const ref = ApiWrapper;
+  if (typeof globalThis !== 'undefined') globalThis.ApiWrapper = ref;
+  if (typeof window !== 'undefined') window.ApiWrapper = ref;
+  if (typeof self !== 'undefined') self.ApiWrapper = ref; // Force property visibility even if sealed or minified
 
-if (typeof globalThis !== 'undefined') {
-  globalThis.ApiWrapper = ApiWrapper;
-}
+  Object.defineProperty(globalThis, 'ApiWrapper', {
+    value: ref,
+    writable: true,
+    enumerable: true,
+    configurable: true
+  }); // Make sure prototype isn’t lost to closure
 
-if ( true && module.exports) {
-  module.exports = ApiWrapper;
+  Object.defineProperty(ref, '__preserve', {
+    value: true
+  });
+  Object.defineProperty(ref.prototype, '__preserve', {
+    value: true
+  }); // Export for Node + AMD
+
+  if ( true && module.exports) module.exports = ref;else if (true) !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_RESULT__ = (() => ref).apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__),
+		__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__)); // Debug visibility
+
+  console.log('[export] ApiWrapper prototype keys:', Object.getOwnPropertyNames(ref.prototype || {}));
+} catch (e) {
+  console.error('[export] hard fail', e);
 }
 
 /***/ }),
