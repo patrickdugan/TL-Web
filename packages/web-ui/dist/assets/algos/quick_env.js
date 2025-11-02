@@ -41,25 +41,24 @@ let ApiWrapper; // must be declared at top level
     return; // bail early; nothing else will work without the bundle
   }
 
-  try {
-    ApiWrapper = mod.default ?? mod.ApiWrapper ?? mod;
-    uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
-  } catch (err) {
-    uiLog('[resolve fail]', String(err?.message || err));
-  }
+  const mod = await import('/assets/algos/tl/algoAPI.bundle.js');
+  ApiWrapper = mod.default ?? mod.ApiWrapper ?? mod;
 
-  let api;
+  // diagnostic
+  uiLog('[import ok]', Object.keys(mod));
+  uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
+
+  // construct safely
   try {
-    api = new ApiWrapper(
+    const api = new ApiWrapper(
       '172.81.181.19', 3001, true, false,
       'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
       '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
       'LTCTEST'
     );
-    uiLog('[constructed ApiWrapper]', Object.getOwnPropertyNames(Object.getPrototypeOf(api)));
+    uiLog('[construct ok]', api ? 'instance created' : 'none');
   } catch (err) {
-    uiLog('[construct fail]', String(err?.message || err));
-    return;
+    uiLog('[construct fail]', err.message || err);
   }
 
   const delay = ms => new Promise(res => setTimeout(res, ms));
