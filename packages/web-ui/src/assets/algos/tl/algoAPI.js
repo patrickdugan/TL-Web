@@ -3,8 +3,8 @@
 
 // ---- logging bridge (works in worker or node) -----------------
 const log =
-  // if worker script already defined log, use it
-  (typeof log === 'function' && log) ||
+  // if worker script already defined uiLog, use it
+  (typeof uiLog === 'function' && uiLog) ||
   // else, if we are in a worker, forward to UI
   (typeof self !== 'undefined' && self.postMessage
     ? (...args) => {
@@ -251,6 +251,8 @@ _initializeSocket() {
     return null;
   }
 }
+
+
 
   // --- API helper ---
   async _relayerPost(path, body) {
