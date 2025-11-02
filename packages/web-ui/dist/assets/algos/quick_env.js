@@ -24,49 +24,10 @@ self.addEventListener('unhandledrejection', e => {
 });
 uiLog('[debug] worker booted');
 
-(async () => {
-  uiLog('[worker] starting dynamic import sequence');
+//setTimeout(startAlgo, 6000);
+// simple logger that streams to the UI and browser console
+let ApiWrapper;
 
-  try {
-    // run UMD file for side effects only
-    await import('/assets/algos/tl/algoAPI.bundle.js');
-    uiLog('[import ok] bundle executed');
-  } catch (err) {
-    uiLog('[import fail]', err?.message || String(err));
-    return;
-  }
-
-  // Now safely grab it from globalThis
-  const ApiWrapper =
-    (typeof globalThis !== 'undefined' && globalThis.ApiWrapper) ||
-    (typeof self !== 'undefined' && self.ApiWrapper);
-
-  if (typeof ApiWrapper !== 'function') {
-    uiLog('[fatal] ApiWrapper missing after import');
-    return;
-  }
-
-  uiLog('[ok] ApiWrapper prototype keys', Object.getOwnPropertyNames(ApiWrapper.prototype));
-
-  const api = new ApiWrapper(
-    '172.81.181.19', 3001, true, false,
-    'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
-    '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
-    'LTCTEST'
-  );
-
-  uiLog('[construct ok] true');
-
-  try {
-    const spot = await api.getSpotMarkets?.();
-    uiLog('[getSpotMarkets]', Array.isArray(spot) ? spot.length : typeof spot);
-  } catch (e) {
-    uiLog('[getSpotMarkets fail]', e?.message || String(e));
-  }
-})();
-
-
-/*
 (async () => {
   uiLog('[worker] starting dynamic import sequence');
 
@@ -145,7 +106,7 @@ const ApiWrapper = self.ApiWrapper || globalThis.ApiWrapper;
 
     uiLog('[done]');
     self.close();
-})();*/
+})();
 
 
 
