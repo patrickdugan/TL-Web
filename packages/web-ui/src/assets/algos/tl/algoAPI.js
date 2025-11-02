@@ -81,7 +81,7 @@ function fillPath(path, params = {}) {
   return path.replace(/:([A-Za-z_]\w*)/g, (_, k) => encodeURIComponent(params[k] ?? ''));
 }
 
-var ApiWrapper = class ApiWrapper {
+class ApiWrapper {
   constructor(baseURL, port, test, tlAlreadyOn = false, address, pubkey, network, apiMode = false, relayerBase) {
     this.baseURL = baseURL;
     this.port = port;
