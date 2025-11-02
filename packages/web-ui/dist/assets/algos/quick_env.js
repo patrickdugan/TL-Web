@@ -68,7 +68,7 @@ let ApiWrapper;
 
 
 
-/*
+
 // ---- CONFIG ----
 const HOST     = '172.81.181.19';
 const PORT     = 3001;
@@ -79,7 +79,7 @@ const PUBKEY   = '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab131
 const NETWORK  = 'LTCTEST';
 const SIZE     = 0.1;
 
-uiLog('[env]', HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
+//uiLog('[env]', HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
 // ---- INIT ----
 //const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
@@ -89,8 +89,7 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 (async () => {
   try {
     await delay(1500);
-    const getExtensionSigner = () => ({ sign: async () => console.log('[stub signer]') });
-
+    
     //const me = api.getMyInfo();
     //uiLog('me:', me.address);
 
@@ -134,4 +133,3 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
     console.error(e);
   }
 })();
-*/
