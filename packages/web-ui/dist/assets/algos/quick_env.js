@@ -25,109 +25,85 @@ self.addEventListener('unhandledrejection', e => {
 uiLog('[debug] worker booted');
 
 (async () => {
-  uiLog('[worker] start import (with fallback)');
+  uiLog('[worker] starting dynamic import sequence');
 
-  const BUNDLE_URL = '/assets/algos/tl/algoAPI.bundle.js';
-
-  async function tryDynamicImport() {
-    try {
-      await import(BUNDLE_URL);
-      uiLog('[worker] dynamic import ok');
-      return true;
-    } catch (err) {
-      const msg = err?.message || String(err);
-      uiLog('[worker] dynamic import failed:', msg);
-
-      // this is the one you're seeing
-      const isCtorErr = msg.includes('Class constructor ApiWrapper cannot be invoked without \'new\'');
-      return isCtorErr ? false : false; // false = go to fallback
-    }
-  }
-
-  async function evalPatchedBundle() {
-    uiLog('[worker] fetching bundle to patch …');
-    const res = await fetch(BUNDLE_URL, { cache: 'no-store' });
-    const src = await res.text();
-
-    // minimal patch: take the old "g.ApiWrapper = factory();" shape
-    // and make it export an object instead
-    const patched = src.replace(
-      /g\.ApiWrapper\s*=\s*factory\(\);\s*$/,
-      // ↓ this is what we actually wanted all along
-      'g.TLAlgoAPI = (function(){' +
-        'const Api = factory();' +
-        'return { ApiWrapper: Api, createApiWrapper: function(){ return new Api(...arguments); } };' +
-      '})();'
-    );
-
-    uiLog('[worker] evaluating patched bundle …');
-    // run in worker scope
-    (0, eval)(patched);
-    uiLog('[worker] patched bundle evaluated');
-  }
-
-  // 1) try normal way
-  let imported = await tryDynamicImport();
-
-  // 2) if that blew up with the class-ctor thing, do the patch
-  if (!imported) {
-    try {
-      await evalPatchedBundle();
-    } catch (e) {
-      uiLog('[worker] fallback eval failed:', e?.message || String(e));
-      return;
-    }
-  }
-
-  // 3) now normalize whatever we got on global
-  const g = typeof self !== 'undefined' ? self : globalThis;
-  const exported = g.TLAlgoAPI || g.ApiWrapper;
-
-  if (!exported) {
-    uiLog('[fatal] still no TLAlgoAPI / ApiWrapper on global');
+  // 1) load the UMD bundle so it sticks something on global
+  try {
+    await import('/assets/algos/tl/algoAPI.bundle.js');
+    uiLog('[import ok] bundle executed');
+  } catch (err) {
+    uiLog('[import fail]', err?.message || String(err));
     return;
   }
 
-  // single place for your env
-  const cfg = [
-    'ws.layerwallet.com',                  // host
-    443,                                   // port
-    true,                                  // test
-    false,                                 // tlAlreadyOn
-    'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf', // address
-    '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677', // pubkey
-    'LTCTEST'
-  ];
+  // 2) get whatever the bundle actually exported
+  const g = (typeof self !== 'undefined' ? self : globalThis);
 
-  let api;
+  // prefer the new shim name if we add it, else fall back
+  const exported =
+    g.TLAlgoAPI ||           // { createApiWrapper, ApiWrapper } – preferred
+    g.ApiWrapper ||          // class ApiWrapper
+    null;
 
-  // preferred: patched shape
-  if (typeof exported === 'object' && typeof exported.createApiWrapper === 'function') {
-    uiLog('[worker] using createApiWrapper from patched export');
-    api = exported.createApiWrapper(...cfg);
-  } else if (typeof exported === 'function') {
-    // old shape, still works
-    uiLog('[worker] using class export');
-    api = new exported(...cfg);
-  } else {
-    // already-instantiated weird shape
+  if (!exported) {
+    uiLog('[fatal] no TLAlgoAPI / ApiWrapper found on global after import');
+    return;
+  }
+
+  // 3) normalize all the shapes we might get
+  let api = null;
+
+  // case A: UMD gave us an object with a factory
+  if (exported && typeof exported === 'object' && typeof exported.createApiWrapper === 'function') {
+    uiLog('[worker] using exported.createApiWrapper(...)');
+    api = exported.createApiWrapper(
+      'ws.layerwallet.com',                 // baseURL / host
+      443,                                  // port
+      true,                                 // test
+      false,                                // tlAlreadyOn
+      'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf', // address
+      '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677', // pubkey
+      'LTCTEST'                             // network
+    );
+  }
+
+  // case B: UMD gave us the class directly
+  else if (typeof exported === 'function') {
+    uiLog('[worker] using `new ApiWrapper(...)` from function export');
+    api = new exported(
+      'ws.layerwallet.com',
+      443,
+      true,
+      false,
+      'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
+      '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
+      'LTCTEST'
+    );
+  }
+
+  // case C: UMD gave us an instance already (weird, but let's cope)
+  else if (typeof exported === 'object' && exported !== null) {
+    uiLog('[worker] exported was an instance – using as-is');
     api = exported;
   }
 
   if (!api) {
-    uiLog('[fatal] could not init api');
+    uiLog('[fatal] could not construct API from bundle export');
     return;
   }
 
   uiLog(
-    '[ok] api ready',
+    '[ok] api ready, proto keys:',
     Object.getOwnPropertyNames(Object.getPrototypeOf(api))
   );
 
-  // smoke test
+  // 4) test call
   try {
     const spot = await api.getSpotMarkets?.();
-    uiLog('[getSpotMarkets]', Array.isArray(spot) ? `len=${spot.length}` : typeof spot);
+    uiLog(
+      '[getSpotMarkets]',
+      Array.isArray(spot) ? `len=${spot.length}` : typeof spot
+    );
   } catch (e) {
     uiLog('[getSpotMarkets fail]', e?.message || String(e));
   }
