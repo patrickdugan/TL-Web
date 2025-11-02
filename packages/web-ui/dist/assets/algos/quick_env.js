@@ -82,10 +82,12 @@ uiLog('[env]', HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 // ---- INIT ----
 //const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
+const delay = ms => new Promise(res => setTimeout(res, ms));
 // ---- MAIN ----
 (async () => {
   try {
-    await api.delay(1500);
+    await delay(1500);
+    const getExtensionSigner = () => ({ sign: async () => console.log('[stub signer]') });
 
     const me = api.getMyInfo();
     uiLog('me:', me.address);
