@@ -34,7 +34,7 @@ let ApiWrapper; // must be declared at top level
     // dynamic import that works in worker context
     const mod = await import('/assets/algos/tl/algoAPI.bundle.js');
     ApiWrapper = mod.default ?? mod;
-
+    uiLog('[bundle length]'+mod.length)
     // Now safe to use
     const api = new ApiWrapper(
       '172.81.181.19', 3001, true, false,
@@ -45,11 +45,11 @@ let ApiWrapper; // must be declared at top level
 
     // Example of async flow to confirm it’s alive
     await api.delay(1500);
-    const me = api.getMyInfo();
-    api.log('[worker] address', me.address);
+    //const me = api.getMyInfo();
+    uilog('[worker] address');
 
     const spot = await api.getSpotMarkets();
-    api.log('spot markets', Array.isArray(spot) ? spot.length : 0);
+    uilog('spot markets', Array.isArray(spot) ? spot.length : 0);
 
     const uuid = await api.sendOrder({
       type: 'SPOT',
@@ -59,7 +59,7 @@ let ApiWrapper; // must be declared at top level
       props: { id_for_sale: 0, id_desired: 5, price: 100, amount: 0.1, transfer: false },
     });
 
-    api.log('order sent:', uuid);
+    uilog('order sent:', uuid);
   } catch (err) {
     console.error('[ALGO async import error]', err);
     api?.log('[ALGO async import error]', String(err.message || err));
@@ -89,7 +89,7 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
     await delay(1500);
     const getExtensionSigner = () => ({ sign: async () => console.log('[stub signer]') });
 
-    const me = api.getMyInfo();
+    //const me = api.getMyInfo();
     uiLog('me:', me.address);
 
     const spot = await api.getSpotMarkets();

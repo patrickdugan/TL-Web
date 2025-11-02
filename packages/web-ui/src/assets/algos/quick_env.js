@@ -46,10 +46,10 @@ let ApiWrapper; // must be declared at top level
     // Example of async flow to confirm it’s alive
     await api.delay(1500);
     const me = api.getMyInfo();
-    api.log('[worker] address', me.address);
+    uilog('[worker] address', me.address);
 
     const spot = await api.getSpotMarkets();
-    api.log('spot markets', Array.isArray(spot) ? spot.length : 0);
+    uilog('spot markets', Array.isArray(spot) ? spot.length : 0);
 
     const uuid = await api.sendOrder({
       type: 'SPOT',
@@ -59,7 +59,7 @@ let ApiWrapper; // must be declared at top level
       props: { id_for_sale: 0, id_desired: 5, price: 100, amount: 0.1, transfer: false },
     });
 
-    api.log('order sent:', uuid);
+    uilog('order sent:', uuid);
   } catch (err) {
     console.error('[ALGO async import error]', err);
     api?.log('[ALGO async import error]', String(err.message || err));
