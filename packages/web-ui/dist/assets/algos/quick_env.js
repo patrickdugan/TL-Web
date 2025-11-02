@@ -28,13 +28,21 @@ setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
 
 let ApiWrapper;
+
 try {
-  // Works in browser and worker contexts that support dynamic import
-  ApiWrapper = (await import('./tl/algoAPI.bundle.js')).default 
-            ?? (await import('./tl/algoAPI.bundle.js'));
+  // Works in browsers and workers that support dynamic import
+  const mod = await import('./tl/algoAPI.bundle.js');
+  ApiWrapper = mod.default ?? mod;
 } catch (err) {
-  // Fallback for Node CLI
-  ApiWrapper = require('./tl/algoAPI.bundle.js');
+  try {
+    // Fallback for Node CLI or older browsers
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    ApiWrapper = require('./tl/algoAPI.bundle.js');
+  } catch (e2) {
+    console.error('[ALGO] failed to load ApiWrapper:', err, e2);
+    self.postMessage({ type: 'log', msg: '[ALGO] failed to load ApiWrapper' });
+    throw e2;
+  }
 }
 
 
