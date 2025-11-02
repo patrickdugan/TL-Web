@@ -176,55 +176,136 @@ saveEphemeralKey(eph) {
 
 
   // --- Socket setup (assigns this.socket if created) ---
-  _initializeSocket() {
-  if (this.socket) return this.socket;
+ // Function to initialize a socket connection
+_initializeSocket() {
+  const log =
+    (typeof uiLog === 'function' && uiLog) ||
+    ((...a) => console.log('[worker][ws]', ...a));
 
-  const proto =
-    (typeof location !== 'undefined' && location.protocol === 'https:')
-      ? 'wss://'
-      : 'ws://';
+  // already have one
+  if (this.socket) {
+    log('[ws] reusing existing socket');
+    return this.socket;
+  }
 
-  const url = `${proto}${this.baseURL}:${this.port}/ws`;
+  // 1) pick URL candidates
+  // what you had before was usually: ws://<host>:3001/ws
+  // server you showed is HyperExpress WSS on 443, so try that too
+  const candidates = [
+    this.wsUrl, // whatever the ctor built
+    `wss://ws.layerwallet.com:443/socket`,
+    `wss://ws.layerwallet.com/socket`,
+    `ws://${this.baseURL}:${this.port}/socket`,
+  ].filter(Boolean);
 
-  const s = io(url, {
-    transports: ['websocket'],
-    reconnectionAttempts: 3,
-    timeout: 5000,
-    // if server is on /socket.io, uncomment:
-    // path: '/socket.io',
-  });
+  // we will try them in order until one connects
+  const tryConnect = async (urls) => {
+    for (const url of urls) {
+      log('[ws] trying', url);
 
-  log('[socket] trying', url);
+      // if ws-transport is not there, bail to raw WS
+      if (!createTransport) {
+        log('[ws] createTransport missing, falling back to raw WebSocket');
+        const ws = new WebSocket(url);
+        this.socket = ws;
 
-  s.on('connect', () => {
-    log('[socket] connected', s.id);
-    try {
-      s.emit('register', {
-        address: this.myInfo?.address,
-        pubkey: this.myInfo?.keypair?.pubkey,
-        network: this.network,
-      });
-      log('[socket] register sent');
-    } catch (e) {
-      log('[socket] register failed', e?.message || e);
+        ws.onopen = () => {
+          log('[ws][open]', url);
+        };
+        ws.onerror = (ev) => {
+          log('[ws][error]', url, ev?.message || ev);
+        };
+        ws.onclose = (ev) => {
+          log('[ws][close]', url, ev.code, ev.reason);
+        };
+        ws.onmessage = (ev) => {
+          log('[ws][msg]', ev.data);
+        };
+
+        return ws;
+      }
+
+      const sock = createTransport({ type: 'ws', url });
+      this.socket = sock;
+
+      try {
+        await sock.connect(url);
+        log('[ws] connect() resolved for', url);
+
+        // mark info
+        this.myInfo.socketId = null; // event-bus mode
+        if (typeof OrderbookSession === 'function') {
+          this.orderbookSession = new OrderbookSession(
+            sock,
+            this.myInfo,
+            this.client,
+            this.test
+          );
+          log('[ws] OrderbookSession created');
+        }
+
+        // hook standard events
+        sock.on('connect', () => {
+          log('[ws][connect]', url, 'id:', sock.id);
+          this.myInfo.socketId = sock.id || null;
+        });
+
+        sock.on('disconnect', (reason) => {
+          log('[ws][disconnect]', reason);
+        });
+
+        sock.on('error', (err) => {
+          log('[ws][error evt]', err?.message || err);
+        });
+
+        // debug raw traffic if ws-transport emits 'message'
+        sock.on('message', (raw) => {
+          try {
+            log('[ws][message]', typeof raw === 'string' ? raw : JSON.stringify(raw));
+          } catch (_) {}
+        });
+
+        // domain events
+        sock.on('order:saved', (orderUuid) => {
+          log('[ws][order:saved]', orderUuid);
+          // you had: this.myOrders.push()
+          if (!this.myOrders) this.myOrders = [];
+          this.myOrders.push(orderUuid);
+        });
+
+        sock.on('order:canceled', (payload) => {
+          // you had buggy references here
+          const orderUuid = payload?.orderUuid || payload?.uuid;
+          log('[ws][order:canceled]', orderUuid);
+          if (this.myOrders && orderUuid) {
+            this.myOrders = this.myOrders.filter((o) => o !== orderUuid);
+          }
+        });
+
+        sock.on('order:error', (err) => {
+          log('[ws][order:error]', typeof err === 'string' ? err : JSON.stringify(err));
+        });
+
+        sock.on('orderbook-data', (data) => {
+          // super noisy, so keep it short
+          log('[ws][orderbook-data] got update');
+        });
+
+        return sock; // <- success, stop trying other URLs
+      } catch (err) {
+        log('[ws] connect() failed for', url, err?.message || err);
+        // try next candidate
+      }
     }
-  });
 
-  s.on('connect_error', err => {
-    log('[socket] connect_error', err?.message || err);
-  });
+    // if none worked
+    log('[ws][fatal] none of the WS candidates connected');
+    return null;
+  };
 
-  s.on('error', err => {
-    log('[socket] error', err?.message || err);
-  });
-
-  s.on('disconnect', reason => {
-    log('[socket] disconnect', reason);
-  });
-
-  this.socket = s;
-  return s;
+  return tryConnect(candidates);
 }
+
 
   // --- API helper ---
   async _relayerPost(path, body) {
