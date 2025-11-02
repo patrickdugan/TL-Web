@@ -33,7 +33,7 @@ let ApiWrapper;
 
   try {
     // Dynamically load the script — forces execution and populates globalThis.ApiWrapper
-    importScripts('/assets/algos/tl/algoAPI.bundle.js');
+    await import('/assets/algos/tl/algoAPI.bundle.js');
   } catch (err) {
     uiLog('[import fail]', String(err?.message || err));
     return;
@@ -44,9 +44,7 @@ let ApiWrapper;
   uiLog('[typeof self.ApiWrapper]', typeof self.ApiWrapper);
 
   // ✅ Use whichever environment provided it
-  
-// now it should be on self / globalThis
-const ApiWrapper = self.ApiWrapper || globalThis.ApiWrapper;
+  ApiWrapper = globalThis.ApiWrapper ?? self.ApiWrapper;
   uiLog('[final resolved ApiWrapper]', typeof ApiWrapper);
 
   if (typeof ApiWrapper !== 'function') {
