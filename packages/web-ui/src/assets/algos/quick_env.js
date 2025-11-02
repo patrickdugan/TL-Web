@@ -26,7 +26,15 @@ uiLog('[debug] worker booted');
 
 setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
-const ApiWrapper = require('./tl/algoAPI.bundle.js')
+
+let ApiWrapper;
+if (typeof importScripts === 'function') {
+  // WebWorker or browser context
+  ApiWrapper = (await import('./tl/algoAPI.bundle.js')).default;
+} else {
+  // Node CLI test (quick_env.js)
+  ApiWrapper = require('./tl/algoAPI.bundle.js');
+}
 
 // ---- CONFIG ----
 const HOST     = '172.81.181.19';
