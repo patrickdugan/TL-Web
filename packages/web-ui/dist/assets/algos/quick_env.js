@@ -34,19 +34,22 @@ let ApiWrapper; // must be declared at top level
   let mod;
   try {
     mod = await import('/assets/algos/tl/algoAPI.bundle.js');
-    uiLog('[import keys]', Object.keys(mod));
+uiLog('[import ok] typeof mod =', typeof mod);
+uiLog('[import keys]', Object.keys(mod));
+uiLog('[mod dump]', JSON.stringify(mod, null, 2));
 
-    if (typeof mod.ApiWrapper === 'function') {
-      ApiWrapper = mod.ApiWrapper;
-      uiLog('[using named export]');
-    } else if (mod.default && typeof mod.default.ApiWrapper === 'function') {
-      ApiWrapper = mod.default.ApiWrapper;
-      uiLog('[using default.ApiWrapper]');
-    } else if (typeof mod.default === 'function') {
-      ApiWrapper = mod.default;
-      uiLog('[using default function]');
-    }
-    uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
+if (globalThis.ApiWrapper)
+  uiLog('[globalThis.ApiWrapper detected]', typeof globalThis.ApiWrapper);
+else
+  uiLog('[globalThis.ApiWrapper]', 'missing');
+
+if (self && self.ApiWrapper)
+  uiLog('[self.ApiWrapper detected]', typeof self.ApiWrapper);
+else
+  uiLog('[self.ApiWrapper]', 'missing');
+
+ApiWrapper = mod.default ?? mod.ApiWrapper ?? globalThis.ApiWrapper ?? self.ApiWrapper;
+uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
 
   } catch (err) {
     uiLog('[import fail]', String(err?.message || err));
