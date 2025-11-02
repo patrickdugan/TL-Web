@@ -80,7 +80,7 @@ const SIZE     = 0.1;
 uiLog('[env]', HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
 // ---- INIT ----
-const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
+//const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
 // ---- MAIN ----
 (async () => {
