@@ -26,40 +26,57 @@ uiLog('[debug] worker booted');
 
 //setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
-
 let ApiWrapper; // must be declared at top level
 
 (async () => {
   uiLog('[worker] starting dynamic import sequence');
 
-let mod;
-try {
-  mod = await import('/assets/algos/tl/algoAPI.bundle.js');
-  uiLog('[import ok]', Object.keys(mod), mod.default ? 'has default export' : 'no default export');
-} catch (err) {
-  uiLog('[import fail]', String(err?.message || err));
-  return;
-}
-uiLog('[import ok]', Object.keys(mod));
-if (typeof mod.ApiWrapper === 'function') {
-  ApiWrapper = mod.ApiWrapper;
-  uiLog('[using named export] ApiWrapper');
-} else if (typeof mod.default === 'function') {
-  ApiWrapper = mod.default;
-  uiLog('[using default export]');
-} else {
-  // fallback: if it’s a nested object { tl: { ApiWrapper } }
-  const nested = Object.values(mod).find(v => v && v.ApiWrapper);
-  ApiWrapper = nested?.ApiWrapper;
-  uiLog('[using nested ApiWrapper path]', nested ? 'found' : 'none');
-}
+  let mod;
+  try {
+    mod = await import('/assets/algos/tl/algoAPI.bundle.js');
+    uiLog('[import ok]', 'typeof mod =', typeof mod);
+
+    // dump keys and first-level structure
+    const keys = Object.keys(mod || {});
+    uiLog('[import keys]', JSON.stringify(keys));
+
+    // try inspecting nested values
+    for (const k of keys) {
+      const val = mod[k];
+      uiLog(`[inspect ${k}]`, typeof val, val && val.constructor && val.constructor.name);
+      if (typeof val === 'object') {
+        const innerKeys = Object.keys(val);
+        uiLog(`[${k} innerKeys]`, JSON.stringify(innerKeys.slice(0, 10)));
+      }
+    }
+  } catch (err) {
+    uiLog('[import fail]', String(err?.message || err));
+    return;
+  }
+
+  // choose best candidate for ApiWrapper
+  if (typeof mod.ApiWrapper === 'function') {
+    ApiWrapper = mod.ApiWrapper;
+    uiLog('[using named export] ApiWrapper');
+  } else if (typeof mod.default === 'function') {
+    ApiWrapper = mod.default;
+    uiLog('[using default export]');
+  } else if (mod && mod.default && typeof mod.default.ApiWrapper === 'function') {
+    ApiWrapper = mod.default.ApiWrapper;
+    uiLog('[using nested default.ApiWrapper]');
+  } else {
+    // last-ditch search
+    const nested = Object.values(mod).find(v => v && typeof v.ApiWrapper === 'function');
+    ApiWrapper = nested?.ApiWrapper;
+    uiLog('[using nested ApiWrapper path]', nested ? 'found' : 'none');
+  }
 
   // diagnostic
-  uiLog('[import ok]', Object.keys(mod));
   uiLog('[resolved ApiWrapper type]', typeof ApiWrapper);
 
   // construct safely
   try {
+    if (typeof ApiWrapper !== 'function') throw new Error('ApiWrapper not a constructor');
     const api = new ApiWrapper(
       '172.81.181.19', 3001, true, false,
       'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
@@ -70,40 +87,6 @@ if (typeof mod.ApiWrapper === 'function') {
   } catch (err) {
     uiLog('[construct fail]', err.message || err);
   }
-
-  const delay = ms => new Promise(res => setTimeout(res, ms));
-
-  try {
-    await delay(1500);
-    uiLog('[worker] delay passed');
-  } catch (err) {
-    uiLog('[delay fail]', String(err?.message || err));
-  }
-
-  try {
-    // const me = api.getMyInfo?.() ?? {};
-    uiLog('[worker] attempting getSpotMarkets');
-    const spot = await api.getSpotMarkets?.();
-    uiLog('[worker] spot markets result', Array.isArray(spot) ? spot.length : JSON.stringify(spot));
-  } catch (err) {
-    uiLog('[getSpotMarkets fail]', String(err?.message || err));
-  }
-
-  try {
-    uiLog('[worker] attempting sendOrder');
-    const uuid = await api.sendOrder?.({
-      type: 'SPOT',
-      action: 'BUY',
-      isLimitOrder: true,
-      keypair: { address: '', pubkey: '' },
-      props: { id_for_sale: 0, id_desired: 5, price: 100, amount: 0.1, transfer: false },
-    });
-    uiLog('[worker] order sent uuid:', uuid);
-  } catch (err) {
-    uiLog('[sendOrder fail]', String(err?.message || err));
-  }
-
-  uiLog('[worker] dynamic import sequence complete');
 })();
 
 
