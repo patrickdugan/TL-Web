@@ -54,7 +54,7 @@ let ApiWrapper;
 
   try {
     const api = new ApiWrapper(
-      '172.81.181.19', 3001, true, false,
+      'ws.layerwallet.com', 3001, true, false,
       'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
       '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
       'LTCTEST'
