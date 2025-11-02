@@ -12,6 +12,9 @@ module.exports = {
     },
     globalObject: 'self',       // <-- ensures it works in worker or window
   },
+  experiments: {
+    outputModule: false  // ✅ ensure it does NOT emit ESM syntax
+  },
   target: 'webworker',          // builds for browser/worker environment
   mode: 'production',
   resolve: {
