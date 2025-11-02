@@ -90,7 +90,7 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
     const getExtensionSigner = () => ({ sign: async () => console.log('[stub signer]') });
 
     //const me = api.getMyInfo();
-    uiLog('me:', me.address);
+    //uiLog('me:', me.address);
 
     const spot = await api.getSpotMarkets();
     uiLog('spot markets:', Array.isArray(spot) ? spot.length : 0);
