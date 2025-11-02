@@ -3,8 +3,8 @@
 
 // ---- logging bridge (works in worker or node) -----------------
 const log =
-  // if worker script already defined uiLog, use it
-  (typeof uiLog === 'function' && uiLog) ||
+  // if worker script already defined log, use it
+  (typeof log === 'function' && log) ||
   // else, if we are in a worker, forward to UI
   (typeof self !== 'undefined' && self.postMessage
     ? (...args) => {
@@ -179,12 +179,12 @@ saveEphemeralKey(eph) {
  // Function to initialize a socket connection
 _initializeSocket() {
   if (this.socket) {
-    uiLog('[ws] reusing existing socket');
+    log('[ws] reusing existing socket');
     return this.socket;
   }
 
   const url = this.wsUrl; // e.g. wss://ws.layerwallet.com/ws
-  uiLog('[ws] attempting connection to', url);
+  log('[ws] attempting connection to', url);
 
   try {
     const sock = createTransport({ type: 'ws', url });
@@ -192,7 +192,7 @@ _initializeSocket() {
 
     sock.connect(url)
       .then(() => {
-        uiLog('[ws] connected to', url);
+        log('[ws] connected to', url);
         this.myInfo.socketId = null; // event-bus mode
 
         if (typeof OrderbookSession === 'function') {
@@ -202,52 +202,52 @@ _initializeSocket() {
             this.client,
             this.test
           );
-          uiLog('[ws] OrderbookSession initialized');
+          log('[ws] OrderbookSession initialized');
         }
       })
       .catch(err => {
-        uiLog('[ws] connect() failed:', err?.message || err);
+        log('[ws] connect() failed:', err?.message || err);
       });
 
     // Core socket event handlers
     sock.on('connect', () => {
-      uiLog('[ws][connect]', url);
+      log('[ws][connect]', url);
       this.myInfo.socketId = sock.id || null;
     });
 
     sock.on('disconnect', reason => {
-      uiLog('[ws][disconnect]', reason);
+      log('[ws][disconnect]', reason);
     });
 
     sock.on('error', err => {
-      uiLog('[ws][error evt]', err?.message || err);
+      log('[ws][error evt]', err?.message || err);
     });
 
     sock.on('order:saved', orderUuid => {
-      uiLog('[ws][order:saved]', orderUuid);
+      log('[ws][order:saved]', orderUuid);
       if (!this.myOrders) this.myOrders = [];
       this.myOrders.push(orderUuid);
     });
 
     sock.on('order:canceled', payload => {
       const orderUuid = payload?.orderUuid || payload?.uuid;
-      uiLog('[ws][order:canceled]', orderUuid);
+      log('[ws][order:canceled]', orderUuid);
       if (this.myOrders && orderUuid) {
         this.myOrders = this.myOrders.filter(o => o !== orderUuid);
       }
     });
 
     sock.on('order:error', err => {
-      uiLog('[ws][order:error]', typeof err === 'string' ? err : JSON.stringify(err));
+      log('[ws][order:error]', typeof err === 'string' ? err : JSON.stringify(err));
     });
 
     sock.on('orderbook-data', data => {
-      uiLog('[ws][orderbook-data] update received');
+      log('[ws][orderbook-data] update received');
     });
 
     return sock;
   } catch (err) {
-    uiLog('[ws][fatal]', err?.message || err);
+    log('[ws][fatal]', err?.message || err);
     return null;
   }
 }
