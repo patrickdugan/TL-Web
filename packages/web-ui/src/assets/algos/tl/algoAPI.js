@@ -1,6 +1,20 @@
 // Full replacement: algoAPI.js
 // Adds API mode with axios routing to relayer endpoints (URIs configurable via RELAYER_PATHS).
 
+// ---- logging bridge (works in worker or node) -----------------
+const log =
+  // if worker script already defined uiLog, use it
+  (typeof uiLog === 'function' && uiLog) ||
+  // else, if we are in a worker, forward to UI
+  (typeof self !== 'undefined' && self.postMessage
+    ? (...args) => {
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        self.postMessage({ type: 'log', msg });
+      }
+    // last fallback: console
+    : (...args) => console.log('[algoAPI]', ...args));
+
+
 const io = require('socket.io-client');
 const axios = require('axios');
 const BigNumber = require('bignumber.js');
@@ -87,7 +101,7 @@ class ApiWrapper {
     // WebSocket endpoint (kept for compatibility)
     const netloc = (baseURL || '').replace(/^ws:\/\/|^wss:\/\//, '').replace(/^http:\/\/|^https:\/\//, '');
     this.apiUrl = `http://${netloc}:${port}`;
-    this.wsUrl  = `ws://${netloc}:${port}/ws`;
+    this.wsUrl  = `wss://${netloc}:${port}/ws`;
 
     // API Mode wiring
     this.tlOn = !!tlAlreadyOn;
@@ -163,13 +177,54 @@ saveEphemeralKey(eph) {
 
   // --- Socket setup (assigns this.socket if created) ---
   _initializeSocket() {
-    if (this.socket) return this.socket;
-    const url = this.wsUrl;
-    const s = io(url, { transports: ['websocket'] });
-    this.socket = s;
-    // Optionally wire event handlers here
-    return s;
-  }
+  if (this.socket) return this.socket;
+
+  const proto =
+    (typeof location !== 'undefined' && location.protocol === 'https:')
+      ? 'wss://'
+      : 'ws://';
+
+  const url = `${proto}${this.baseURL}:${this.port}/ws`;
+
+  const s = io(url, {
+    transports: ['websocket'],
+    reconnectionAttempts: 3,
+    timeout: 5000,
+    // if server is on /socket.io, uncomment:
+    // path: '/socket.io',
+  });
+
+  log('[socket] trying', url);
+
+  s.on('connect', () => {
+    log('[socket] connected', s.id);
+    try {
+      s.emit('register', {
+        address: this.myInfo?.address,
+        pubkey: this.myInfo?.keypair?.pubkey,
+        network: this.network,
+      });
+      log('[socket] register sent');
+    } catch (e) {
+      log('[socket] register failed', e?.message || e);
+    }
+  });
+
+  s.on('connect_error', err => {
+    log('[socket] connect_error', err?.message || err);
+  });
+
+  s.on('error', err => {
+    log('[socket] error', err?.message || err);
+  });
+
+  s.on('disconnect', reason => {
+    log('[socket] disconnect', reason);
+  });
+
+  this.socket = s;
+  return s;
+}
 
   // --- API helper ---
   async _relayerPost(path, body) {
