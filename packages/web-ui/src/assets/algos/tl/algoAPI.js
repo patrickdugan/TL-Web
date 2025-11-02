@@ -104,7 +104,7 @@ class ApiWrapper {
 
     // Orderbook session (optional, when not using relayer for books)
     this.orderbookSession = OrderbookSession ? new OrderbookSession() : null;
-    this.sessionKey = loadEphemeralKey();
+    this.sessionKey = this.loadEphemeralKey();
     // Socket handle
     this.socket = null;
     setTimeout(() => { this.initUntilSuccess(); }, 0);
@@ -121,13 +121,13 @@ class ApiWrapper {
   async generateEphemeralKey(network = 'LTCTEST') {
     const keyObj = makeNewAddress(network);
     this.sessionKey = keyObj;
-    saveEphemeralKey(keyObj);
+    this.saveEphemeralKey(keyObj);
     return keyObj;
   }
 
   clearEphemeralKey() {
     this.sessionKey = null;
-    clearEphemeralKey();
+    //clearEphemeralKey();
   }
 
 loadEphemeralKey() {
@@ -137,7 +137,7 @@ loadEphemeralKey() {
       if (raw){ 
         return JSON.parse(raw);
       }else{
-        generateEphemeralKey()
+        this.generateEphemeralKey()
       }
 
     }
