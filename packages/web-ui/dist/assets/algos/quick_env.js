@@ -32,17 +32,15 @@ let ApiWrapper; // must be declared at top level
 (async () => {
   uiLog('[worker] starting dynamic import sequence');
 
-  let mod;
-  try {
-    mod = await import('/assets/algos/tl/algoAPI.bundle.js');
-    uiLog('[import ok]', Object.keys(mod), mod.default ? 'has default export' : 'no default export');
-  } catch (err) {
-    uiLog('[import fail]', String(err?.message || err));
-    return; // bail early; nothing else will work without the bundle
-  }
-
-  const mod = await import('/assets/algos/tl/algoAPI.bundle.js');
-  ApiWrapper = mod.default ?? mod.ApiWrapper ?? mod;
+let mod;
+try {
+  mod = await import('/assets/algos/tl/algoAPI.bundle.js');
+  uiLog('[import ok]', Object.keys(mod), mod.default ? 'has default export' : 'no default export');
+} catch (err) {
+  uiLog('[import fail]', String(err?.message || err));
+  return;
+}
+ApiWrapper = mod.default ?? mod.ApiWrapper ?? mod;
 
   // diagnostic
   uiLog('[import ok]', Object.keys(mod));
