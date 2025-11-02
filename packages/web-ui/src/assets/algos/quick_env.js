@@ -24,27 +24,47 @@ self.addEventListener('unhandledrejection', e => {
 });
 uiLog('[debug] worker booted');
 
-setTimeout(startAlgo, 6000);
+//setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
 
-let ApiWrapper;
+let ApiWrapper; // must be declared at top level
 
-try {
-  // Works in browsers and workers that support dynamic import
-  const mod = await import('./tl/algoAPI.bundle.js');
-  ApiWrapper = mod.default ?? mod;
-} catch (err) {
+(async () => {
   try {
-    // Fallback for Node CLI or older browsers
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    ApiWrapper = require('./tl/algoAPI.bundle.js');
-  } catch (e2) {
-    console.error('[ALGO] failed to load ApiWrapper:', err, e2);
-    self.postMessage({ type: 'log', msg: '[ALGO] failed to load ApiWrapper' });
-    throw e2;
-  }
-}
+    // dynamic import that works in worker context
+    const mod = await import('/assets/algos/tl/algoAPI.bundle.js');
+    ApiWrapper = mod.default ?? mod;
 
+    // Now safe to use
+    const api = new ApiWrapper(
+      '172.81.181.19', 3001, true, false,
+      'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
+      '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
+      'LTCTEST'
+    );
+
+    // Example of async flow to confirm it’s alive
+    await api.delay(1500);
+    const me = api.getMyInfo();
+    api.log('[worker] address', me.address);
+
+    const spot = await api.getSpotMarkets();
+    api.log('spot markets', Array.isArray(spot) ? spot.length : 0);
+
+    const uuid = await api.sendOrder({
+      type: 'SPOT',
+      action: 'BUY',
+      isLimitOrder: true,
+      keypair: { address: me.address, pubkey: me.pubkey },
+      props: { id_for_sale: 0, id_desired: 5, price: 100, amount: 0.1, transfer: false },
+    });
+
+    api.log('order sent:', uuid);
+  } catch (err) {
+    console.error('[ALGO async import error]', err);
+    api?.log('[ALGO async import error]', String(err.message || err));
+  }
+})();
 
 
 // ---- CONFIG ----
@@ -60,12 +80,14 @@ const SIZE     = 0.1;
 uiLog('[env]', HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
 // ---- INIT ----
-const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
+//const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
 
+const delay = ms => new Promise(res => setTimeout(res, ms));
 // ---- MAIN ----
 (async () => {
   try {
-    await api.delay(1500);
+    await delay(1500);
+    const getExtensionSigner = () => ({ sign: async () => console.log('[stub signer]') });
 
     const me = api.getMyInfo();
     uiLog('me:', me.address);

@@ -110,6 +110,10 @@ class ApiWrapper {
     setTimeout(() => { this.initUntilSuccess(); }, 0);
   }
 
+  getMyInfo() {
+    return this.myInfo
+  }
+
   getEphemeralKey() {
     return this.sessionKey;
   }
