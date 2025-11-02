@@ -12,11 +12,6 @@ module.exports = {
   },
   mode: 'production',
   devtool: false,
-  optimization: {
-    usedExports: false,          // <- don’t tree-shake
-    concatenateModules: false,   // <- don’t scope-hoist
-    minimize: false,             // <- keep methods readable for now
-  },
   target: 'webworker',
   experiments: {
     outputModule: false,            // prevents ESM stub
