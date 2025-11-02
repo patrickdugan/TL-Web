@@ -106,7 +106,106 @@ uiLog('[debug] worker booted');
 
   uiLog('[ok] api ready', Object.getOwnPropertyNames(Object.getPrototypeOf(api)));
 
-  // smoke test
+(async () => {
+  const BUNDLE_URL = '/assets/algos/tl/algoAPI.bundle.js';
+
+  function uiLog(...args) {
+    if (typeof self !== 'undefined' && self.postMessage) {
+      self.postMessage({ type: 'log', msg: args.join(' ') });
+    } else {
+      console.log('[worker]', ...args);
+    }
+  }
+
+  uiLog('[worker] boot');
+
+  // 1) get the raw bundle text
+  let src;
+  try {
+    const res = await fetch(BUNDLE_URL + '?_=' + Date.now(), { cache: 'no-store' });
+    src = await res.text();
+  } catch (e) {
+    uiLog('[fatal] cannot fetch bundle:', e?.message || String(e));
+    return;
+  }
+
+  // 2) protect the class/function definition name so we don't break it
+  // covers: "class ApiWrapper {" and "function ApiWrapper("
+  src = src
+    .replace(/class\s+ApiWrapper\s*\{/g, 'class __ApiWrapper_DEF__ {')
+    .replace(/function\s+ApiWrapper\s*\(/g, 'function __ApiWrapper_DEF__(');
+
+  // 3) now nuke ALL calls like "ApiWrapper(...)" (the thing throwing)
+  // we only match when preceded by a non-identifier char, so we don't hit "...SomeApiWrapper("
+  src = src.replace(/([^A-Za-z0-9_$])ApiWrapper\s*\(/g, '$1ApiWrapper');
+
+  // 4) restore the real name
+  src = src.replace(/__ApiWrapper_DEF__/g, 'ApiWrapper');
+
+  // 5) make extra sure it exposes TLAlgoAPI (in case your built file was older)
+  if (!/TLAlgoAPI/.test(src)) {
+    src += `
+    (function (root, factory) {
+      var lib = factory();
+      (root || (typeof self !== 'undefined' ? self : globalThis)).TLAlgoAPI = lib;
+    })(typeof self !== 'undefined' ? self : this, function () {
+      function createApiWrapper() {
+        return new ApiWrapper(...arguments);
+      }
+      return { ApiWrapper: ApiWrapper, createApiWrapper: createApiWrapper };
+    });
+    `;
+  }
+
+  // 6) eval the cleaned bundle
+  try {
+    (0, eval)(src);
+    uiLog('[worker] patched bundle evaluated');
+  } catch (e) {
+    uiLog('[fatal] eval still failed:', e?.message || String(e));
+    return;
+  }
+
+  // 7) consume it
+  const g = typeof self !== 'undefined' ? self : globalThis;
+  const exported = g.TLAlgoAPI || g.ApiWrapper;
+
+  if (!exported) {
+    uiLog('[fatal] no TLAlgoAPI / ApiWrapper on global after eval');
+    return;
+  }
+
+  // hardcoded for now
+  const cfg = [
+    'ws.layerwallet.com',
+    443,
+    true,
+    false,
+    'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
+    '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
+    'LTCTEST'
+  ];
+
+  let api;
+  if (typeof exported === 'object' && typeof exported.createApiWrapper === 'function') {
+    uiLog('[worker] using createApiWrapper');
+    api = exported.createApiWrapper(...cfg);
+  } else if (typeof exported === 'function') {
+    uiLog('[worker] using class export');
+    api = new exported(...cfg);
+  } else {
+    uiLog('[worker] using instance export');
+    api = exported;
+  }
+
+  if (!api) {
+    uiLog('[fatal] could not init api');
+    return;
+  }
+
+  uiLog('[ok] api ready', Object.getOwnPropertyNames(Object.getPrototypeOf(api)));
+
+  // 8) smoke test
   try {
     const spot = await api.getSpotMarkets?.();
     uiLog('[getSpotMarkets]', Array.isArray(spot) ? `len=${spot.length}` : typeof spot);
