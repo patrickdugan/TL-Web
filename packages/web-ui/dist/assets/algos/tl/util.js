@@ -117,16 +117,6 @@ async function getUnifiedSigner(preferredNetwork) {
   };
 }
 
-// util.js — merged version (no exports lost)
-
-try {
-  bitcoin = require('../bitcoinjs.js');
-} catch (e) {
-  if (typeof self !== 'undefined' && self.bitcoin) {
-    bitcoin = self.bitcoin;
-  }
-}
-
 // ---------------------------------------------------------------------
 // ORIGINAL STUFF
 // ---------------------------------------------------------------------
