@@ -40,7 +40,19 @@ try {
   uiLog('[import fail]', String(err?.message || err));
   return;
 }
-ApiWrapper = mod.default ?? mod.ApiWrapper ?? mod;
+uiLog('[import ok]', Object.keys(mod));
+if (typeof mod.ApiWrapper === 'function') {
+  ApiWrapper = mod.ApiWrapper;
+  uiLog('[using named export] ApiWrapper');
+} else if (typeof mod.default === 'function') {
+  ApiWrapper = mod.default;
+  uiLog('[using default export]');
+} else {
+  // fallback: if it’s a nested object { tl: { ApiWrapper } }
+  const nested = Object.values(mod).find(v => v && v.ApiWrapper);
+  ApiWrapper = nested?.ApiWrapper;
+  uiLog('[using nested ApiWrapper path]', nested ? 'found' : 'none');
+}
 
   // diagnostic
   uiLog('[import ok]', Object.keys(mod));
