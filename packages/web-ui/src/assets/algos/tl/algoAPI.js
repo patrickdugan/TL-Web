@@ -527,3 +527,4 @@ try {
   log('[export] failed', err);
 }
 
+Object.defineProperty(globalThis, 'ApiWrapper', { value: ApiWrapper, writable: true });
