@@ -94,29 +94,6 @@ function signPsbtLocal(psbtBase64, wif, network) {
   return psbt.extractTransaction().toHex();
 }
 
-/**
- * Unified signer:
- *  - try extension
- *  - else local ephemeral key
- */
-async function getUnifiedSigner(preferredNetwork) {
-  const extSigner = await getExtensionSigner();
-  if (extSigner) {
-    return {
-      type: 'extension',
-      sign: extSigner,
-    };
-  }
-
-  // fallback local
-  const eph = makeEphemeralKey(preferredNetwork);
-  return {
-    type: 'local',
-    key: eph,
-    signPsbt: (psbtBase64) => signPsbtLocal(psbtBase64, eph.privWIF, eph.network),
-  };
-}
-
 // ---------------------------------------------------------------------
 // ORIGINAL STUFF
 // ---------------------------------------------------------------------
@@ -125,7 +102,7 @@ function ensureBitcoin() {
   return bitcoin;
 }
 
-async function getUnifiedSigner(preferredNetwork) {
+/*async function getUnifiedSigner(preferredNetwork) {
   const ext = await getExtensionSigner();
   if (ext) {
     return {
@@ -139,7 +116,7 @@ async function getUnifiedSigner(preferredNetwork) {
     key: eph,
     signPsbt: (psbtBase64) => signPsbtLocal(psbtBase64, eph.network),
   };
-}
+}*/
 
 // ---------------------------------------------------------------------
 // NEW STUFF (does NOT overwrite the above)
