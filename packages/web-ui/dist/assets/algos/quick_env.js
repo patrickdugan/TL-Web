@@ -60,11 +60,12 @@ let ApiWrapper;
       'LTCTEST'
     );
     uiLog('[construct ok]', !!api);
+    uiLog('[ApiWrapper keys]', Object.keys(ApiWrapper.prototype || ApiWrapper));
   } catch (err) {
     uiLog('[construct fail]', err.message || err);
   }
 
-  
+
     const spot = await api.getSpotMarkets();
     uiLog('spot markets:', Array.isArray(spot) ? spot.length : 0);
 
