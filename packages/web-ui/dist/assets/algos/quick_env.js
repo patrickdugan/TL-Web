@@ -37,32 +37,23 @@ uiLog('[debug] worker booted');
   }
 
   // Now safely grab it from globalThis
- // Normalize both class and instance export cases
-let ApiWrapperExport =
-  (typeof globalThis !== 'undefined' && globalThis.ApiWrapper) ||
-  (typeof self !== 'undefined' && self.ApiWrapper);
+  const ApiWrapper =
+    (typeof globalThis !== 'undefined' && globalThis.ApiWrapper) ||
+    (typeof self !== 'undefined' && self.ApiWrapper);
 
-if (!ApiWrapperExport) {
-  uiLog('[fatal] ApiWrapper missing after import');
-  return;
-}
+  if (typeof ApiWrapper !== 'function') {
+    uiLog('[fatal] ApiWrapper missing after import');
+    return;
+  }
 
-// If the bundle accidentally exported an instance, unwrap its constructor
-if (typeof ApiWrapperExport !== 'function' && typeof ApiWrapperExport.constructor === 'function') {
-  uiLog('[warn] ApiWrapper export was instance — unwrapping constructor');
-  ApiWrapperExport = ApiWrapperExport.constructor;
-}
+  uiLog('[ok] ApiWrapper prototype keys', Object.getOwnPropertyNames(ApiWrapper.prototype));
 
-uiLog('[ok] ApiWrapper prototype keys', Object.getOwnPropertyNames(ApiWrapperExport.prototype));
-
-// ✅ Always use `new` here
-const api = new ApiWrapperExport(
-  'ws.layerwallet.com', 443, true, false,
-  'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
-  '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
-  'LTCTEST'
-);
-
+  const api = new ApiWrapper(
+    '172.81.181.19', 3001, true, false,
+    'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
+    '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
+    'LTCTEST'
+  );
 
   uiLog('[construct ok] true');
 
