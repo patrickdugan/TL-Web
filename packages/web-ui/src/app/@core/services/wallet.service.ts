@@ -142,59 +142,91 @@ export class WalletService {
 
   // ---- Selection & connection ----------------------------------------------
 
-  private available(): IWalletProvider[] {
-    return [this.phantomBtc, this.customExt].filter(p => p.isAvailable());
-  }
+// ---- Selection & connection ----------------------------------------------
 
-  private providerNet(): 'mainnet' | 'testnet' {
-    // if you later add BTC testnet UI, toggle here
-    return (this.rpc.NETWORK === 'LTCTEST') ? 'testnet' : 'mainnet';
-  }
+/** Return all wallets that are currently available in the browser. */
+private available(): IWalletProvider[] {
+  return [this.phantomBtc, this.customExt].filter(p => p?.isAvailable?.());
+}
 
-  private pick(): IWalletProvider | null {
-    const options = this.available();
-    const phantom = options.find(p => p.kind === 'phantom-btc');
-    return phantom || options[0] || null;
-  }
+/** Map app network → wallet network key. */
+private providerNet(): 'mainnet' | 'testnet' {
+  const n = (this.rpc.NETWORK || '').toUpperCase();
+  if (n.includes('TEST')) return 'testnet';
+  return 'mainnet';
+}
 
-  /** For a dropdown UI */
-  getDetectedProviders(): { primary: IWalletProvider | null; options: IWalletProvider[] } {
-    const options = this.available();
-    const primary = options.find(p => p.kind === 'phantom-btc') || options[0] || null;
-    return { primary, options };
-  }
+/**
+ * Pick the best default wallet for current network.
+ * Phantom wins for BTC; custom wins for LTC / TL networks.
+ */
+private pick(): IWalletProvider | null {
+  const opts = this.available();
+  const net = this.providerNet();
+  const isLtc = String(this.rpc.NETWORK || '').toUpperCase().startsWith('LTC');
+  if (isLtc) return opts.find(p => p.kind === 'custom') || opts[0] || null;
+  return opts.find(p => p.kind === 'phantom-btc') || opts[0] || null;
+}
 
-  async connectPreferred(): Promise<void> {
-    const p = this.pick();
-    if (!p) throw new Error('No supported wallet found (Phantom or TL extension).');
-    await this.finishConnect(p);
-  }
+/** For a dropdown UI (Phantom first if present). */
+getDetectedProviders(): { primary: IWalletProvider | null; options: IWalletProvider[] } {
+  const options = this.available();
+  const primary = this.pick();
+  return { primary, options };
+}
 
-  async useProvider(kind: WalletKind): Promise<void> {
-    const p = this.available().find(x => x.kind === kind);
-    if (!p) throw new Error(`Wallet provider ${kind} not available`);
-    await this.finishConnect(p);
-  }
+/**
+ * High-level connect that automatically picks provider based on network.
+ */
+async connectPreferred(): Promise<void> {
+  const p = this.pick();
+  if (!p) throw new Error('No supported wallet found (Phantom or TL extension).');
+  await this.finishConnect(p);
+}
 
-  private async finishConnect(p: IWalletProvider) {
-    const net = this.providerNet();
+/** Force-use a specific provider kind (e.g. user selection). */
+async useProvider(kind: WalletKind): Promise<void> {
+  const p = this.available().find(x => x.kind === kind);
+  if (!p) throw new Error(`Wallet provider ${kind} not available`);
+  await this.finishConnect(p);
+}
+
+/**
+ * Finalize the connection logic with optional network switch fallback.
+ */
+private async finishConnect(p: IWalletProvider) {
+  const net = this.providerNet();
+
+  // Prefer explicit switchNetwork if wallet supports it
+  if (p.switchNetwork) {
+    try {
+      await p.switchNetwork(net);
+    } catch (err) {
+      console.warn(`[wallet] switchNetwork failed, falling back to connect()`, err);
+      await p.connect?.(net);
+    }
+  } else {
     await p.connect?.(net);
-
-    this.provider$.next(p);
-
-    const addrs = await p.getAddresses(net);
-    this.addresses$.next(addrs);
-    this.address$.next(addrs[0] ?? null);
-
-    p.on?.('accountsChanged', (accs: string[]) => {
-      this.addresses$.next(accs || []);
-      this.address$.next(accs?.[0] ?? null);
-    });
-
-    p.on?.('networkChanged', () => {
-      // hook if you want to react (e.g., reload)
-    });
   }
+
+  this.provider$.next(p);
+
+  // Resolve addresses (some wallets ignore network param)
+  const addrs = await p.getAddresses(net);
+  this.addresses$.next(addrs);
+  this.address$.next(addrs[0] ?? null);
+
+  // Re-wire event listeners safely
+  p.on?.('accountsChanged', (accs: string[]) => {
+    this.addresses$.next(accs || []);
+    this.address$.next(accs?.[0] ?? null);
+  });
+
+  p.on?.('networkChanged', (newNet?: any) => {
+    console.log('[wallet] networkChanged event', newNet);
+    // optional: trigger re-sync / UI update
+  });
+}
 
   // ---- Public API (clean, de-duped) ----------------------------------------
 
