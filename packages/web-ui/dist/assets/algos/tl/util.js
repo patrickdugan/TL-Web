@@ -94,14 +94,6 @@ function signPsbtLocal(psbtBase64, wif, network) {
   return psbt.extractTransaction().toHex();
 }
 
-// ---------------------------------------------------------------------
-// ORIGINAL STUFF
-// ---------------------------------------------------------------------
-function ensureBitcoin() {
-  if (!bitcoin) throw new Error('bitcoinjs bundle not loaded');
-  return bitcoin;
-}
-
 /*async function getUnifiedSigner(preferredNetwork) {
   const ext = await getExtensionSigner();
   if (ext) {
@@ -219,7 +211,7 @@ function createRawTransaction(inputs, outputs, network = 'LTCTEST') {
   return built.toHex();
 }
 
-function createPsbt(inputs, outputs, network = 'LTCTEST') {
+function createPsbtAsync(inputs, outputs, network = 'LTCTEST') {
   const btc = ensureBitcoin();
   const net =
     (network && btc.networks[network.toLowerCase?.()]) ||
@@ -233,7 +225,7 @@ function createPsbt(inputs, outputs, network = 'LTCTEST') {
   return psbt.toBase64();
 }
 
-function decodeRawTransaction(rawtx, network = 'LTCTEST') {
+function decodeRawTransactionAsync(rawtx, network = 'LTCTEST') {
   const btc = ensureBitcoin();
   const net =
     (network && btc.networks[network.toLowerCase?.()]) ||
@@ -258,7 +250,7 @@ function decodeRawTransaction(rawtx, network = 'LTCTEST') {
   };
 }
 
-function decodePsbt(psbtBase64, network = 'LTCTEST') {
+function decodepsbtAsync(psbtBase64, network = 'LTCTEST') {
   const btc = ensureBitcoin();
   const net =
     (network && btc.networks[network.toLowerCase?.()]) ||
@@ -303,10 +295,10 @@ function getPubkeyFromWif(wif, networkName = 'LTCTEST') {
 module.exports = {
   // original
   ensureBitcoin,
-  getExtensionSigner,
-  makeEphemeralKey,
+  //getExtensionSigner,
+  //makeEphemeralKey,
   signPsbtLocal,
-  getUnifiedSigner,
+  //getUnifiedSigner,
   BigNumber,
   // new
   makeNewAddress,

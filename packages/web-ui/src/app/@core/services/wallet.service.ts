@@ -197,17 +197,7 @@ async useProvider(kind: WalletKind): Promise<void> {
 private async finishConnect(p: IWalletProvider) {
   const net = this.providerNet();
 
-  // Prefer explicit switchNetwork if wallet supports it
-  if (p.switchNetwork) {
-    try {
-      await p.switchNetwork(net);
-    } catch (err) {
-      console.warn(`[wallet] switchNetwork failed, falling back to connect()`, err);
-      await p.connect?.(net);
-    }
-  } else {
-    await p.connect?.(net);
-  }
+  await p.connect?.(net);
 
   this.provider$.next(p);
 

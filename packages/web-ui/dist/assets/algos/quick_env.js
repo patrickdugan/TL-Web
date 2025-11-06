@@ -26,45 +26,71 @@ uiLog('[debug] worker booted');
 
 //setTimeout(startAlgo, 6000);
 // simple logger that streams to the UI and browser console
-let ApiWrapper;
+
+let ApiWrapper; // must be declared at top level
 
 (async () => {
-  uiLog('[worker] starting dynamic import sequence');
-
   try {
-    // Dynamically load the script — forces execution and populates globalThis.ApiWrapper
-    await import('/assets/algos/tl/algoAPI.bundle.js');
-  } catch (err) {
-    uiLog('[import fail]', String(err?.message || err));
-    return;
-  }
+    // dynamic import that works in worker context
+    const mod = await import('/assets/algos/tl/algoAPI.bundle.js');
+    ApiWrapper = mod.default ?? mod;
 
-  // ✅ Diagnostic: check global scope directly
-  uiLog('[typeof globalThis.ApiWrapper]', typeof globalThis.ApiWrapper);
-  uiLog('[typeof self.ApiWrapper]', typeof self.ApiWrapper);
-
-  // ✅ Use whichever environment provided it
-  ApiWrapper = globalThis.ApiWrapper ?? self.ApiWrapper;
-  uiLog('[final resolved ApiWrapper]', typeof ApiWrapper);
-
-  if (typeof ApiWrapper !== 'function') {
-    uiLog('[fatal] ApiWrapper not defined or not a constructor');
-    return;
-  }
-
-  try {
+    // Now safe to use
     const api = new ApiWrapper(
-      'ws.layerwallet.com', 443, true, false,
+      '172.81.181.19', 3001, true, false,
       'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf',
       '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677',
       'LTCTEST'
     );
-    uiLog('[construct ok]', !!api);
-    uiLog('[ApiWrapper keys]', Object.keys(ApiWrapper.prototype || ApiWrapper));
-  } catch (err) {
-    uiLog('[construct fail]', err.message || err);
-  }
 
+    // Example of async flow to confirm it’s alive
+    await api.delay(1500);
+    const me = api.getMyInfo();
+    uilog('[worker] address', me.address);
+
+    const spot = await api.getSpotMarkets();
+    uilog('spot markets', Array.isArray(spot) ? spot.length : 0);
+
+    const uuid = await api.sendOrder({
+      type: 'SPOT',
+      action: 'BUY',
+      isLimitOrder: true,
+      keypair: { address: me.address, pubkey: me.pubkey },
+      props: { id_for_sale: 0, id_desired: 5, price: 100, amount: 0.1, transfer: false },
+    });
+
+    uilog('order sent:', uuid);
+  } catch (err) {
+    console.error('[ALGO async import error]', err);
+    api?.log('[ALGO async import error]', String(err.message || err));
+  }
+})();
+
+
+// ---- CONFIG ----
+const HOST     = '172.81.181.19';
+const PORT     = 3001;
+const TESTNET  = true;
+const TL_ON    = false;
+const ADDRESS  = 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf';
+const PUBKEY   = '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677';
+const NETWORK  = 'LTCTEST';
+const SIZE     = 0.1;
+
+uiLog('[env]', HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
+
+// ---- INIT ----
+//const api = new ApiWrapper(HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);
+
+const delay = ms => new Promise(res => setTimeout(res, ms));
+// ---- MAIN ----
+(async () => {
+  try {
+    await delay(1500);
+    const getExtensionSigner = () => ({ sign: async () => console.log('[stub signer]') });
+
+    const me = api.getMyInfo();
+    uiLog('me:', me.address);
 
     const spot = await api.getSpotMarkets();
     uiLog('spot markets:', Array.isArray(spot) ? spot.length : 0);
@@ -101,20 +127,8 @@ let ApiWrapper;
 
     uiLog('[done]');
     self.close();
+  } catch (e) {
+    uiLog('[fatal]', e.message || e);
+    console.error(e);
+  }
 })();
-
-
-
-
-
-// ---- CONFIG ----
-const HOST     = '172.81.181.19';
-const PORT     = 3001;
-const TESTNET  = true;
-const TL_ON    = false;
-const ADDRESS  = 'tltc1qn006lvcx89zjnhuzdmj0rjcwnfuqn7eycw40yf';
-const PUBKEY   = '03670d8f2109ea83ad09142839a55c77a6f044dab8cb8724949931ae8ab1316677';
-const NETWORK  = 'LTCTEST';
-const SIZE     = 0.1;
-
-//uiLog('[env]', HOST, PORT, TESTNET, TL_ON, ADDRESS, PUBKEY, NETWORK);

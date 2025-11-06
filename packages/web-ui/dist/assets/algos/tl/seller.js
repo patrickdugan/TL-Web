@@ -5,10 +5,10 @@ const BigNumber = require('bignumber.js');
 const {
   // original
   ensureBitcoin,
-  getExtensionSigner,
-  makeEphemeralKey,
+  //getExtensionSigner,
+  //makeEphemeralKey,
   signPsbtLocal,
-  getUnifiedSigner,
+  //getUnifiedSigner,
   // new
   makeNewAddress,
   makeMultisig,

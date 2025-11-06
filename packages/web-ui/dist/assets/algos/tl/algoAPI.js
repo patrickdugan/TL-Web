@@ -1,14 +1,28 @@
 // Full replacement: algoAPI.js
 // Adds API mode with axios routing to relayer endpoints (URIs configurable via RELAYER_PATHS).
 
+// ---- logging bridge (works in worker or node) -----------------
+const log =
+  // if worker script already defined uiLog, use it
+  (typeof uiLog === 'function' && uiLog) ||
+  // else, if we are in a worker, forward to UI
+  (typeof self !== 'undefined' && self.postMessage
+    ? (...args) => {
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        self.postMessage({ type: 'log', msg });
+      }
+    // last fallback: console
+    : (...args) => console.log('[algoAPI]', ...args));
+
+
 const io = require('socket.io-client');
 const axios = require('axios');
 const BigNumber = require('bignumber.js');
 const {ensureBitcoin,
-  getExtensionSigner,
-  makeEphemeralKey,
+  //getExtensionSigner,
+  //makeEphemeralKey,
   signPsbtLocal,
-  getUnifiedSigner,
+  //getUnifiedSigner,
   makeNewAddress,
   makeMultisig,
   makeLocalRpc,
@@ -87,7 +101,7 @@ class ApiWrapper {
     // WebSocket endpoint (kept for compatibility)
     const netloc = (baseURL || '').replace(/^ws:\/\/|^wss:\/\//, '').replace(/^http:\/\/|^https:\/\//, '');
     this.apiUrl = `http://${netloc}:${port}`;
-    this.wsUrl  = `ws://${netloc}:${port}/ws`;
+    this.wsUrl  = `wss://${netloc}:${port}/ws`;
 
     // API Mode wiring
     this.tlOn = !!tlAlreadyOn;
@@ -104,10 +118,15 @@ class ApiWrapper {
 
     // Orderbook session (optional, when not using relayer for books)
     this.orderbookSession = OrderbookSession ? new OrderbookSession() : null;
-    this.sessionKey = loadEphemeralKey();
+    this.sessionKey = this.loadEphemeralKey();
     // Socket handle
     this.socket = null;
+    this._initializeSocket();
     setTimeout(() => { this.initUntilSuccess(); }, 0);
+  }
+
+  getMyInfo() {
+    return this.myInfo
   }
 
   getEphemeralKey() {
@@ -117,24 +136,123 @@ class ApiWrapper {
   async generateEphemeralKey(network = 'LTCTEST') {
     const keyObj = makeNewAddress(network);
     this.sessionKey = keyObj;
-    saveEphemeralKey(keyObj);
+    this.saveEphemeralKey(keyObj);
     return keyObj;
   }
 
   clearEphemeralKey() {
     this.sessionKey = null;
-    clearEphemeralKey();
+    //clearEphemeralKey();
   }
 
-  // --- Socket setup (assigns this.socket if created) ---
-  _initializeSocket() {
-    if (this.socket) return this.socket;
-    const url = this.wsUrl;
-    const s = io(url, { transports: ['websocket'] });
-    this.socket = s;
-    // Optionally wire event handlers here
-    return s;
+loadEphemeralKey() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('ephemeral_key');
+      if (raw){ 
+        return JSON.parse(raw);
+      }else{
+        this.generateEphemeralKey()
+      }
+
+    }
+  } catch (err) {
+    console.warn('[EphemeralKey] localStorage read failed', err);
   }
+  return null;
+}
+
+saveEphemeralKey(eph) {
+  try {
+    if (typeof localStorage !== 'undefined' && eph) {
+      localStorage.setItem('ephemeral_key', JSON.stringify(eph));
+      return true;
+    }
+  } catch (err) {
+    console.warn('[EphemeralKey] localStorage save failed', err);
+  }
+  return false;
+}
+
+
+  // --- Socket setup (assigns this.socket if created) ---
+ // Function to initialize a socket connection
+_initializeSocket() {
+  if (this.socket) {
+    log('[ws] reusing existing socket');
+    return this.socket;
+  }
+
+  const url = this.wsUrl; // e.g. wss://ws.layerwallet.com/ws
+  log('[ws] attempting connection to', url);
+
+  try {
+    const sock = createTransport({ type: 'ws', url });
+    this.socket = sock;
+
+    sock.connect(url)
+      .then(() => {
+        log('[ws] connected to', url);
+        this.myInfo.socketId = null; // event-bus mode
+
+        if (typeof OrderbookSession === 'function') {
+          this.orderbookSession = new OrderbookSession(
+            sock,
+            this.myInfo,
+            this.client,
+            this.test
+          );
+          log('[ws] OrderbookSession initialized');
+        }
+      })
+      .catch(err => {
+        log('[ws] connect() failed:', err?.message || err);
+      });
+
+    // Core socket event handlers
+    sock.on('connect', () => {
+      log('[ws][connect]', url);
+      this.myInfo.socketId = sock.id || null;
+    });
+
+    sock.on('disconnect', reason => {
+      log('[ws][disconnect]', reason);
+    });
+
+    sock.on('error', err => {
+      log('[ws][error evt]', err?.message || err);
+    });
+
+    sock.on('order:saved', orderUuid => {
+      log('[ws][order:saved]', orderUuid);
+      if (!this.myOrders) this.myOrders = [];
+      this.myOrders.push(orderUuid);
+    });
+
+    sock.on('order:canceled', payload => {
+      const orderUuid = payload?.orderUuid || payload?.uuid;
+      log('[ws][order:canceled]', orderUuid);
+      if (this.myOrders && orderUuid) {
+        this.myOrders = this.myOrders.filter(o => o !== orderUuid);
+      }
+    });
+
+    sock.on('order:error', err => {
+      log('[ws][order:error]', typeof err === 'string' ? err : JSON.stringify(err));
+    });
+
+    sock.on('orderbook-data', data => {
+      log('[ws][orderbook-data] update received');
+    });
+
+    return sock;
+  } catch (err) {
+    log('[ws][fatal]', err?.message || err);
+    return null;
+  }
+}
+
+
 
   // --- API helper ---
   async _relayerPost(path, body) {
@@ -393,5 +511,19 @@ async sendOrder(order) {
         }else{throw new Error('Invalid response format: futures markets not found')};
     }
 }
+// --- Final hard export (no tree-shake, no closure loss) ---
+try {
+  // Force a reference so Terser keeps it
+  const _ApiWrapperRef = ApiWrapper;
+  // Attach everywhere possible
+  (typeof globalThis !== 'undefined' ? globalThis : self).ApiWrapper = _ApiWrapperRef;
+  if (typeof window !== 'undefined') window.ApiWrapper = _ApiWrapperRef;
+  if (typeof self !== 'undefined') self.ApiWrapper = _ApiWrapperRef;
+  if (typeof module !== 'undefined' && module.exports) module.exports = _ApiWrapperRef;
+  if (typeof define === 'function' && define.amd) define([], () => _ApiWrapperRef);
+  // expose name for diagnostics
+  log('[export] ApiWrapper prototype keys:', Object.keys(_ApiWrapperRef?.prototype || {}));
+} catch (err) {
+  log('[export] failed', err);
+}
 
-module.exports = ApiWrapper;

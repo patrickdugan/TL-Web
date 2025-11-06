@@ -2,9 +2,11 @@
 // NOTE: this version is webpack/browser safe (no util.promisify RPCs)
 const Encode = require('./tradelayer.js/src/txEncoder.js');
 const { buildLitecoinTransaction, buildTokenTradeTransaction, buildFuturesTransaction, getUTXOFromCommit,signPsbtRawTx } = require('./litecoreTxBuilder');
-const { getNewAddress, makeMultisig, getUnifiedSigner, ensureBitcoin,
-  getExtensionSigner,
-  makeEphemeralKey,
+const { getNewAddress, makeMultisig, 
+  //getUnifiedSigner, 
+  ensureBitcoin,
+  //getExtensionSigner,
+  //makeEphemeralKey,
   signPsbtLocal,
   BigNumber,
   // new
