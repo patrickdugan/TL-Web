@@ -194,42 +194,100 @@ export class TxsService {
     const fee = 0.00001; // Example static fee, adjust dynamically if needed
     return { finalInputs, fee };
   };
-
+  
   async buildSignSendTxGrabUTXO(
     buildTxConfig: IBuildTxConfig
   ): Promise<{ txid?: string; commitUTXO?: IUTXO; error?: string; data?: any }> {
     try {
       this.loadingService.isLoading = true;
-    const UTXOs = this.balanceService.allBalances[buildTxConfig.fromKeyPair.address]?.coinBalance?.utxos;
 
-      const biggestInput = this.getEnoughInputs2(UTXOs,0.0000546)
-      buildTxConfig.inputs=biggestInput.finalInputs
-      console.log('buildTxConfig '+JSON.stringify(buildTxConfig))
-      // Sign transaction using wallet
-      const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: buildTxConfig, network: this.balanceService.NETWORK });
-      if (!signResponse || !signResponse.success){
-        return { error: signResponse?.error || "Failed to sign transaction." };
+      const UTXOs =
+        this.balanceService.allBalances[buildTxConfig.fromKeyPair.address]
+          ?.coinBalance?.utxos || [];
+
+      const biggestInput = this.getEnoughInputs2(UTXOs, 0.0000546);
+      buildTxConfig.inputs = biggestInput.finalInputs;
+
+      console.log("buildTxConfig " + JSON.stringify(buildTxConfig));
+
+      // ────────────────────────────────────────────
+      //  PHANTOM MODE? → PSBT SIGNING FLOW
+      // ────────────────────────────────────────────
+      const provider = this.walletService.provider$.value || this.walletService["pick"]();
+      const isPhantom = provider?.kind === "phantom-btc";
+
+      let finalHex: string;
+
+      if (isPhantom) {
+        console.log("[phantom] building unsigned PSBT");
+        
+        // 1) Get unsigned PSBT from relayer
+        const unsignedRes = await fetch(`${this.walletService.baseUrl}/tx/buildUnsigned`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            txConfig: buildTxConfig,
+            network: this.balanceService.NETWORK
+          })
+        }).then(r => r.json());
+
+        if (!unsignedRes.success) {
+          return { error: unsignedRes.error || "Failed to build unsigned PSBT" };
+        }
+
+        const psbtBase64 = unsignedRes.data.psbtBase64;
+
+        // 2) Phantom signs PSBT
+        console.log("[phantom] signing PSBT");
+        const signedPsbt = await this.walletService.signPsbt(psbtBase64, {
+          autoFinalize: true,
+          broadcast: false
+        });
+
+        // 3) Server extracts final TX hex OR Phantom returns it
+        finalHex = signedPsbt.finalHex || signedPsbt.rawTx || signedPsbt;
+
+      } else {
+        // ────────────────────────────────────────────
+        //  CUSTOM EXTENSION? → existing direct-sign flow
+        // ────────────────────────────────────────────
+        const signResponse = await window.myWallet?.sendRequest("signTransaction", {
+          transaction: buildTxConfig,
+          network: this.balanceService.NETWORK,
+        });
+
+        if (!signResponse || !signResponse.success) {
+          return { error: signResponse?.error || "Failed to sign transaction." };
+        }
+
+        finalHex = signResponse.data.rawTx;
       }
-      console.log('sign response '+JSON.stringify(signResponse))
-      const signedTx = signResponse.data.rawTx;
 
-      console.log('signed tx'+signedTx)
-      // Broadcast signed transaction
-     const sendResponse = await this.sendTx(signedTx);
-     const commitUTXO = {amount: 0.0000546, confirmations:0, vout: 0, txid: sendResponse.data as string,}
-    
-    if (sendResponse.error) {
-      return { error: sendResponse.error };
-    }
-    console.log('Transaction ID:', sendResponse.data);
-    
-    return { txid: sendResponse.data, 
-    commitUTXO: commitUTXO, 
-    data: {rawtx:signedTx} // 'data' here is just the raw transaction hex
-    };
-    } catch (error: any) {
-      console.error("Error in buildSignSendTx:", error.message);
-      return { error: error.message };
+      console.log("signed tx:", finalHex);
+
+      // ────────────────────────────────────────────
+      //  BROADCAST FINAL HEX
+      // ────────────────────────────────────────────
+      const sendResponse = await this.sendTx(finalHex);
+      if (sendResponse.error) return { error: sendResponse.error };
+
+      const txid = sendResponse.data;
+      const commitUTXO = {
+        amount: 0.0000546,
+        confirmations: 0,
+        vout: 0,
+        txid,
+      };
+
+      return {
+        txid,
+        commitUTXO,
+        data: { rawtx: finalHex }
+      };
+
+    } catch (err: any) {
+      console.error("Error in buildSignSendTxGrabUTXO:", err.message);
+      return { error: err.message };
     } finally {
       this.loadingService.isLoading = false;
     }
@@ -241,22 +299,56 @@ export class TxsService {
     try {
       this.loadingService.isLoading = true;
 
-      // Sign transaction using wallet
-      const signResponse = await window.myWallet?.sendRequest("signTransaction", { transaction: buildTxConfig, network: this.balanceService.NETWORK });
-      if (!signResponse || !signResponse.success) {
-        return { error: signResponse?.error || "Failed to sign transaction." };
-      }
-      console.log('sign response '+JSON.stringify(signResponse))
-      const signedTx = signResponse.data.rawTx;
-      console.log('signed tx'+signedTx)
-      // Broadcast signed transaction
-     const sendResponse = await this.sendTx(signedTx);
-    if (sendResponse.error) {
-      return { error: sendResponse.error };
-    }
-    console.log('Transaction ID:', sendResponse.data);
+      const provider = this.walletService.provider$.value || this.walletService["pick"]();
+      const isPhantom = provider?.kind === "phantom-btc";
 
-    return { data: sendResponse.data }; // Pass only the `txid`
+      let finalHex: string;
+
+      if (isPhantom) {
+        // 1) Build PSBT server-side
+        const unsignedRes = await fetch(`${this.walletService.baseUrl}/tx/buildUnsigned`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            txConfig: buildTxConfig,
+            network: this.balanceService.NETWORK
+          })
+        }).then(r => r.json());
+
+        if (!unsignedRes.success) {
+          return { error: unsignedRes.error || "Failed to build unsigned PSBT" };
+        }
+
+        const psbtBase64 = unsignedRes.data.psbtBase64;
+
+        // 2) Phantom signs it
+        const signedPsbt = await this.walletService.signPsbt(psbtBase64, {
+          autoFinalize: true,
+          broadcast: false,
+        });
+
+        finalHex = signedPsbt.finalHex || signedPsbt.rawTx || signedPsbt;
+
+      } else {
+        // EXTENSION legacy flow
+        const signResponse = await window.myWallet?.sendRequest("signTransaction", {
+          transaction: buildTxConfig,
+          network: this.balanceService.NETWORK,
+        });
+
+        if (!signResponse || !signResponse.success) {
+          return { error: signResponse?.error || "Failed to sign transaction." };
+        }
+
+        finalHex = signResponse.data.rawTx;
+      }
+
+      // 3) Broadcast
+      const sendResponse = await this.sendTx(finalHex);
+      if (sendResponse.error) return { error: sendResponse.error };
+
+      return { data: sendResponse.data };
+
     } catch (error: any) {
       console.error("Error in buildSignSendTx:", error.message);
       return { error: error.message };
@@ -264,6 +356,7 @@ export class TxsService {
       this.loadingService.isLoading = false;
     }
   }
+
 
   async signPsbt(psbtHex: string, sellerFlag: boolean): Promise<{
     data?: {
