@@ -43,12 +43,12 @@ class WsTransport extends EventEmitter {
    * @param {string|object} arg  url or { url, headers?, pingMs? }
    * @param {object} [opts]
    */
-  constructor(arg, opts = {}) {
+  constructor(arg, opts = {}, network) {
     super();
     const cfg = (typeof arg === 'string') ? { url: arg, ...opts } : (arg || {});
     this.url = cfg.url || null;
     this.opts = { headers: cfg.headers, pingMs: cfg.pingMs || 0 };
-
+    this.network=network
     /** @type {WebSocket|null} */
     this.ws = null;
 
@@ -258,13 +258,22 @@ class WsTransport extends EventEmitter {
       return this;
     }
 
-    // NOTE: server expects top-level merge, not { data: payload }
-    const frame = Object.assign({ event }, payload || {});
-    try { this.ws.send(JSON.stringify(frame)); }
-    catch (e) { _emitLocal(this, 'ws-error', e); }
+    // inject network
+    const frame = {
+      event,
+      ...(payload || {}),
+      network: this.network
+    };
+
+    try {
+      this.ws.send(JSON.stringify(frame));
+    } catch (e) {
+      _emitLocal(this, 'ws-error', e);
+    }
 
     return this;
   }
+
 }
 
 /* Factory kept for parity with your callers */

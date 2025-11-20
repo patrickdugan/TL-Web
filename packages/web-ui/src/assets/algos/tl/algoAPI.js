@@ -187,7 +187,7 @@ _initializeSocket() {
   log('[ws] attempting connection to', url);
 
   try {
-    const sock = createTransport({ type: 'ws', url });
+    const sock = createTransport({ type: 'ws', url },{},network);
     this.socket = sock;
 
     sock.connect(url)
