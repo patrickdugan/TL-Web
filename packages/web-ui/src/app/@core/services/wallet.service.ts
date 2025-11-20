@@ -91,9 +91,9 @@ export class WalletService {
   // -------------------------------------------------------------------------
 
     async checkIP(): Promise<{ ip: string; isVpn: boolean; countryCode: string }> {
-      if (this.activeWallet === 'custom') {
+      /*if (this.activeWallet === 'custom') {
         return window.myWallet!.sendRequest("fetchUserIP", {});
-      }
+      }*/
 
       // Phantom fallback: server-side check
       const res = await fetch(`${this.baseUrl}/attestation/ip`, {
