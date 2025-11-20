@@ -10,6 +10,13 @@ type PhantomBtc = {
   on?: (ev: string, cb: (...a: any[]) => void) => void;
 };
 
+interface MultisigRecord {
+  m: number;
+  pubKeys: string[];
+  redeemScript: string;
+  address?: string;
+}
+
 const isLtcNet = (net?: TNETWORK | string) =>
   String(net ?? '').toUpperCase().startsWith('LTC');
 
@@ -43,14 +50,31 @@ interface IWalletProvider {
 
 @Injectable({ providedIn: 'root' })
 export class WalletService {
-  constructor(private rpc: RpcService) {}
+  constructor(private rpc: RpcService) {
+    const net = (this.rpc.NETWORK || '').toUpperCase();
+
+    this.baseUrl = net.includes('TEST')
+      ? "https://testnet-api.layerwallet.com"
+      : "https://api.layerwallet.com";
+  }
 
   // Reactive state (handy if you bind in header/futures)
   public provider$  = new BehaviorSubject<IWalletProvider | null>(null);
   public addresses$ = new BehaviorSubject<string[]>([]);
   public address$   = new BehaviorSubject<string | null>(null);
+  public baseUrl: string;
+
 
   // ---- Providers ------------------------------------------------------------
+
+  private multisigCache = new Map<string, MultisigRecord>();
+
+  private msigKey(m: number, pubKeys: string[]): string {
+    // sort pubkeys for deterministic key
+    const sorted = [...pubKeys].sort();
+    return `${m}:${sorted.join(',')}`;
+  }
+
 
   private phantomBtc: IWalletProvider = {
     kind: 'phantom-btc',
@@ -133,9 +157,93 @@ export class WalletService {
       return await window.myWallet!.sendRequest('signTransaction', { transaction: txHex, network });
     },
 
-    addMultisig: async (m, pubkeys, network) => {
-      return await window.myWallet!.sendRequest('addMultisig', { m, pubkeys, network });
+    private loadLocalMsig(key: string): MultisigRecord | null {
+        const raw = localStorage.getItem("msig:" + key);
+        return raw ? JSON.parse(raw) : null;
     },
+
+    private async fetchMsDataFromRelayer(
+      m: number,
+      pubKeys: string[]
+    ): Promise<MultisigRecord> {
+      const isTest = String(this.rpc.NETWORK).toLowerCase().includes("test");
+
+      const url = `${this.rpc.baseUrl}/tx/multisig`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          m,
+          pubKeys,
+          network: this.rpc.NETWORK,
+        }),
+      }).then(r => r.json());
+
+      if (!response.success) {
+        throw new Error(`Failed to compute multisig: ${response.error}`);
+      }
+
+      return response.data;
+    },
+
+
+    private saveLocalMsig(key: string, data: MultisigRecord) {
+        localStorage.setItem("msig:" + key, JSON.stringify(data));
+    },
+
+    async addMultisig(
+      m: number,
+      pubKeys: string[],
+      msData?: MultisigRecord   // optional, see call-site note below
+    ): Promise<MultisigRecord> {
+      const provider = this.pick?.(); // or however you select the active provider
+      if (!provider) throw new Error('No wallet provider available');
+
+      const key = this.msigKey(m, pubKeys);
+
+      // ✅ Phantom path: purely local cache, no provider RPC
+      if (provider.kind === 'phantom-btc') {
+        // Already cached? Just return it.
+        const cached = this.multisigCache.get(key);
+        if (cached) return cached;
+
+        if (!msData) {
+          // For Phantom we need caller to give us the msData once
+          throw new Error('Multisig data (msData) required for Phantom.');
+        }
+
+        this.multisigCache.set(key, msData);
+        return msData;
+      }
+
+      // ✅ Custom extension path: keep old behavior
+      if (provider.kind === 'custom') {
+        const res = await (window as any).myWallet.sendRequest('addMultisig', {
+          m,
+          pubKeys,
+          network: this.rpc.NETWORK,
+        });
+
+        if (!res || !res.success) {
+          throw new Error(res?.error || 'addMultisig failed in custom wallet.');
+        }
+
+        const result: MultisigRecord = {
+          m,
+          pubKeys,
+          redeemScript: res.data.redeemScript,
+          address: res.data.address,
+        };
+
+        // Also cache for consistency
+        this.multisigCache.set(key, result);
+        return result;
+      }
+
+      throw new Error(`Unsupported wallet provider kind: ${provider.kind}`);
+    }
+
 
     on: (ev, cb) => window.myWallet?.on?.(ev, cb),
   };

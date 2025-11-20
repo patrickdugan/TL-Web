@@ -97,37 +97,36 @@ export class TxsService {
     }
   }
 
- async buildLTCITTx(
-  buildLTCITTxConfig: IBuildLTCITTxConfig, satsPaid: number
-): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
-  try {
-    // Fetch account details from balanceService
-    const allAccounts = this.balanceService.allAccounts; // Assuming this returns an array of accounts with `address` and `pubkey`
-    console.log('before checking for pubkey '+buildLTCITTxConfig.buyerKeyPair.pubkey)
-    // Match the address and find the corresponding pubkey if available
-    const matchingAccount = allAccounts.find(
-      (account) => account.address === buildLTCITTxConfig.buyerKeyPair.address
-    );
+  async buildLTCITTx(
+    buildLTCITTxConfig: IBuildLTCITTxConfig, satsPaid: number
+  ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
+    try {
+      // Fetch account details from balanceService
+      const allAccounts = this.balanceService.allAccounts; // Assuming this returns an array of accounts with `address` and `pubkey`
+      console.log('before checking for pubkey '+buildLTCITTxConfig.buyerKeyPair.pubkey)
+      // Match the address and find the corresponding pubkey if available
+      const matchingAccount = allAccounts.find(
+        (account) => account.address === buildLTCITTxConfig.buyerKeyPair.address
+      );
 
-    // Use the pubkey from the matched account or fallback to the one in the config
-    const pubkey = matchingAccount?.pubkey || buildLTCITTxConfig.buyerKeyPair.pubkey || '';
-    console.log('about to call for utxo in build ltc trade '+buildLTCITTxConfig.buyerKeyPair.address+' '+pubkey )
-   
+      // Use the pubkey from the matched account or fallback to the one in the config
+      const pubkey = matchingAccount?.pubkey || buildLTCITTxConfig.buyerKeyPair.pubkey || '';
+      console.log('about to call for utxo in build ltc trade '+buildLTCITTxConfig.buyerKeyPair.address+' '+pubkey )
+     
 
-    if(this.balanceService.NETWORK=="LTCTEST"){
-          this.baseUrl = 'https://testnet-api.layerwallet.com'
-          console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+      if(this.balanceService.NETWORK=="LTCTEST"){
+            this.baseUrl = 'https://testnet-api.layerwallet.com'
+            console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+      }
+      const uri = this.baseUrl+'/tx/buildLTCTradeTx'
+      const response = await axios.post(uri,{buildLTCITTxConfig});
+      console.log('utxo build response '+JSON.stringify(response))
+      return response.data;
+    } catch (error: any) {
+      console.error("Error in buildLTCITTx:", error.message);
+      return { error: error.message };
     }
-    const uri = this.baseUrl+'/tx/buildLTCTradeTx'
-    const response = await axios.post(uri,{buildLTCITTxConfig});
-    console.log('utxo build response '+JSON.stringify(response))
-    return response.data;
-  } catch (error: any) {
-    console.error("Error in buildLTCITTx:", error.message);
-    return { error: error.message };
   }
-}
-
 
   async fetchUTXOs(address: string, pubkey:string): Promise<{ data?: string; error?: string }>{
       if(this.balanceService.NETWORK=="LTCTEST"){
@@ -305,71 +304,70 @@ async buildSignSendTxGrabUTXO(
     }
   }
 
-async decode(rawTx:string): Promise<{ data?: string; error?: string }>{
-    if(this.balanceService.NETWORK=="LTCTEST"){
-          this.baseUrl = 'https://testnet-api.layerwallet.com'
-          console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
-      }
+    async decode(rawTx:string): Promise<{ data?: string; error?: string }>{
+        if(this.balanceService.NETWORK=="LTCTEST"){
+              this.baseUrl = 'https://testnet-api.layerwallet.com'
+              console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+          }
 
-      try {
-        const response = await axios.post('${this.baseUrl}/tx/decode',{rawTx});
-        return response.data;
-      } catch (error: any) {
-        console.error('Error in decode:', error.message);
-        return error;
-      }
-}
-
-async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
-    if(this.balanceService.NETWORK=="LTCTEST"){
-      this.baseUrl = 'https://testnet-api.layerwallet.com'
-      console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
-    }
-  try {
-    const response = await axios.post(`${this.baseUrl}/tx/sendTx`, { rawTx });
-    console.log('send response:', JSON.stringify(response));
-
-    if (response.data.error) {
-      return { error: response.data.error };
+          try {
+            const response = await axios.post('${this.baseUrl}/tx/decode',{rawTx});
+            return response.data;
+          } catch (error: any) {
+            console.error('Error in decode:', error.message);
+            return error;
+          }
     }
 
-    const txid = response.data.txid?.data;
-
-    return { data: txid }; // Ensure the returned type matches the Promise<{ data?: string; error?: string }>
-  } catch (error: any) {
-    console.error("Error broadcasting transaction:", error.message);
-    return { error: error.message };
-  }
-}
-
-async getChainInfo(): Promise<{ data?: string; error?: string }>{
-      if(this.balanceService.NETWORK=="LTCTEST"){
+    async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
+        if(this.balanceService.NETWORK=="LTCTEST"){
           this.baseUrl = 'https://testnet-api.layerwallet.com'
-          console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
-      }
-
+          console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
+        }
       try {
-        const response = await axios.get(`${this.baseUrl}/chain/info`);
-        return response.data;
-      } catch (error: any) {
-        console.error('Error in getChainInfo:', error.message);
-        return error;
-      }
-}
+        const response = await axios.post(`${this.baseUrl}/tx/sendTx`, { rawTx });
+        console.log('send response:', JSON.stringify(response));
 
+        if (response.data.error) {
+          return { error: response.data.error };
+        }
+
+        const txid = response.data.txid?.data;
+
+        return { data: txid }; // Ensure the returned type matches the Promise<{ data?: string; error?: string }>
+      } catch (error: any) {
+        console.error("Error broadcasting transaction:", error.message);
+        return { error: error.message };
+      }
+    }
+
+    async getChainInfo(): Promise<{ data?: string; error?: string }>{
+          if(this.balanceService.NETWORK=="LTCTEST"){
+              this.baseUrl = 'https://testnet-api.layerwallet.com'
+              console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+          }
+
+          try {
+            const response = await axios.get(`${this.baseUrl}/chain/info`);
+            return response.data;
+          } catch (error: any) {
+            console.error('Error in getChainInfo:', error.message);
+            return error;
+          }
+    }
 
     async predictColumn(channelAddress: string, myAddress: string, cpAddress: string): Promise<{ data?: string; error?: string }>{
-      if(this.balanceService.NETWORK=="LTCTEST"){
-        this.baseUrl = 'https://testnet-api.layerwallet.com'
-        console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
-      }
-      try {
-        const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannelColumn`, {channelAddress, myAddress, cpAddress });
-        return response.data;
-      } catch (error: any) {
-        console.error('Error in predictColumn:', error.message);
-        return error;
-      }
+        if(this.balanceService.NETWORK=="LTCTEST"){
+          this.baseUrl = 'https://testnet-api.layerwallet.com'
+          console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
+        }
+        try {
+          const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannelColumn`, {channelAddress, myAddress, cpAddress });
+          return response.data;
+        } catch (error: any) {
+          console.error('Error in predictColumn:', error.message);
+          return error;
+        }
     }
 
     async getWifByAddress(address: string) {
@@ -407,5 +405,4 @@ async getChainInfo(): Promise<{ data?: string; error?: string }>{
 
       return _sendTxWithRetry(rawTx, 15, 800);
     }
-
 }
