@@ -83,6 +83,15 @@ export class WalletService {
     return this.available().length > 0;
   }
 
+  get activeWallet(): 'phantom' | 'custom' | null {
+    const p = this.provider$.value;
+    if (!p) return null;
+    if (p.kind === 'phantom-btc') return 'phantom';
+    if (p.kind === 'custom') return 'custom';
+    return null;
+  }
+
+
   // In-memory + persistent cache for multisig
   private multisigCache = new Map<string, MultisigRecord>();
 
@@ -229,6 +238,10 @@ export class WalletService {
       });
       return r.signature;
     },
+
+    async signPsbtWithPhantom(psbtBase64: string): Promise<string> {
+      return this.signPsbt(psbtBase64, { autoFinalize: true, broadcast: false });
+    }
 
     signPsbt: async (psbtBase64, opts) => {
       const ph = getPhantomBtc();

@@ -173,29 +173,29 @@ export class TxsService {
   }
 
 
-getEnoughInputs2(
-  utxos: IUTXO[],
-  amount: number
-): { finalInputs: IUTXO[]; fee: number }{
-  const sortedUtxos = [...utxos].sort((a, b) => b.amount - a.amount); // Sort by amount (largest first)
-  const finalInputs: IUTXO[] = [];
-  let total = 0;
+  getEnoughInputs2(
+    utxos: IUTXO[],
+    amount: number
+  ): { finalInputs: IUTXO[]; fee: number }{
+    const sortedUtxos = [...utxos].sort((a, b) => b.amount - a.amount); // Sort by amount (largest first)
+    const finalInputs: IUTXO[] = [];
+    let total = 0;
 
-  for (const utxo of sortedUtxos) {
-    finalInputs.push(utxo);
-    total += utxo.amount;
-    if (total >= amount) break;
-  }
+    for (const utxo of sortedUtxos) {
+      finalInputs.push(utxo);
+      total += utxo.amount;
+      if (total >= amount) break;
+    }
 
-  if (total < amount) {
-    throw new Error('Not enough UTXOs to cover the required amount');
-  }
+    if (total < amount) {
+      throw new Error('Not enough UTXOs to cover the required amount');
+    }
 
-  const fee = 0.00001; // Example static fee, adjust dynamically if needed
-  return { finalInputs, fee };
-};
+    const fee = 0.00001; // Example static fee, adjust dynamically if needed
+    return { finalInputs, fee };
+  };
 
-async buildSignSendTxGrabUTXO(
+  async buildSignSendTxGrabUTXO(
     buildTxConfig: IBuildTxConfig
   ): Promise<{ txid?: string; commitUTXO?: IUTXO; error?: string; data?: any }> {
     try {
@@ -266,6 +266,48 @@ async buildSignSendTxGrabUTXO(
   }
 
   async signPsbt(psbtHex: string, sellerFlag: boolean): Promise<{
+    data?: {
+      psbtHex: string;
+      isValid: boolean;
+      isFinished: boolean;
+      finalHex?: string;
+    };
+    error?: string;
+  }> {
+    try {
+      const active = this.walletService.activeWallet;
+
+      if (active === 'phantom') {
+        // Convert hex → base64 (Phantom requires base64)
+        const psbtBase64 = hexToBase64(psbtHex);
+
+        const signedBase64 = await this.walletService.signPsbtWithPhantom(psbtBase64);
+        const signedHex = base64ToHex(signedBase64);
+
+        return {
+          data: {
+            psbtHex: signedHex,
+            isValid: true,
+            isFinished: true,
+            finalHex: undefined, // Phantom doesn't finalize rawTX in their API
+          },
+        };
+      }
+
+      if (active === 'custom') {
+        const res = await this.walletService.signPsbtWithCustomHex(psbtHex, sellerFlag);
+        return { data: res };
+      }
+
+      throw new Error("No compatible wallet connected");
+    } catch (error: any) {
+      console.error("Error signing PSBT:", error.message);
+      return { error: error.message };
+    }
+  }
+
+
+  async signPsbtWithCustom(psbtHex: string, sellerFlag: boolean): Promise<{
     data?: {
       psbtHex: string;
       isValid: boolean;
