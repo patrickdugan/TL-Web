@@ -9,6 +9,7 @@ import { AuthService } from "../auth.service";
 import { ITradeInfo } from "src/app/utils/swapper";
 import { ISpotTradeProps } from "src/app/utils/swapper/common";
 import { wrangleObMessageInPlace } from "src/app/@core/utils/ob-normalize";
+import { RpcService } from "../rpc.service"
 
 type Side = 'bids' | 'asks' | 'both';
 
@@ -65,7 +66,8 @@ export class SpotOrderbookService {
     private spotMarkertService: SpotMarketsService,
     private toastrService: ToastrService,
     private loadingService: LoadingService,
-    private authService: AuthService
+    private authService: AuthService,
+    private rpcService: RpcService
   ) {}
 
   get activeSpotKey() {
@@ -147,7 +149,8 @@ export class SpotOrderbookService {
       this.socketService.events$
         .pipe(filter(({ event }) => event === "update-orders-request"))
         .subscribe(() => {
-            this.socketService.send("update-orderbook", this.marketFilter)
+            const net = this.rpcService.NETWORK
+            this.socketService.send("update-orderbook", {...this.marketFilter, network: net})
          })
     );
 
@@ -199,7 +202,9 @@ export class SpotOrderbookService {
     );
 
     // Finally, request the current orderbook
-    this.socketService.send("update-orderbook",this.marketFilter);
+
+    const net = this.rpcService.NETWORK
+    this.socketService.send("update-orderbook",{...this.marketFilter, network: net});
   }
 
   /**
@@ -225,8 +230,9 @@ export class SpotOrderbookService {
         const newKey = this.normalizeKey(first_token,second_token);
         this._lastRequestedKey = this.activeKey;
         // Leave old
+        const net = this.rpcService.NETWORK
         if (this.activeKey && this.activeKey !== newKey) {
-          this.socketService.send('orderbook:leave',this.activeKey);
+          this.socketService.send('orderbook:leave',{ marketKey: this.activeKey, network: net });
         }
 
         this.activeKey = newKey;
@@ -243,12 +249,13 @@ export class SpotOrderbookService {
                 depth: String(p?.depth ?? 50),
                 side: p?.side ?? 'both',
                 includeTrades: String(p?.includeTrades ?? false),
+                network: net 
               }
             },
         );
 
         // Join for live deltas
-        this.socketService.send('orderbook:join', { marketKey: newKey});
+        this.socketService.send('orderbook:join', { marketKey: newKey, network: net });
       }
 
   private _structureOrderbook(isBuy: boolean) {

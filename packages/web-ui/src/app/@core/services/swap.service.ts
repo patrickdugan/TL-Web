@@ -49,6 +49,7 @@ export class SwapService {
         console.log('Inside channel swap:', JSON.stringify(tradeInfo));
         console.log('sock')
         
+        const key = [buyer?.uuid, seller?.uuid].join('-');
         if (!socket) {
             throw new Error("obSocket is not connected");
         }
@@ -57,8 +58,8 @@ export class SwapService {
             const { transfer } = props as ISpotTradeProps;
 
             const swapper = isBuyer
-                ? new BuySwapper(type, props, buyer, seller, socket,this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService)
-                : new SellSwapper(type, props, seller, buyer, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService);
+                ? new BuySwapper(type, props, buyer, seller, socket,this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService,key)
+                : new SellSwapper(type, props, seller, buyer, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService,key);
 
             swapper.eventSubs$.subscribe(eventData => {
                 this.toastrService.info(eventData.eventName, 'Trade Info', { timeOut: 3000 });
@@ -70,8 +71,8 @@ export class SwapService {
             const { transfer } = props as IFuturesTradeProps;
 
             const swapper = isBuyer
-                ? new BuySwapper(type, props, buyer, seller, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService)
-                : new SellSwapper(type, props, seller, buyer, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService);
+                ? new BuySwapper(type, props, buyer, seller, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService,key)
+                : new SellSwapper(type, props, seller, buyer, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService,key);
 
             swapper.eventSubs$.subscribe(eventData => {
                 this.toastrService.info(eventData.eventName, 'Trade Info', { timeOut: 3000 });

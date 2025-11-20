@@ -2,6 +2,7 @@ import { Injectable } from "@angular/core";
 import { LoadingService } from "../loading.service";
 import { SocketService } from "../socket.service";
 import { FuturesMarketService } from "./futures-markets.service";
+import { RpcService } from "../rpc.service"
 
 export interface IFuturesTradeConf {
   keypair: { address: string; pubkey: string };
@@ -43,7 +44,8 @@ export class FuturesOrdersService {
   constructor(
     private loadingService: LoadingService,
     private socketService: SocketService,
-    private futuresMarketService: FuturesMarketService
+    private futuresMarketService: FuturesMarketService,
+    private rpcService: RpcService,
   ) {}
 
   get openedOrders(): IFuturesOrderRow[] {
@@ -61,7 +63,10 @@ export class FuturesOrdersService {
   }
 
   placeOrder(orderConf: IFuturesTradeConf) {
-    this.socketService.send("new-order", orderConf);
+        const net = this.rpcService.NETWORK
+        const msg = { ...orderConf, network: net }
+
+        this.socketService.send('new-order', msg);
   }
 
   // Alias some UI calls use
@@ -70,13 +75,15 @@ export class FuturesOrdersService {
   }
 
   addLiquidity(orders: IFuturesTradeConf[]) {
-    this.socketService.send("many-orders", orders);
+    const net = this.rpcService.NETWORK
+    this.socketService.send("many-orders", {orders,network:net});
   }
 
   closeOpenedOrder(uuid: string) {
     const sel = (this.futuresMarketService as any)?.selectedMarket;
     const ctx = sel ? { contract_id: sel.contract_id } : {};
-    this.socketService.send("close-order", { orderUUID: uuid, ...ctx });
+    const net = this.rpcService.NETWORK
+    this.socketService.send("close-order", { orderUUID: uuid, ...ctx, network: net});
   }
 
   closeAllOrders() {

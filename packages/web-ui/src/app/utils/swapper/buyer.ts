@@ -28,9 +28,10 @@ export class BuySwapper extends Swap {
         private toastrService: ToastrService,
         private walletService: WalletService,
         private rpcService: RpcService,
-        protected socketService: SocketService
+        protected socketService: SocketService,
+        tradeUUID: string
     ) {
-        super(typeTrade, tradeInfo, buyerInfo, sellerInfo, socket, txsService,socketService);
+        super(typeTrade, tradeInfo, buyerInfo, sellerInfo, socket, txsService,socketService,tradeUUID);
         this.handleOnEvents();
         this.tradeStartTime = Date.now();
         this.onReady();
@@ -77,17 +78,20 @@ export class BuySwapper extends Swap {
         return fallback;
       }
 
-             private handleOnEvents() {
-    this.removePreviuesListeners();
-    const _eventName = `${this.cpInfo.socketId}::swap`;
+    private handleOnEvents() {
+        this.removePreviuesListeners();
+        const _eventName = `${this.cpInfo.socketId}::swap`;
 
     // If you can't annotate upstream, cast here:
-    this.swapSub = this.socket.pipe(filter(({ event }) => event === _eventName))
-        .subscribe((payload) => {
-            // payload: { event: string, data: SwapEvent }
+        this.swapSub = this.socket.pipe(filter(({ event }) => event === _eventName))
+            .subscribe((payload) => {
+                // payload: { event: string, data: SwapEvent }
 
             const eventData = payload.data;
             console.log('inside rxjs listener '+JSON.stringify(eventData))
+            if (eventData.data?.tradeUUID && eventData.data.tradeUUID !== this.tradeUUID){
+                return;
+            }
 
             this.eventSubs$.next(eventData);
 
@@ -108,7 +112,7 @@ export class BuySwapper extends Swap {
                     break;
             }
         });
-}
+    }
 
 
     private async onStep1(cpId: string, msData: IMSChannelData) {

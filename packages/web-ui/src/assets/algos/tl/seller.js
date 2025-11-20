@@ -76,7 +76,7 @@ async function getChannelColumn(channelAddress, buyerAddress, cpAddress, relayer
 
 
 class SellSwapper {
-    constructor(typeTrade, tradeInfo, sellerInfo, buyerInfo, client, socket,test) {
+    constructor(typeTrade, tradeInfo, sellerInfo, buyerInfo, client, socket,test,tradeUUID){
         this.typeTrade = typeTrade;
         this.tradeInfo = tradeInfo;
         this.sellerInfo = sellerInfo;
@@ -91,7 +91,7 @@ class SellSwapper {
         this.relayerUrl = test
   ? 'https://testnet-api.layerwallet.com'
   : 'https://api.layerwallet.com';
-
+        this.tradeUUID = tradeUUID
          // Promisify methods for the given client
        this.getNewAddressAsync           = makeNewAddress;       // local key generation
        this.addMultisigAddressAsync      = makeMultisig;         // 2-of-2 multisig builder
@@ -168,6 +168,9 @@ class SellSwapper {
         const eventName = `${this.buyerInfo.socketId}::swap`;
         this.socket.on(eventName, async (eventData) => {
             const { socketId, data } = eventData;
+            if (eventData.data?.tradeUUID && eventData.data.tradeUUID !== this.tradeUUID){
+                return;
+            }
             switch (eventData.eventName) {
                 case 'BUYER:STEP2':
                     await this.onStep2(socketId, data);

@@ -21,6 +21,7 @@ export abstract class Swap {
         socket: Observable<any>,                 // <--- plain param
         public txsService: TxsService,
         protected socketService: SocketService,
+        protected tradeUUID: string
     ) {
         this.socket = socket;                    // <--- explicit assignment
     }

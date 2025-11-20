@@ -82,7 +82,8 @@ class BuySwapper {
     sellerInfo,
     client,      // may be null/undefined in browser
     socket,
-    test
+    test,
+    tradeUUID
   ) {
     this.typeTrade = typeTrade;
     this.tradeInfo = tradeInfo;
@@ -96,6 +97,7 @@ class BuySwapper {
 this.relayerUrl = test
   ? 'https://testnet-api.layerwallet.com'
   : 'https://api.layerwallet.com';
+    this.tradeUUID= tradeUUID
 
     this.getNewAddressAsync       = makeNewAddress;       // local key generation
     this.addMultisigAddressAsync      = makeMultisig;         // 2-of-2 multisig builder
@@ -202,7 +204,11 @@ this.relayerUrl = test
           console.log('Received event:', JSON.stringify(eventName)); 
         this.socket.on(eventName, (eventData) => {
             console.log('event name '+eventData.eventName)
-             const { socketId, data } = eventData;
+            const { socketId, data } = eventData;
+            if (eventData.data?.tradeUUID && eventData.data.tradeUUID !== this.tradeUUID){
+                return;
+            }
+            
             switch (eventData.eventName) {
                 case 'SELLER:STEP1':
                     this.onStep1(socketId,data);

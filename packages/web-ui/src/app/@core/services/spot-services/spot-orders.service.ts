@@ -2,6 +2,7 @@ import { Injectable } from "@angular/core";
 import { LoadingService } from "../loading.service";
 import { SocketService } from "../socket.service";
 import { SpotMarketsService, IMarket } from "./spot-markets.service";
+import { RpcService } from "../rpc.service"
 
 export interface ISpotTradeConf {
   keypair: { address: string; pubkey: string };
@@ -41,7 +42,8 @@ export class SpotOrdersService {
   constructor(
     private loadingService: LoadingService,
     private socketService: SocketService,
-    private spotMarketService: SpotMarketsService
+    private spotMarketService: SpotMarketsService,
+    private rpcService: RpcService
   ) {}
 
   get openedOrders(): ISpotOrderRow[] {
@@ -64,7 +66,10 @@ export class SpotOrdersService {
   }
 
   placeOrder(orderConf: ISpotTradeConf) {
-    this.socketService.send("new-order", orderConf);
+        const net = this.rpcService.NETWORK
+        const msg = { ...orderConf, network: net } 
+
+        this.socketService.send('new-order', msg);
   }
 
   // Alias some UI calls use
@@ -72,8 +77,9 @@ export class SpotOrdersService {
     this.placeOrder(orderConf);
   }
 
-  addLiquidity(orders: ISpotTradeConf[]) {
-    this.socketService.send("many-orders", orders);
+  addLiquidity(orders: ISpotTradeConf[]){
+    const net = this.rpcService.NETWORK
+    this.socketService.send("many-orders", {orders, network:net});
   }
 
   closeOpenedOrder(uuid: string) {
@@ -84,11 +90,13 @@ export class SpotOrdersService {
     const quote =
       found?.props?.id_desired ??
       (this.spotMarketService as any)?.selectedMarket?.second_token?.propertyId;
-
+      const net = this.rpcService.NETWORK
+       
     this.socketService.send("close-order", {
       orderUUID: uuid,
       id_for_sale: base,
-      id_desired: quote
+      id_desired: quote,
+      network: net
     });
   }
 

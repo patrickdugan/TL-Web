@@ -6,6 +6,7 @@ import { ToastrService } from "ngx-toastr";
 import { LoadingService } from "../loading.service";
 import { FuturesMarketService } from "./futures-markets.service";
 import { wrangleFuturesObMessageInPlace } from "src/app/@core/utils/ob-normalize";
+import { RpcService } from "../rpc.service"
 
 type Side = "bids" | "asks" | "both";
 
@@ -62,7 +63,8 @@ export class FuturesOrderbookService {
     private socketService: SocketService,
     private futuresMarketService: FuturesMarketService,
     private toastrService: ToastrService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private rpcService: RpcService,
   ) {}
 
   // ---- public getters ----
@@ -127,7 +129,7 @@ export class FuturesOrderbookService {
         .subscribe(() => {
           const cid = this.selectedMarket?.contract_id;
           if (typeof cid !== "number") return;
-
+          const net = this.rpcService.NETWORK
           const mk = this.key(cid);
           const payload = {
             type: "FUTURES",
@@ -135,6 +137,7 @@ export class FuturesOrderbookService {
             marketKey: mk,
             activeKey: this.activeKey ?? mk,
             lastRequestedKey: this._lastRequestedKey ?? null,
+            network: net
           };
           this.socketService.send("update-orderbook", payload);
         })
@@ -173,9 +176,10 @@ export class FuturesOrderbookService {
 
     // initial snapshot
     const cid = this.selectedMarket?.contract_id;
+    const net = this.rpcService.NETWORK
     if (typeof cid === "number") {
       this.socketService.send("update-orderbook", {
-        filter: { type: "FUTURES", contract_id: cid },
+        filter: { type: "FUTURES", contract_id: cid, network: net },
       });
     }
   }
@@ -208,9 +212,9 @@ export class FuturesOrderbookService {
 
     const newKey = this.key(contract_id);
     this._lastRequestedKey = this.activeKey;
-
+    const net = this.rpcService.NETWORK
     if (this.activeKey && this.activeKey !== newKey) {
-      this.socketService.send("orderbook:leave", { marketKey: this.activeKey });
+      this.socketService.send("orderbook:leave", { marketKey: this.activeKey, network: net });
     }
 
     this.activeKey = newKey;
@@ -222,10 +226,11 @@ export class FuturesOrderbookService {
         depth: String(p?.depth ?? 50),
         side: p?.side ?? "both",
         includeTrades: String(p?.includeTrades ?? false),
+        network: net
       },
     });
 
-    this.socketService.send("orderbook:join", { marketKey: newKey });
+    this.socketService.send("orderbook:join", { marketKey: newKey, network:net });
   }
 
   // ---- local shaping ----
