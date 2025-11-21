@@ -65,6 +65,26 @@ export interface IBuildLTCITTxConfig {
   commitUTXOs: IUTXO[];
 }
 
+function isHex(str: string): boolean {
+  return /^[0-9a-fA-F]+$/.test(str) && str.length % 2 === 0;
+}
+
+function hexToBase64(hex: string): string {
+  const bytes = hex.match(/.{1,2}/g)!.map(b => parseInt(b, 16));
+  let bin = "";
+  for (const byte of bytes) bin += String.fromCharCode(byte);
+  return btoa(bin);
+}
+
+function base64ToHex(b64: string): string {
+  const bin = atob(b64);
+  let hex = "";
+  for (let i = 0; i < bin.length; i++) {
+    hex += bin.charCodeAt(i).toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
 
 @Injectable({
   providedIn: "root",
@@ -358,46 +378,117 @@ export class TxsService {
   }
 
 
-  async signPsbt(psbtHex: string, sellerFlag: boolean): Promise<{
+  async signPsbt(
+    psbtHex: string,
+    sellerFlag: boolean
+  ): Promise<{
     data?: {
-      psbtHex: string;
-      isValid: boolean;
-      isFinished: boolean;
+      psbtHex?: string;
       finalHex?: string;
+      isValid?: boolean;
+      isFinished?: boolean;
     };
     error?: string;
   }> {
     try {
-      const active = this.walletService.activeWallet;
+      const provider = this.walletService.provider$.value || this.walletService["pick"]();
+      const isPhantom = provider?.kind === "phantom-btc";
 
-      if (active === 'phantom') {
-        // Convert hex → base64 (Phantom requires base64)
-        const psbtBase64 = hexToBase64(psbtHex);
+      let psbtBase64 = psbtHex;
 
-        const signedBase64 = await this.walletService.signPsbtWithPhantom(psbtBase64);
-        const signedHex = base64ToHex(signedBase64);
+      // Convert hex → base64 for Phantom
+      if (isPhantom && /^[0-9a-fA-F]+$/.test(psbtHex)) {
+        psbtBase64 = hexToBase64(psbtHex);
+      }
 
+      // ───────────────────────────────────────────────
+      // 1) SIGN PSBT (Phantom OR custom extension)
+      // ───────────────────────────────────────────────
+
+      let signRes: any;
+
+      if (isPhantom) {
+        console.log("[phantom] signPsbt");
+
+        const signedBase64 = await this.walletService.signPsbt(psbtBase64, {
+          autoFinalize: false,
+          broadcast: false
+        });
+
+        signRes = {
+          success: true,
+          data: {
+            psbtHex: signedBase64, // still base64
+            isValid: true,
+            isFinished: false,
+          }
+        };
+      } else {
+        // Existing extension behavior
+        console.log("[custom ext] signPsbt");
+
+        signRes = await window.myWallet?.sendRequest("signPsbt", {
+          psbtHex,
+          network: this.balanceService.NETWORK,
+          sellerFlag
+        });
+
+        if (!signRes || !signRes.success) {
+          return { error: signRes?.error || "Failed to sign PSBT." };
+        }
+      }
+
+      const signedPsbt = signRes.data.psbtHex || signRes.data.psbtBase64 || psbtBase64;
+
+      // If extension already gives finalHex (rare), use it
+      if (signRes.data?.finalHex) {
         return {
           data: {
-            psbtHex: signedHex,
+            psbtHex: signedPsbt,
+            finalHex: signRes.data.finalHex,
             isValid: true,
-            isFinished: true,
-            finalHex: undefined, // Phantom doesn't finalize rawTX in their API
-          },
+            isFinished: true
+          }
         };
       }
 
-      if (active === 'custom') {
-        const res = await this.walletService.signPsbtWithCustomHex(psbtHex, sellerFlag);
-        return { data: res };
+      // ───────────────────────────────────────────────
+      // 2) ALWAYS FINALIZE VIA RELAYER
+      // ───────────────────────────────────────────────
+
+      const finalizeRes = await fetch(
+        `${this.relayerUrl}/tx/finalizePsbt`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            psbtBase64: signedPsbt,
+            network: this.balanceService.NETWORK
+          })
+        }
+      ).then(r => r.json());
+
+      if (!finalizeRes.success) {
+        return { error: `Finalization failed: ${finalizeRes.error}` };
       }
 
-      throw new Error("No compatible wallet connected");
-    } catch (error: any) {
-      console.error("Error signing PSBT:", error.message);
-      return { error: error.message };
+      const finalHex = finalizeRes.finalHex;
+
+      return {
+        data: {
+          psbtHex: signedPsbt,
+          finalHex,
+          isValid: true,
+          isFinished: true
+        }
+      };
+
+    } catch (err: any) {
+      console.error("signPsbt error:", err.message);
+      return { error: err.message };
     }
   }
+
 
 
   async signPsbtWithCustom(psbtHex: string, sellerFlag: boolean): Promise<{

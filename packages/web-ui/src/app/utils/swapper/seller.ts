@@ -192,7 +192,8 @@ private isSpotZeroTrade(): boolean {
             
             const skipRbf = this.isSpotZeroTrade();
             if (commitTxId && !skipRbf) {
-                const txRes = await axios.get(`https://api.layerwallet.com/tx/${commitTxId}?verbose=true`);
+                const baseUrl = this.relayerUrl
+                const txRes = await axios.get(`{$baseUrl}/tx/${commitTxId}?verbose=true`);
                 const vins = txRes?.data?.vin || [];
                 const isRbf = vins.some((vin: any) => vin.sequence < 0xfffffffe);
                 if (isRbf) throw new Error('RBF-enabled commit tx detected');
