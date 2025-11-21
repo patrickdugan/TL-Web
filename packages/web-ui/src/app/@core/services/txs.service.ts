@@ -91,7 +91,13 @@ function base64ToHex(b64: string): string {
 })
 export class TxsService {
   private baseUrl = "https://api.layerwallet.com";
+  private testUrl = "https://testnet-api.layerwallet.com"
   private network = this.rpcService.NETWORK
+  private relayerUrl =
+  String(this.network).includes("TEST")
+    ? this.testUrl
+    : this.baseUrl;
+
 
   constructor(
     private rpcService: RpcService,
