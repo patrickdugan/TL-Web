@@ -207,6 +207,10 @@ export class WalletService {
     throw new Error(`Unsupported wallet provider: ${provider.kind}`);
   }
 
+   async signPsbtWithPhantom(psbtBase64: string): Promise<string> {
+      return this.signPsbt(psbtBase64, { autoFinalize: true, broadcast: false });
+    }
+
   // -------------------------------------------------------------------------
   // Providers (lightweight)
   // -------------------------------------------------------------------------
@@ -238,10 +242,6 @@ export class WalletService {
       });
       return r.signature;
     },
-
-    async signPsbtWithPhantom(psbtBase64: string): Promise<string> {
-      return this.signPsbt(psbtBase64, { autoFinalize: true, broadcast: false });
-    }
 
     signPsbt: async (psbtBase64, opts) => {
       const ph = getPhantomBtc();

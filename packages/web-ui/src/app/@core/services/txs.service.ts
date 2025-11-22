@@ -265,13 +265,34 @@ export class TxsService {
 
         // 2) Phantom signs PSBT
         console.log("[phantom] signing PSBT");
-        const signedPsbt = await this.walletService.signPsbt(psbtBase64, {
+        const signedBase64 = await this.walletService.signPsbt(psbtBase64, {
           autoFinalize: true,
           broadcast: false
         });
 
-        // 3) Server extracts final TX hex OR Phantom returns it
-        finalHex = signedPsbt.finalHex || signedPsbt.rawTx || signedPsbt;
+        // Wrap Phantom output in object shape
+        const phantomSigned = {
+          psbtBase64: signedBase64,
+          psbtHex: base64ToHex(signedBase64),
+          rawTx: undefined,
+          finalHex: undefined
+        };
+
+        // 3) Finalize at relayer (Phantom cannot finalize multisig)
+        const finalizeRes = await fetch(`${this.walletService.baseUrl}/tx/finalizePsbt`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ psbt: signedBase64 })
+        }).then(r => r.json());
+
+        if (!finalizeRes.success) {
+          return { error: finalizeRes.error || "Failed to finalize Phantom PSBT" };
+        }
+
+        phantomSigned.finalHex = finalizeRes.finalHex;
+
+        // Return a valid finalHex into the flow
+        finalHex = phantomSigned.finalHex!;
 
       } else {
         // ────────────────────────────────────────────
@@ -297,8 +318,11 @@ export class TxsService {
       const sendResponse = await this.sendTx(finalHex);
       if (sendResponse.error) return { error: sendResponse.error };
 
-      const txid = sendResponse.data;
-      const commitUTXO = {
+      if (!sendResponse.data) {
+        return { error: "Broadcast returned no txid" };
+      }
+      const txid = sendResponse.data || ''
+      const commitUTXO: IUTXO = {
         amount: 0.0000546,
         confirmations: 0,
         vout: 0,
@@ -348,12 +372,32 @@ export class TxsService {
         const psbtBase64 = unsignedRes.data.psbtBase64;
 
         // 2) Phantom signs it
-        const signedPsbt = await this.walletService.signPsbt(psbtBase64, {
+        const signedBase64 = await this.walletService.signPsbt(psbtBase64, {
           autoFinalize: true,
-          broadcast: false,
+          broadcast: false
         });
 
-        finalHex = signedPsbt.finalHex || signedPsbt.rawTx || signedPsbt;
+        const phantomSigned = {
+          psbtBase64: signedBase64,
+          psbtHex: base64ToHex(signedBase64),
+          rawTx: undefined,
+          finalHex: undefined,
+        };
+
+        const finalizeRes = await fetch(`${this.walletService.baseUrl}/tx/finalizePsbt`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ psbt: signedBase64 })
+        }).then(r => r.json());
+
+        if (!finalizeRes.success) {
+          return { error: finalizeRes.error || "Failed to finalize Phantom PSBT" };
+        }
+
+        phantomSigned.finalHex = finalizeRes.finalHex;
+
+        finalHex = phantomSigned.finalHex!;
+
 
       } else {
         // EXTENSION legacy flow
@@ -384,118 +428,125 @@ export class TxsService {
   }
 
 
-  async signPsbt(
-    psbtHex: string,
-    sellerFlag: boolean
-  ): Promise<{
+  async signPsbt(psbtHex: string, sellerFlag: boolean): Promise<{
     data?: {
-      psbtHex?: string;
+      psbtHex: string;
+      isValid: boolean;
+      isFinished: boolean;
       finalHex?: string;
-      isValid?: boolean;
-      isFinished?: boolean;
     };
     error?: string;
   }> {
     try {
-      const provider = this.walletService.provider$.value || this.walletService["pick"]();
+      const provider = this.walletService.provider$.value || this.walletService["pick"]?.();
       const isPhantom = provider?.kind === "phantom-btc";
+      const isCustom = provider?.kind === "custom";
 
-      let psbtBase64 = psbtHex;
-
-      // Convert hex → base64 for Phantom
-      if (isPhantom && /^[0-9a-fA-F]+$/.test(psbtHex)) {
-        psbtBase64 = hexToBase64(psbtHex);
+      if (!provider) {
+        return { error: "No wallet provider connected." };
       }
 
-      // ───────────────────────────────────────────────
-      // 1) SIGN PSBT (Phantom OR custom extension)
-      // ───────────────────────────────────────────────
+      //-----------------------------------------------------------
+      // Convert PSBT to base64 for Phantom (Phantom requires base64)
+      //-----------------------------------------------------------
+      const psbtBase64 = isPhantom ? hexToBase64(psbtHex) : null;
 
-      let signRes: any;
+      //-----------------------------------------------------------
+      // 1. SIGNING (Provider-dependent)
+      //-----------------------------------------------------------
+      let signedPsbtHex: string | undefined;
+      let signedPsbtBase64: string | undefined;
 
       if (isPhantom) {
-        console.log("[phantom] signPsbt");
+        console.log("Signing PSBT via Phantom", psbtBase64);
 
-        const signedBase64 = await this.walletService.signPsbt(psbtBase64, {
+        const res = await provider.signPsbt(psbtBase64!, {
           autoFinalize: false,
-          broadcast: false
+          broadcast: false,
         });
 
-        signRes = {
-          success: true,
-          data: {
-            psbtHex: signedBase64, // still base64
-            isValid: true,
-            isFinished: false,
-          }
-        };
-      } else {
-        // Existing extension behavior
-        console.log("[custom ext] signPsbt");
+        // res is a base64 PSBT coming back
+        signedPsbtBase64 = res;
+        signedPsbtHex = base64ToHex(res);
 
-        signRes = await window.myWallet?.sendRequest("signPsbt", {
+      } else if (isCustom) {
+        console.log("Signing PSBT via custom extension", psbtHex);
+
+        const response = await window.myWallet!.sendRequest("signPsbt", {
           psbtHex,
           network: this.balanceService.NETWORK,
-          sellerFlag
+          sellerFlag,
         });
 
-        if (!signRes || !signRes.success) {
-          return { error: signRes?.error || "Failed to sign PSBT." };
+        if (!response || !response.success) {
+          return { error: response?.error || "Failed to sign PSBT." };
         }
+
+        signedPsbtHex = response.data.psbtHex;
       }
 
-      const signedPsbt = signRes.data.psbtHex || signRes.data.psbtBase64 || psbtBase64;
+      if (!signedPsbtHex) {
+        return { error: "PSBT signing failed (null signedPsbtHex)" };
+      }
 
-      // If extension already gives finalHex (rare), use it
-      if (signRes.data?.finalHex) {
-        return {
-          data: {
-            psbtHex: signedPsbt,
-            finalHex: signRes.data.finalHex,
-            isValid: true,
-            isFinished: true
+      //-----------------------------------------------------------
+      // 2. FINALIZATION (Phantom needs relayer; custom may already be final)
+      //-----------------------------------------------------------
+      let finalHex: string | undefined = undefined;
+      let isFinished = false;
+
+      if (isPhantom) {
+        // DON'T finalize during Step 4 (seller)
+        if (!sellerFlag) {
+          const finalizeRes = await axios.post(
+            `${this.relayerUrl}/tx/finalizePsbt`,
+            { psbt: signedPsbtBase64 },
+            { headers: { "Content-Type": "application/json" } }
+          );
+
+          if (!finalizeRes?.data?.success) {
+            return {
+              error:
+                finalizeRes?.data?.error ||
+                "Relayer failed to finalize Phantom PSBT.",
+            };
           }
-        };
-      }
 
-      // ───────────────────────────────────────────────
-      // 2) ALWAYS FINALIZE VIA RELAYER
-      // ───────────────────────────────────────────────
-
-      const finalizeRes = await fetch(
-        `${this.relayerUrl}/tx/finalizePsbt`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            psbtBase64: signedPsbt,
-            network: this.balanceService.NETWORK
-          })
+          finalHex = finalizeRes.data.finalHex;
+          isFinished = true;
+        } else {
+          // Step 4: Return half-signed PSBT only
+          finalHex = undefined;
+          isFinished = false;
         }
-      ).then(r => r.json());
+      }else if (isCustom) {
+        // custom extension already gives finalHex when finished
+        const response = await window.myWallet!.sendRequest("signPsbt", {
+          psbtHex,
+          network: this.balanceService.NETWORK,
+          sellerFlag,
+        });
 
-      if (!finalizeRes.success) {
-        return { error: `Finalization failed: ${finalizeRes.error}` };
+        finalHex = response.data?.rawTx;
+        isFinished = response.data?.isFinished ?? !!finalHex;
       }
 
-      const finalHex = finalizeRes.finalHex;
-
+      //-----------------------------------------------------------
+      // 3. Return EXACT original structure
+      //-----------------------------------------------------------
       return {
         data: {
-          psbtHex: signedPsbt,
-          finalHex,
+          psbtHex: signedPsbtHex,
           isValid: true,
-          isFinished: true
-        }
+          isFinished,
+          finalHex,
+        },
       };
-
     } catch (err: any) {
-      console.error("signPsbt error:", err.message);
+      console.error("Error in signPsbt:", err);
       return { error: err.message };
     }
   }
-
-
 
   async signPsbtWithCustom(psbtHex: string, sellerFlag: boolean): Promise<{
     data?: {
