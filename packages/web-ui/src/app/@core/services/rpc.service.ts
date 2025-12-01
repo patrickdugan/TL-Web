@@ -109,7 +109,7 @@ export class RpcService {
   // If you later add a relayer WS, call the correct method name here.
 
   // ✅ set network + mark selected
-  this.NETWORK = 'BTC';
+  this.NETWORK = 'LTCTEST';
   this.isNetworkSelected = true;
 
   // pull header / network info after URLs are set
