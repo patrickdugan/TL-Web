@@ -96,7 +96,7 @@ export class RpcService {
     ) {}
 
     onInit() {
-      const ep = environment.ENDPOINTS.BTC;
+      const ep = environment.ENDPOINTS.LTCTEST;
 
   // ✅ set URLs on ApiService (that's where they live)
   this.apiService.apiUrl       = ep.relayerUrl;
