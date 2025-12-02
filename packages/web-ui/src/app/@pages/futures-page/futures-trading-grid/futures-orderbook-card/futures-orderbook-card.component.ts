@@ -66,7 +66,6 @@ export class FuturesOrderbookCardComponent implements OnInit, OnDestroy {
     }
 
     get sellOrderbooks() {
-      this.scrollToBottom();
       return this.futuresOrderbookService.sellOrderbooks;
     }
 
