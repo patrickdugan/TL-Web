@@ -83,8 +83,9 @@ export class FuturesOrderbookService {
 
   // ---- utils ----
   private key(contract_id: number): string {
-    return `FUTURES:${contract_id}`;
+    return `${contract_id}-perp`; 
   }
+
 
   private ensureActiveKeyFromMessage(msg: any): void {
     if (this.activeKey) return;
