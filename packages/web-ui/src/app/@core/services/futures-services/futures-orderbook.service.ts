@@ -144,7 +144,7 @@ export class FuturesOrderbookService {
         })
     );
 
-    // orderbook-data
+    // orderboo-data
     this.socketServiceSubscriptions.push(
       this.socketService.events$
         .pipe(filter(({ event }) => event === "orderbook-data"))
@@ -277,7 +277,7 @@ export class FuturesOrderbookService {
     return isBuy
       ? [...buckets].sort((a, b) => b.price - a.price).slice(0, 9)
       : [...buckets]
-          .sort((a, b) => b.price - a.price)
+          .sort((a, b) => a.price - b.price)
           .slice(Math.max(buckets.length - 9, 0));
   }
 

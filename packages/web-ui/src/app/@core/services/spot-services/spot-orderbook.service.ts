@@ -154,22 +154,27 @@ export class SpotOrderbookService {
          })
     );
 
-    // RxJS: "orderbook-data"
-    this.socketServiceSubscriptions.push(
-       this.socketService.events$
-    .pipe(filter(({ event }) => event === "orderbook-data"))
-    .subscribe(({ data }: { data: any }) => {
+      // RxJS: "orderbook-data"
+  this.socketServiceSubscriptions.push(
+    this.socketService.events$
+      .pipe(filter(({ event }) => event === "orderbook-data"))
+      .subscribe(({ data }: { data: any }) => {
       const msg = wrangleObMessageInPlace(data);
-      if (msg.event !== 'orderbook-data') return;
+      if (msg.event !== "orderbook-data") return;
 
-      // new unified format — simple passthrough
+      // unified format
       const book = msg.orders || {};
       const bids = book.bids ?? msg.bids ?? [];
       const asks = book.asks ?? msg.asks ?? [];
-      const symbol = msg.marketKey ?? book.symbol ?? null;
 
-      this.buyOrderbooks = bids;
-      this.sellOrderbooks = asks;
+      /**
+       * IMPORTANT:
+       * Mirror desktop behavior:
+       *  - Feed all rows into rawOrderbookData
+       *  - Let the setter call structureOrderBook()
+       *  - That will populate buyOrderbooks / sellOrderbooks
+       */
+      this.rawOrderbookData = [...bids, ...asks];
 
       // always normalize history to an array
       const rawHistory = data.history;
@@ -179,12 +184,14 @@ export class SpotOrderbookService {
       const lastTrade = this.tradeHistory[0];
       if (!lastTrade || !lastTrade.props) {
         // fallback: pick midpoint of best bid/ask, else 1
-        const bids = data.orders?.bids ?? [];
-        const asks = data.orders?.asks ?? [];
+        const bestBid = bids[0]?.price;
+        const bestAsk = asks[0]?.price;
+
         const mid =
-          bids.length && asks.length
-            ? (bids[0].price + asks[0].price) / 2
-            : bids[0]?.price || asks[0]?.price || 1;
+          typeof bestBid === "number" && typeof bestAsk === "number"
+            ? (bestBid + bestAsk) / 2
+            : bestBid || bestAsk || 1;
+
         this.currentPrice = parseFloat(mid.toFixed(6));
       } else {
         const { amountForSale, amountDesired } = lastTrade.props;
@@ -192,14 +199,14 @@ export class SpotOrderbookService {
           parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
       }
 
-
       if (this.onUpdate) {
         try {
           this.onUpdate();
         } catch {}
       }
     })
-    );
+  );  
+
 
     // Finally, request the current orderbook
 
