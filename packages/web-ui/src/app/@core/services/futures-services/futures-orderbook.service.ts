@@ -273,7 +273,7 @@ export class FuturesOrderbookService {
       this.lastPrice = last ?? this.currentPrice ?? 1;
     }
 
-    // bids: highest first → top 9; asks: highest first then take last 9 (lowest)
+    // bids: highest first → top 9, asks: highest first then take last 9 (lowest)
     return isBuy
       ? [...buckets].sort((a, b) => b.price - a.price).slice(0, 9)
       : [...buckets]
