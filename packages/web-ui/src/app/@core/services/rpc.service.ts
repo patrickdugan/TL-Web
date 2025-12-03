@@ -96,7 +96,7 @@ export class RpcService {
     ) {}
 
     onInit() {
-      const ep = environment.ENDPOINTS.LTCTEST;
+      const ep = environment.ENDPOINTS.BTC;
 
   // ✅ set URLs on ApiService (that's where they live)
   this.apiService.apiUrl       = ep.relayerUrl;
@@ -109,7 +109,7 @@ export class RpcService {
   // If you later add a relayer WS, call the correct method name here.
 
   // ✅ set network + mark selected
-  this.NETWORK = 'LTCTEST';
+  this.NETWORK = 'BTC';
   this.isNetworkSelected = true;
 
   // pull header / network info after URLs are set
