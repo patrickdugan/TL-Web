@@ -1,6 +1,6 @@
-import { Injectable } from "@angular/core";
+import { Injectable, OnDestroy } from "@angular/core";
 import { Subject, Subscription } from "rxjs";
-import { filter } from "rxjs/operators";
+import { filter, auditTime, takeUntil } from "rxjs/operators";
 import { SpotMarketsService, IMarket } from "./spot-markets.service";
 import { SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
@@ -46,7 +46,7 @@ export interface ISpotOrder {
 @Injectable({
   providedIn: "root",
 })
-export class SpotOrderbookService {
+export class SpotOrderbookService implements OnDestroy {
   private _rawOrderbookData: ISpotOrder[] = [];
   outsidePriceHandler: Subject<number> = new Subject();
   buyOrderbooks: { amount: number; price: number }[] = [];
@@ -58,8 +58,14 @@ export class SpotOrderbookService {
   private _lastRequestedKey: string | null = null;
   onUpdate?: () => void;
 
-  // ADD: For rxjs event subscriptions
+  // For rxjs event subscriptions
   private socketServiceSubscriptions: Subscription[] = [];
+  
+  // === NEW: Proper lifecycle management ===
+  private destroy$ = new Subject<void>();
+  
+  // === NEW: Throttled update trigger ===
+  private updateTrigger$ = new Subject<void>();
 
   constructor(
     private socketService: SocketService,
@@ -68,7 +74,21 @@ export class SpotOrderbookService {
     private loadingService: LoadingService,
     private authService: AuthService,
     private rpcService: RpcService
-  ) {}
+  ) {
+    // === NEW: Throttled updates at ~30fps max ===
+    this.updateTrigger$.pipe(
+      auditTime(32), // ~30fps max, prevents CD storms
+      takeUntil(this.destroy$)
+    ).subscribe(() => {
+      this.onUpdate?.();
+    });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.endOrderbookSubscription();
+  }
 
   get activeSpotKey() {
     return this.authService.activeSpotKey;
@@ -126,7 +146,10 @@ export class SpotOrderbookService {
     // RxJS: "order:error"
     this.socketServiceSubscriptions.push(
       this.socketService.events$
-        .pipe(filter(({ event }) => event === "order:error"))
+        .pipe(
+          filter(({ event }) => event === "order:error"),
+          takeUntil(this.destroy$)
+        )
         .subscribe(({ data }) => {
           const message: string = data;
           this.toastrService.error(message || `Undefined Error`, "Orderbook Error");
@@ -137,7 +160,10 @@ export class SpotOrderbookService {
     // RxJS: "order:saved"
     this.socketServiceSubscriptions.push(
       this.socketService.events$
-        .pipe(filter(({ event }) => event === "order:saved"))
+        .pipe(
+          filter(({ event }) => event === "order:saved"),
+          takeUntil(this.destroy$)
+        )
         .subscribe(({ data }) => {
           this.loadingService.tradesLoading = false;
           this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
@@ -147,71 +173,61 @@ export class SpotOrderbookService {
     // RxJS: "update-orders-request"
     this.socketServiceSubscriptions.push(
       this.socketService.events$
-        .pipe(filter(({ event }) => event === "update-orders-request"))
+        .pipe(
+          filter(({ event }) => event === "update-orders-request"),
+          takeUntil(this.destroy$)
+        )
         .subscribe(() => {
-            const net = this.rpcService.NETWORK
-            this.socketService.send("update-orderbook", {...this.marketFilter, network: net})
-         })
+          const net = this.rpcService.NETWORK
+          this.socketService.send("update-orderbook", {...this.marketFilter, network: net})
+        })
     );
 
-      // RxJS: "orderbook-data"
-  this.socketServiceSubscriptions.push(
-    this.socketService.events$
-      .pipe(filter(({ event }) => event === "orderbook-data"))
-      .subscribe(({ data }: { data: any }) => {
-      const msg = wrangleObMessageInPlace(data);
-      if (msg.event !== "orderbook-data") return;
+    // RxJS: "orderbook-data"
+    this.socketServiceSubscriptions.push(
+      this.socketService.events$
+        .pipe(
+          filter(({ event }) => event === "orderbook-data"),
+          takeUntil(this.destroy$)
+        )
+        .subscribe(({ data }: { data: any }) => {
+          const msg = wrangleObMessageInPlace(data);
+          if (msg.event !== "orderbook-data") return;
 
-      // unified format
-      const book = msg.orders || {};
-      const bids = book.bids ?? msg.bids ?? [];
-      const asks = book.asks ?? msg.asks ?? [];
+          const book = msg.orders || {};
+          const bids = book.bids ?? msg.bids ?? [];
+          const asks = book.asks ?? msg.asks ?? [];
 
-      /**
-       * IMPORTANT:
-       * Mirror desktop behavior:
-       *  - Feed all rows into rawOrderbookData
-       *  - Let the setter call structureOrderBook()
-       *  - That will populate buyOrderbooks / sellOrderbooks
-       */
-      this.rawOrderbookData = [...bids, ...asks];
+          this.rawOrderbookData = [...bids, ...asks];
 
-      // always normalize history to an array
-      const rawHistory = data.history;
-      this.tradeHistory = Array.isArray(rawHistory) ? rawHistory : [];
+          const rawHistory = data.history;
+          this.tradeHistory = Array.isArray(rawHistory) ? rawHistory : [];
 
-      // derive last trade safely
-      const lastTrade = this.tradeHistory[0];
-      if (!lastTrade || !lastTrade.props) {
-        // fallback: pick midpoint of best bid/ask, else 1
-        const bestBid = bids[0]?.price;
-        const bestAsk = asks[0]?.price;
+          const lastTrade = this.tradeHistory[0];
+          if (!lastTrade || !lastTrade.props) {
+            const bestBid = bids[0]?.price;
+            const bestAsk = asks[0]?.price;
 
-        const mid =
-          typeof bestBid === "number" && typeof bestAsk === "number"
-            ? (bestBid + bestAsk) / 2
-            : bestBid || bestAsk || 1;
+            const mid =
+              typeof bestBid === "number" && typeof bestAsk === "number"
+                ? (bestBid + bestAsk) / 2
+                : bestBid || bestAsk || 1;
 
-        this.currentPrice = parseFloat(mid.toFixed(6));
-      } else {
-        const { amountForSale, amountDesired } = lastTrade.props;
-        this.currentPrice =
-          parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
-      }
+            this.currentPrice = parseFloat(mid.toFixed(6));
+          } else {
+            const { amountForSale, amountDesired } = lastTrade.props;
+            this.currentPrice =
+              parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
+          }
 
-      if (this.onUpdate) {
-        try {
-          this.onUpdate();
-        } catch {}
-      }
-    })
-  );  
-
+          // === FIX: Use throttled trigger instead of direct onUpdate ===
+          this.updateTrigger$.next();
+        })
+    );
 
     // Finally, request the current orderbook
-
     const net = this.rpcService.NETWORK
-    this.socketService.send("update-orderbook",{...this.marketFilter, network: net});
+    this.socketService.send("update-orderbook", {...this.marketFilter, network: net});
   }
 
   /**
@@ -231,39 +247,35 @@ export class SpotOrderbookService {
   }
 
   async switchMarket(
-        first_token:number, second_token:number,
-        p?: { depth?: number; side?: 'bids' | 'asks' | 'both'; includeTrades?: boolean }
-      ) {
-        const newKey = this.normalizeKey(first_token,second_token);
-        this._lastRequestedKey = this.activeKey;
-        // Leave old
-        const net = this.rpcService.NETWORK
-        if (this.activeKey && this.activeKey !== newKey) {
-          this.socketService.send('orderbook:leave',{ marketKey: this.activeKey, network: net });
+    first_token: number, second_token: number,
+    p?: { depth?: number; side?: 'bids' | 'asks' | 'both'; includeTrades?: boolean }
+  ) {
+    const newKey = this.normalizeKey(first_token, second_token);
+    this._lastRequestedKey = this.activeKey;
+    const net = this.rpcService.NETWORK
+    if (this.activeKey && this.activeKey !== newKey) {
+      this.socketService.send('orderbook:leave', { marketKey: this.activeKey, network: net });
+    }
+
+    this.activeKey = newKey;
+
+    this.socketService.send(
+      'update-orderbook',
+      {
+        filter: {
+          type: 'SPOT',
+          first_token,
+          second_token,
+          depth: String(p?.depth ?? 50),
+          side: p?.side ?? 'both',
+          includeTrades: String(p?.includeTrades ?? false),
+          network: net 
         }
+      },
+    );
 
-        this.activeKey = newKey;
-        
-
-        // Ask server for snapshot
-        this.socketService.send(
-            'update-orderbook',
-            {
-              filter: {
-                type: 'SPOT',
-                first_token,
-                second_token,
-                depth: String(p?.depth ?? 50),
-                side: p?.side ?? 'both',
-                includeTrades: String(p?.includeTrades ?? false),
-                network: net 
-              }
-            },
-        );
-
-        // Join for live deltas
-        this.socketService.send('orderbook:join', { marketKey: newKey, network: net });
-      }
+    this.socketService.send('orderbook:join', { marketKey: newKey, network: net });
+  }
 
   private _structureOrderbook(isBuy: boolean) {
     const propIdDesired = isBuy
@@ -289,7 +301,6 @@ export class SpotOrderbookService {
         });
       }
     });
-    // If it's a sell side, we keep track of 'lastPrice' from the sorted array
     if (!isBuy) {
       this.lastPrice =
         result.sort((a, b) => b.price - a.price)?.[result.length - 1]?.price ||
@@ -297,7 +308,6 @@ export class SpotOrderbookService {
         1;
     }
 
-    // Return either the top 9 buys or the bottom 9 sells
     return isBuy
       ? result.sort((a, b) => b.price - a.price).slice(0, 9)
       : result.sort((a, b) => b.price - a.price).slice(Math.max(result.length - 9, 0));

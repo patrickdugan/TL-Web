@@ -1,7 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
 import { Subject } from 'rxjs';
-//import { SwapService } from './swap.service';
 import { ESounds, SoundsService } from "./sound.service";
 import { LoadingService } from "./loading.service";
 import { wrangleObMessageInPlace, wrangleFuturesObMessageInPlace } from "src/app/@core/utils/ob-normalize";
@@ -10,24 +9,37 @@ import { wrangleObMessageInPlace, wrangleFuturesObMessageInPlace } from "src/app
 @Injectable({
   providedIn: 'root',
 })
-export class SocketService {
+export class SocketService implements OnDestroy {
   public ws: WebSocket | null = null;
   private wsConnected = false;
   private clientId = '';
   private eventSubject = new Subject<{ event: string; data: any }>();
+  
+  // === NEW: Track if we're destroyed to prevent zombie connections ===
+  private destroyed = false;
 
   constructor(
     private toasterService: ToastrService,
-    //private swapService: SwapService,
     private soundsService: SoundsService,
     private loadingService: LoadingService
   ) {}
+
+  ngOnDestroy() {
+    this.destroyed = true;
+    this.obSocketDisconnect();
+    this.eventSubject.complete();
+  }
 
   /**
    * Connects to the backend WebSocket, if used.
    * For in-app events only, call emitEvent instead.
    */
   public obSocketConnect(url: string): void {
+    if (this.destroyed) {
+      console.warn('SocketService destroyed, refusing to connect');
+      return;
+    }
+    
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       console.log('WebSocket is already connected or connecting.');
       return;
@@ -35,23 +47,33 @@ export class SocketService {
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
+      if (this.destroyed) {
+        this.ws?.close();
+        return;
+      }
       this.wsConnected = true;
       console.log('OB WebSocket connected');
     };
 
     this.ws.onclose = (event) => {
       this.wsConnected = false;
-      this.toasterService.error('Socket Disconnected', 'Socket');
+      if (!this.destroyed) {
+        this.toasterService.error('Socket Disconnected', 'Socket');
+      }
       console.error('OB WebSocket disconnected:', event.reason);
     };
 
     this.ws.onerror = (err) => {
       this.wsConnected = false;
-      this.toasterService.error('Socket Connection Error', 'Socket');
+      if (!this.destroyed) {
+        this.toasterService.error('Socket Connection Error', 'Socket');
+      }
       console.error('OB WebSocket connection error:', err);
     };
 
     this.ws.onmessage = (msg) => {
+      if (this.destroyed) return;
+      
       try {
         const data = JSON.parse(msg.data);
         const eventName = data.event || data.type || 'unknown';
@@ -61,20 +83,18 @@ export class SocketService {
           console.log('[OB WS] Assigned client id:', data.id);
         }
 
-             // Emit event for in-app subscribers
+        // Emit event for in-app subscribers
         this.emitEvent(eventName, data);
 
         if (eventName === 'new-channel') {
           console.log("[Caller] About to call onInit, this.events$ =", this.events$);
-          //this.swapService.onInit(data.data, this.events$);
         }
 
-        if(eventName=== 'orderbook-data'){
+        if(eventName === 'orderbook-data'){
           const ob = wrangleFuturesObMessageInPlace(data)
           console.log('normalized '+JSON.stringify(ob))
         }
 
-   
       } catch (e) {
         console.error('WebSocket message parse error:', e, msg.data);
       }
@@ -91,6 +111,7 @@ export class SocketService {
 
   /** Emits an event to in-app subscribers (no networking) */
   public emitEvent(event: string, data: any): void {
+    if (this.destroyed) return;
     console.log('event emitter '+event +' '+JSON.stringify(data))
     this.eventSubject.next({ event, data });
   }
@@ -101,24 +122,23 @@ export class SocketService {
   }
 
   /** Send a message over the backend WebSocket, if still needed */
-    public send(event: string, data: any): void {
-      if (!this.ws || !this.wsConnected || this.ws.readyState !== WebSocket.OPEN) {
-        console.error('WebSocket is not connected; cannot send message');
-        return;
-      }
+  public send(event: string, data: any): void {
+    if (!this.ws || !this.wsConnected || this.ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not connected; cannot send message');
+      return;
+    }
 
-      // Events that expect flattened payloads
-      const flatEvents = ['new-order', 'close-order','::swap','update-orderbook'];
+    // Events that expect flattened payloads
+    const flatEvents = ['new-order', 'close-order','::swap','update-orderbook'];
 
     const isFlat = flatEvents.some(e => event.endsWith(e))
     const msg = isFlat 
         ? JSON.stringify({ event, ...data })      // flattened
         : JSON.stringify({ event, data });        // nested
 
-      console.log('[SocketService.send] sending:', msg);
-      this.ws.send(msg);
-    }
-
+    console.log('[SocketService.send] sending:', msg);
+    this.ws.send(msg);
+  }
 
   get obSocketConnected(): boolean {
     return this.wsConnected;

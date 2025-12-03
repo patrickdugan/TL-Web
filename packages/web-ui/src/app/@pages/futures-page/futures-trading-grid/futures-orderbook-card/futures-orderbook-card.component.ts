@@ -1,4 +1,5 @@
 import { Component, Input, ViewChild, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Subject } from 'rxjs';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
 import { FuturesOrderbookService } from 'src/app/@core/services/futures-services/futures-orderbook.service';
 import { FuturesOrdersService } from 'src/app/@core/services/futures-services/futures-orders.service';
@@ -15,13 +16,15 @@ export interface PeriodicElement {
   styleUrls: ['../../../spot-page/spot-trading-grid/spot-orderbook-card/orderbook-card.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-
 export class FuturesOrderbookCardComponent implements OnInit, OnDestroy {
     @ViewChild('sellOrdersContainer') sellOrdersContainer: any;
-    private alive = true;
+    
+    // === FIX: Replace boolean with Subject for proper cleanup ===
+    private destroy$ = new Subject<void>();
 
     displayedColumns: string[] = ['price', 'amount', 'total'];
     clickedRows = new Set<PeriodicElement>();
+    
     constructor(
       private futuresOrderbookService: FuturesOrderbookService,
       private futuresOrdersService: FuturesOrdersService,
@@ -72,13 +75,18 @@ export class FuturesOrderbookCardComponent implements OnInit, OnDestroy {
     get selectedMarket() {
       return this.futuresMarketService.selectedMarket;
     }
+
+    // === NEW: trackBy function to prevent DOM reconstruction ===
+    trackByPrice(index: number, item: { price: number; amount: number }): number {
+      return item.price;
+    }
   
     ngOnInit() {
       this.futuresOrderbookService.subscribeForOrderbook();
+      
+      // The service now handles throttling internally
       this.futuresOrderbookService.onUpdate = () => {
-        if (this.alive) {
-          this.cd.markForCheck();
-        }
+        this.cd.markForCheck();
       };
     }
 
@@ -89,19 +97,13 @@ export class FuturesOrderbookCardComponent implements OnInit, OnDestroy {
     }
 
     ngOnDestroy() {
-      this.futuresOrderbookService.endOrderbookSubscription()
-      this.alive = false;
+      this.destroy$.next();
+      this.destroy$.complete();
+      this.futuresOrderbookService.endOrderbookSubscription();
       this.futuresOrderbookService.onUpdate = undefined;
     }
 
     fillBuySellPrice(price: number) {
       if (price) this.futuresOrderbookService.outsidePriceHandler.next(price);
     }
-
-    // haveOpenedOrdersOnThisPrice(isBuy: boolean, price: number) {
-    //   const positions = isBuy
-    //     ? this.openedBuyOrders
-    //     : this.openedSellOrders;
-    //   return positions.map(e => e.props.price).some(e => e >= price && (e < price + 0.01));
-    // }
 }

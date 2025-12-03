@@ -1,6 +1,6 @@
-import { Injectable } from "@angular/core";
+import { Injectable, OnDestroy } from "@angular/core";
 import { Subject, Subscription } from "rxjs";
-import { filter } from "rxjs/operators";
+import { filter, auditTime, takeUntil } from "rxjs/operators";
 import { SocketService } from "../socket.service";
 import { ToastrService } from "ngx-toastr";
 import { LoadingService } from "../loading.service";
@@ -36,7 +36,7 @@ export interface IFuturesHistoryTrade {
 }
 
 @Injectable({ providedIn: "root" })
-export class FuturesOrderbookService {
+export class FuturesOrderbookService implements OnDestroy {
   private _rawOrderbookData: IFuturesOrderRow[] = [];
 
   // arrays consumed by components (aggregated book levels)
@@ -58,6 +58,12 @@ export class FuturesOrderbookService {
 
   // rxjs subscriptions
   private socketServiceSubscriptions: Subscription[] = [];
+  
+  // === NEW: Proper lifecycle management ===
+  private destroy$ = new Subject<void>();
+  
+  // === NEW: Throttled update trigger ===
+  private updateTrigger$ = new Subject<void>();
 
   constructor(
     private socketService: SocketService,
@@ -65,7 +71,21 @@ export class FuturesOrderbookService {
     private toastrService: ToastrService,
     private loadingService: LoadingService,
     private rpcService: RpcService,
-  ) {}
+  ) {
+    // === NEW: Throttled updates at ~30fps max ===
+    this.updateTrigger$.pipe(
+      auditTime(32), // ~30fps max, prevents CD storms
+      takeUntil(this.destroy$)
+    ).subscribe(() => {
+      this.onUpdate?.();
+    });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.endOrderbookSubscription();
+  }
 
   // ---- public getters ----
   get selectedMarket() {
@@ -86,7 +106,6 @@ export class FuturesOrderbookService {
     return `${contract_id}-perp`; 
   }
 
-
   private ensureActiveKeyFromMessage(msg: any): void {
     if (this.activeKey) return;
     const k = typeof msg?.marketKey === "string" ? msg.marketKey : null;
@@ -105,7 +124,10 @@ export class FuturesOrderbookService {
     // order:error
     this.socketServiceSubscriptions.push(
       this.socketService.events$
-        .pipe(filter(({ event }) => event === "order:error"))
+        .pipe(
+          filter(({ event }) => event === "order:error"),
+          takeUntil(this.destroy$)
+        )
         .subscribe(({ data }) => {
           const message: string = data;
           this.toastrService.error(message || `Undefined Error`, "Orderbook Error");
@@ -116,7 +138,10 @@ export class FuturesOrderbookService {
     // order:saved
     this.socketServiceSubscriptions.push(
       this.socketService.events$
-        .pipe(filter(({ event }) => event === "order:saved"))
+        .pipe(
+          filter(({ event }) => event === "order:saved"),
+          takeUntil(this.destroy$)
+        )
         .subscribe(() => {
           this.loadingService.tradesLoading = false;
           this.toastrService.success(`The Order is Saved in Orderbook`, "Success");
@@ -126,7 +151,10 @@ export class FuturesOrderbookService {
     // update-orders-request
     this.socketServiceSubscriptions.push(
       this.socketService.events$
-        .pipe(filter(({ event }) => event === "update-orders-request"))
+        .pipe(
+          filter(({ event }) => event === "update-orders-request"),
+          takeUntil(this.destroy$)
+        )
         .subscribe(() => {
           const cid = this.selectedMarket?.contract_id;
           if (typeof cid !== "number") return;
@@ -144,13 +172,15 @@ export class FuturesOrderbookService {
         })
     );
 
-    // orderboo-data
+    // orderbook-data
     this.socketServiceSubscriptions.push(
       this.socketService.events$
-        .pipe(filter(({ event }) => event === "orderbook-data"))
+        .pipe(
+          filter(({ event }) => event === "orderbook-data"),
+          takeUntil(this.destroy$)
+        )
         .subscribe(({ data }: { data: any }) => {
-          // inside your existing WS handler after wrangling:
-          const msg  = wrangleFuturesObMessageInPlace(data);
+          const msg = wrangleFuturesObMessageInPlace(data);
           if (msg.event !== 'orderbook-data') return;
 
           const book = msg.orders || {};
@@ -159,18 +189,17 @@ export class FuturesOrderbookService {
 
           this.rawOrderbookData = [...bids, ...asks];
           
-          // optional history
           if (Array.isArray(data?.history)) {
             this.tradeHistory = data.history as IFuturesHistoryTrade[];
           }
 
-          // update current price from asks (lowest ask proxy)
           if (this.sellOrderbooks.length > 0) {
             const asksSorted = [...this.sellOrderbooks].sort((a, b) => a.price - b.price);
             this.currentPrice = asksSorted[0]?.price ?? this.currentPrice ?? 1;
           }
 
-          this.onUpdate?.();
+          // === FIX: Use throttled trigger instead of direct onUpdate ===
+          this.updateTrigger$.next();
         })
     );
 
@@ -190,10 +219,6 @@ export class FuturesOrderbookService {
   }
 
   // ---- market switching ----
-   // ---- market switching ----
-  // Accept both styles:
-  //   switchMarket(contract_id, params?)
-  //   switchMarket('FUTURES', contract_id, params?)
   async switchMarket(
     a: number | "FUTURES",
     b?: number | { depth?: number; side?: Side; includeTrades?: boolean },
@@ -230,7 +255,7 @@ export class FuturesOrderbookService {
       },
     });
 
-    this.socketService.send("orderbook:join", { marketKey: newKey, network:net });
+    this.socketService.send("orderbook:join", { marketKey: newKey, network: net });
   }
 
   // ---- local shaping ----
@@ -239,10 +264,6 @@ export class FuturesOrderbookService {
     this.sellOrderbooks = this._structureOrderbook(false);
   }
 
-  /**
-   * Group by price with 0.001 bucket precision; top-9 bids / bottom-9 asks.
-   * We treat BUY action as bids and SELL action as asks and filter by selected contract_id.
-   */
   private _structureOrderbook(isBuy: boolean) {
     const cid = this.selectedMarket?.contract_id;
     if (typeof cid !== "number") return [];
@@ -267,13 +288,11 @@ export class FuturesOrderbookService {
     });
 
     if (!isBuy) {
-      // derive a "last price" approximation from asks (lowest ask)
       const sorted = [...buckets].sort((a, b) => a.price - b.price);
       const last = sorted[0]?.price;
       this.lastPrice = last ?? this.currentPrice ?? 1;
     }
 
-    // bids: highest first → top 9, asks: highest first then take last 9 (lowest)
     return isBuy
       ? [...buckets].sort((a, b) => b.price - a.price).slice(0, 9)
       : [...buckets]
