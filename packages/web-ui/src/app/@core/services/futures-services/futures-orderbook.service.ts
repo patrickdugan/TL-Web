@@ -156,8 +156,7 @@ export class FuturesOrderbookService {
           const bids = book.bids ?? msg.bids ?? [];
           const asks = book.asks ?? msg.asks ?? [];
 
-          this.buyOrderbooks  = bids;   // or whatever arrays your template reads
-          this.sellOrderbooks = asks;
+          this.rawOrderbookData = [...bids, ...asks];
           
           // optional history
           if (Array.isArray(data?.history)) {
