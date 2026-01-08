@@ -188,46 +188,44 @@ export class FuturesOrderbookService implements OnDestroy {
         )
         .subscribe(({ data }: { data: any }) => {
           const msg = wrangleFuturesObMessageInPlace(data);
-          console.log('fut ob msg'+JSON.stringify(msg))
           if (msg.event !== "orderbook-data") return;
 
-          // === FUTURES: orders is ALWAYS a flat array after normalization ===
-          const orders: any[] = Array.isArray(msg.orders) ? msg.orders : [];
+          // Web uses SNAPSHOT semantics
+          const snap = msg.ordersObj;
 
-          // Optional but important: gate by canonical marketKey
-          const mk = normalizePerpMarketKey(msg.marketKey);
-          const ak = this.activeKey ? normalizePerpMarketKey(this.activeKey) : null;
-          if (mk && ak && mk !== ak) {
-            // hard reset on mismatch (prevents stale boards)
-            this.rawOrderbookData = [];
-            this.tradeHistory = [];
-            this.currentPrice = undefined;
-            this.updateTrigger$.next();
-            return;
-          }
+          const bids: Array<{ price: number; amount?: number; quantity?: number }> =
+            Array.isArray(snap?.bids) ? snap.bids : [];
 
-          // Replace book atomically (no merge semantics)
-          this.rawOrderbookData = orders;
+          const asks: Array<{ price: number; amount?: number; quantity?: number }> =
+            Array.isArray(snap?.asks) ? snap.asks : [];
 
-          // Trade history
+          // Build UI rows (spot-compatible shape)
+          this.rawOrderbookData = [
+            ...bids.map((b) => ({
+              price: Number(b.price),
+              amount: Number(b.amount ?? b.quantity ?? 0),
+              sell: false,
+            })),
+            ...asks.map((a) => ({
+              price: Number(a.price),
+              amount: Number(a.amount ?? a.quantity ?? 0),
+              sell: true,
+            })),
+          ] as unknown as IFuturesOrderRow[];
+
+          // history
           if (Array.isArray(msg.history)) {
-            this.tradeHistory = msg.history as IFuturesHistoryTrade[];
+            this.tradeHistory = msg.history;
           }
 
-          // Price derivation (same behavior, but against flat futures rows)
-          if (orders.length > 0) {
-            const asks = orders
-              .filter((o: any) => o.sell)
-              .sort((a: any, b: any) => a.price - b.price);
-            this.currentPrice =
-              asks[0]?.price ??
-              orders[0]?.price ??
-              this.currentPrice ??
-              1;
+          // price from best ask
+          if (asks.length > 0) {
+            this.currentPrice = Number(asks[0].price);
           }
-          // Trigger UI update
+
           this.updateTrigger$.next();
         })
+
     );
 
     // initial snapshot
