@@ -181,24 +181,41 @@ export class FuturesOrderbookService implements OnDestroy {
         )
         .subscribe(({ data }: { data: any }) => {
           const msg = wrangleFuturesObMessageInPlace(data);
-          if (msg.event !== 'orderbook-data') return;
+          if (msg.event !== "orderbook-data") return;
 
-          const book = msg.orders || {};
-          const bids = book.bids ?? msg.bids ?? [];
-          const asks = book.asks ?? msg.asks ?? [];
+          // === FUTURES: orders is ALWAYS a flat array after normalization ===
+          const orders = Array.isArray(msg.orders) ? msg.orders : [];
 
-          this.rawOrderbookData = [...bids, ...asks];
-          
-          if (Array.isArray(data?.history)) {
-            this.tradeHistory = data.history as IFuturesHistoryTrade[];
+          // Optional but important: gate by canonical marketKey
+          const mk = normalizePerpMarketKey(msg.marketKey);
+          const ak = this.activeKey ? normalizePerpMarketKey(this.activeKey) : null;
+          if (mk && ak && mk !== ak) {
+            // hard reset on mismatch (prevents stale boards)
+            this.rawOrderbookData = [];
+            this.tradeHistory = [];
+            this.currentPrice = undefined;
+            this.updateTrigger$.next();
+            return;
           }
 
-          if (this.sellOrderbooks.length > 0) {
-            const asksSorted = [...this.sellOrderbooks].sort((a, b) => a.price - b.price);
-            this.currentPrice = asksSorted[0]?.price ?? this.currentPrice ?? 1;
+          // Replace book atomically (no merge semantics)
+          this.rawOrderbookData = orders;
+
+          // Trade history
+          if (Array.isArray(msg.history)) {
+            this.tradeHistory = msg.history as IFuturesHistoryTrade[];
           }
 
-          // === FIX: Use throttled trigger instead of direct onUpdate ===
+          // Price derivation (same behavior, but against flat futures rows)
+          if (orders.length > 0) {
+            const asks = orders.filter(o => o.sell).sort((a, b) => a.price - b.price);
+            this.currentPrice =
+              asks[0]?.price ??
+              orders[0]?.price ??
+              this.currentPrice ??
+              1;
+          }
+          // Trigger UI update
           this.updateTrigger$.next();
         })
     );
@@ -213,50 +230,55 @@ export class FuturesOrderbookService implements OnDestroy {
     }
   }
 
-  endOrderbookSubscription() {
-    this.socketServiceSubscriptions.forEach((s) => s.unsubscribe());
-    this.socketServiceSubscriptions = [];
-  }
+    endOrderbookSubscription() {
+        this.socketServiceSubscriptions.forEach((s) => s.unsubscribe());
+        this.socketServiceSubscriptions = [];
+      }
 
-  // ---- market switching ----
-  async switchMarket(
-    a: number | "FUTURES",
-    b?: number | { depth?: number; side?: Side; includeTrades?: boolean },
-    c?: { depth?: number; side?: Side; includeTrades?: boolean }
-  ) {
-    let contract_id: number;
-    let p: { depth?: number; side?: Side; includeTrades?: boolean } | undefined;
+      // ---- market switching ----
+      async switchMarket(
+      contract_id: number,
+      p?: { depth?: number; side?: 'bids' | 'asks' | 'both'; includeTrades?: boolean }
+    ) {
+      const net = this.rpcService.NETWORK;
+      const newKey = normalizePerpMarketKey(`${contract_id}-perp`);
 
-    if (typeof a === "string") {
-      contract_id = Number(b);
-      p = c;
-    } else {
-      contract_id = a;
-      p = (b as any) || undefined;
+      // leave old market
+      if (this.activeKey && this.activeKey !== newKey) {
+        this.socketService.send("orderbook:leave", {
+          marketKey: this.activeKey,
+          network: net,
+        });
+      }
+
+      // HARD RESET (matches spot semantics)
+      this.rawOrderbookData = [];
+      this.tradeHistory = [];
+      this.currentPrice = undefined;
+      this.updateTrigger$.next();
+
+      this.activeKey = newKey;
+      this._lastRequestedKey = newKey;
+
+      // request fresh snapshot
+      this.socketService.send("update-orderbook", {
+        filter: {
+          type: "FUTURES",
+          contract_id,
+          depth: String(p?.depth ?? 50),
+          side: p?.side ?? "both",
+          includeTrades: String(p?.includeTrades ?? false),
+          network: net,
+        },
+      });
+
+      // join stream
+      this.socketService.send("orderbook:join", {
+        marketKey: newKey,
+        network: net,
+      });
     }
 
-    const newKey = this.key(contract_id);
-    this._lastRequestedKey = this.activeKey;
-    const net = this.rpcService.NETWORK
-    if (this.activeKey && this.activeKey !== newKey) {
-      this.socketService.send("orderbook:leave", { marketKey: this.activeKey, network: net });
-    }
-
-    this.activeKey = newKey;
-
-    this.socketService.send("update-orderbook", {
-      filter: {
-        type: "FUTURES",
-        contract_id,
-        depth: String(p?.depth ?? 50),
-        side: p?.side ?? "both",
-        includeTrades: String(p?.includeTrades ?? false),
-        network: net
-      },
-    });
-
-    this.socketService.send("orderbook:join", { marketKey: newKey, network: net });
-  }
 
   // ---- local shaping ----
   private structureOrderBook() {
