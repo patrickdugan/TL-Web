@@ -188,6 +188,7 @@ export class FuturesOrderbookService implements OnDestroy {
         )
         .subscribe(({ data }: { data: any }) => {
           const msg = wrangleFuturesObMessageInPlace(data);
+          console.log('fut ob msg '+JSON.stringify(msg))
           if (msg.event !== "orderbook-data") return;
 
           // Web uses SNAPSHOT semantics
