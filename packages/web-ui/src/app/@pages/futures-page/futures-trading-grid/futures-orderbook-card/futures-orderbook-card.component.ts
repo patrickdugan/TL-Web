@@ -33,7 +33,7 @@ export class FuturesOrderbookCardComponent implements OnInit, OnDestroy {
     ) {}
 
     get upTrend() {
-      return this.lastPrice > this.marketPrice;
+      return this.lastPrice > (this.marketPrice ?? 0);
     }
 
     get lastPrice() {

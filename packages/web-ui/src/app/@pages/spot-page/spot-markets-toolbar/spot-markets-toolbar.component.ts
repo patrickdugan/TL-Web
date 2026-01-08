@@ -56,8 +56,7 @@ export class SpotMarketsToolbarComponent {
         this.spotHistory.refreshNow();
         this.spotOrderbookService.switchMarket(
               sel.first_token.propertyId,
-              sel.second_token.propertyId,
-              { depth: 50, side: 'both', includeTrades: false }
+              sel.second_token.propertyId
             );
     }
 }

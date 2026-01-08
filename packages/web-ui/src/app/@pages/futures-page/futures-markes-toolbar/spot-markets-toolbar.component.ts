@@ -57,7 +57,6 @@ export class FuturesMarketsToolbarComponent {
         this.futHistory.refreshNow();
         const sel = this.futuresOrderbookService.selectedMarket;
         this.futuresOrderbookService.switchMarket(
-          'FUTURES',
           sel.contract_id,
           { depth: 50, side: 'both', includeTrades: false }
         );
