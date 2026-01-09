@@ -38,12 +38,22 @@ export interface IFuturesHistoryTrade {
 /** Normalize perp market key to consistent format */
 function normalizePerpMarketKey(key: string | null | undefined): string | null {
   if (!key) return null;
-  // Strip any extra formatting, ensure lowercase consistency
   return String(key).toLowerCase().trim();
+}
+
+/** Simplified row for internal orderbook display */
+interface NormalizedOrderRow {
+  price: number;
+  amount: number;
+  sell: boolean;
 }
 
 @Injectable({ providedIn: "root" })
 export class FuturesOrderbookService implements OnDestroy {
+  // Internal storage - uses simplified normalized rows
+  private _normalizedOrders: NormalizedOrderRow[] = [];
+  
+  // Legacy accessor for compatibility
   private _rawOrderbookData: IFuturesOrderRow[] = [];
 
   // arrays consumed by components (aggregated book levels)
@@ -66,10 +76,10 @@ export class FuturesOrderbookService implements OnDestroy {
   // rxjs subscriptions
   private socketServiceSubscriptions: Subscription[] = [];
   
-  // === NEW: Proper lifecycle management ===
+  // === Proper lifecycle management ===
   private destroy$ = new Subject<void>();
   
-  // === NEW: Throttled update trigger ===
+  // === Throttled update trigger ===
   private updateTrigger$ = new Subject<void>();
 
   constructor(
@@ -79,9 +89,9 @@ export class FuturesOrderbookService implements OnDestroy {
     private loadingService: LoadingService,
     private rpcService: RpcService,
   ) {
-    // === NEW: Throttled updates at ~30fps max ===
+    // Throttled updates at ~30fps max
     this.updateTrigger$.pipe(
-      auditTime(32), // ~30fps max, prevents CD storms
+      auditTime(32),
       takeUntil(this.destroy$)
     ).subscribe(() => {
       this.onUpdate?.();
@@ -105,7 +115,7 @@ export class FuturesOrderbookService implements OnDestroy {
 
   set rawOrderbookData(v: IFuturesOrderRow[]) {
     this._rawOrderbookData = v || [];
-    this.structureOrderBook();
+    // Don't call structureOrderBook here - we handle it separately for normalized data
   }
 
   // ---- utils ----
@@ -165,7 +175,7 @@ export class FuturesOrderbookService implements OnDestroy {
         .subscribe(() => {
           const cid = this.selectedMarket?.contract_id;
           if (typeof cid !== "number") return;
-          const net = this.rpcService.NETWORK
+          const net = this.rpcService.NETWORK;
           const mk = this.key(cid);
           const payload = {
             type: "FUTURES",
@@ -188,20 +198,20 @@ export class FuturesOrderbookService implements OnDestroy {
         )
         .subscribe(({ data }: { data: any }) => {
           const msg = wrangleFuturesObMessageInPlace(data);
-          console.log('fut ob msg '+JSON.stringify(msg))
+          console.log('fut ob msg ' + JSON.stringify(msg));
           if (msg.event !== "orderbook-data") return;
 
-          // Web uses SNAPSHOT semantics
+          // Get bids/asks from ordersObj (normalized by wrangler)
           const snap = msg.ordersObj;
-
+          
           const bids: Array<{ price: number; amount?: number; quantity?: number }> =
             Array.isArray(snap?.bids) ? snap.bids : [];
-
+          
           const asks: Array<{ price: number; amount?: number; quantity?: number }> =
             Array.isArray(snap?.asks) ? snap.asks : [];
 
-          // Build UI rows (spot-compatible shape)
-          this.rawOrderbookData = [
+          // Store as normalized rows
+          this._normalizedOrders = [
             ...bids.map((b) => ({
               price: Number(b.price),
               amount: Number(b.amount ?? b.quantity ?? 0),
@@ -212,26 +222,31 @@ export class FuturesOrderbookService implements OnDestroy {
               amount: Number(a.amount ?? a.quantity ?? 0),
               sell: true,
             })),
-          ] as unknown as IFuturesOrderRow[];
+          ];
 
-          // history
+          // Rebuild UI orderbooks
+          this.structureOrderBook();
+
+          // History
           if (Array.isArray(msg.history)) {
-            this.tradeHistory = msg.history;
+            this.tradeHistory = msg.history as IFuturesHistoryTrade[];
           }
 
-          // price from best ask
+          // Price from best ask
           if (asks.length > 0) {
             this.currentPrice = Number(asks[0].price);
+          } else if (bids.length > 0) {
+            this.currentPrice = Number(bids[0].price);
           }
 
+          // Trigger UI update
           this.updateTrigger$.next();
         })
-
     );
 
     // initial snapshot
     const cid = this.selectedMarket?.contract_id;
-    const net = this.rpcService.NETWORK
+    const net = this.rpcService.NETWORK;
     if (typeof cid === "number") {
       this.socketService.send("update-orderbook", {
         filter: { type: "FUTURES", contract_id: cid, network: net },
@@ -260,8 +275,11 @@ export class FuturesOrderbookService implements OnDestroy {
       });
     }
 
-    // HARD RESET (matches spot semantics)
-    this.rawOrderbookData = [];
+    // HARD RESET
+    this._normalizedOrders = [];
+    this._rawOrderbookData = [];
+    this.buyOrderbooks = [];
+    this.sellOrderbooks = [];
     this.tradeHistory = [];
     this.currentPrice = undefined;
     this.updateTrigger$.next();
@@ -288,47 +306,51 @@ export class FuturesOrderbookService implements OnDestroy {
     });
   }
 
-
   // ---- local shaping ----
   private structureOrderBook() {
-    this.buyOrderbooks = this._structureOrderbook(true);
-    this.sellOrderbooks = this._structureOrderbook(false);
+    this.buyOrderbooks = this._structureOrderbook(false);  // bids (sell=false)
+    this.sellOrderbooks = this._structureOrderbook(true);  // asks (sell=true)
   }
 
-  private _structureOrderbook(isBuy: boolean) {
-    const cid = this.selectedMarket?.contract_id;
-    if (typeof cid !== "number") return [];
-
-    const side = isBuy ? "BUY" : "SELL";
-    const rows = (this._rawOrderbookData || []).filter(
-      (o) => o?.props?.contract_id === cid && o?.action === side
-    );
+  private _structureOrderbook(isSell: boolean) {
+    // Filter normalized orders by side
+    const rows = this._normalizedOrders.filter((o) => o.sell === isSell);
 
     const range = 1000;
     const buckets: { price: number; amount: number }[] = [];
 
     rows.forEach((o) => {
-      const p = Number(o.props.price) || 0;
-      const a = Number(o.props.amount) || 0;
+      const p = Number(o.price) || 0;
+      const a = Number(o.amount) || 0;
       const bucketKey = Math.trunc(p * range);
       const existing = buckets.find(
         (b) => Math.trunc(b.price * range) === bucketKey
       );
-      if (existing) existing.amount += a;
-      else buckets.push({ price: parseFloat(p.toFixed(4)), amount: a });
+      if (existing) {
+        existing.amount += a;
+      } else {
+        buckets.push({ price: parseFloat(p.toFixed(4)), amount: a });
+      }
     });
 
-    if (!isBuy) {
+    // Update lastPrice from asks (sell side)
+    if (isSell && buckets.length > 0) {
       const sorted = [...buckets].sort((a, b) => a.price - b.price);
-      const last = sorted[0]?.price;
-      this.lastPrice = last ?? this.currentPrice ?? 1;
+      this.lastPrice = sorted[0]?.price ?? this.currentPrice ?? 1;
     }
 
-    return isBuy
-      ? [...buckets].sort((a, b) => b.price - a.price).slice(0, 9)
-      : [...buckets]
-          .sort((a, b) => a.price - b.price)
-          .slice(Math.max(buckets.length - 9, 0));
+    // Return sorted and sliced
+    if (isSell) {
+      // Asks: lowest prices first, take bottom 9
+      return [...buckets]
+        .sort((a, b) => a.price - b.price)
+        .slice(0, 9);
+    } else {
+      // Bids: highest prices first, take top 9
+      return [...buckets]
+        .sort((a, b) => b.price - a.price)
+        .slice(0, 9);
+    }
   }
 
   private mergeOrders(

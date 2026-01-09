@@ -192,32 +192,78 @@ export class SpotOrderbookService implements OnDestroy {
         )
         .subscribe(({ data }: { data: any }) => {
           const msg = wrangleObMessageInPlace(data);
+          console.log('spot ob msg ' + JSON.stringify(msg));
           if (msg.event !== "orderbook-data") return;
 
-          const book = msg.orders || {};
-          const bids = book.bids ?? msg.bids ?? [];
-          const asks = book.asks ?? msg.asks ?? [];
+          // === UPDATED: Use ordersObj like futures service ===
+          // wrangleObMessageInPlace normalizes to ordersObj.bids / ordersObj.asks
+          const snap = msg.ordersObj;
+          
+          const bids: Array<{ price: number; amount?: number; quantity?: number }> =
+            Array.isArray(snap?.bids) ? snap.bids : [];
+          
+          const asks: Array<{ price: number; amount?: number; quantity?: number }> =
+            Array.isArray(snap?.asks) ? snap.asks : [];
 
-          this.rawOrderbookData = [...bids, ...asks];
+          // Build UI rows - convert to ISpotOrder-compatible shape
+          // Note: These are simplified rows for display, not full ISpotOrder objects
+          this._rawOrderbookData = [
+            ...bids.map((b) => ({
+              action: "BUY" as const,
+              props: {
+                price: Number(b.price),
+                amount: Number(b.amount ?? b.quantity ?? 0),
+                id_desired: this.selectedMarket?.first_token?.propertyId ?? 0,
+                id_for_sale: this.selectedMarket?.second_token?.propertyId ?? 0,
+              },
+              type: "SPOT" as const,
+              uuid: '',
+              keypair: { address: '', pubkey: '' },
+              lock: false,
+              socketService_id: '',
+              timestamp: Date.now(),
+            })),
+            ...asks.map((a) => ({
+              action: "SELL" as const,
+              props: {
+                price: Number(a.price),
+                amount: Number(a.amount ?? a.quantity ?? 0),
+                id_desired: this.selectedMarket?.second_token?.propertyId ?? 0,
+                id_for_sale: this.selectedMarket?.first_token?.propertyId ?? 0,
+              },
+              type: "SPOT" as const,
+              uuid: '',
+              keypair: { address: '', pubkey: '' },
+              lock: false,
+              socketService_id: '',
+              timestamp: Date.now(),
+            })),
+          ] as ISpotOrder[];
 
-          const rawHistory = data.history;
+          // Trigger structure rebuild
+          this.structureOrderBook();
+
+          // History
+          const rawHistory = msg.history;
           this.tradeHistory = Array.isArray(rawHistory) ? rawHistory : [];
 
-          const lastTrade = this.tradeHistory[0];
-          if (!lastTrade || !lastTrade.props) {
+          // Price derivation
+          if (asks.length > 0 || bids.length > 0) {
             const bestBid = bids[0]?.price;
             const bestAsk = asks[0]?.price;
 
-            const mid =
-              typeof bestBid === "number" && typeof bestAsk === "number"
-                ? (bestBid + bestAsk) / 2
-                : bestBid || bestAsk || 1;
-
-            this.currentPrice = parseFloat(mid.toFixed(6));
-          } else {
-            const { amountForSale, amountDesired } = lastTrade.props;
-            this.currentPrice =
-              parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
+            if (typeof bestAsk === "number") {
+              this.currentPrice = parseFloat(Number(bestAsk).toFixed(6));
+            } else if (typeof bestBid === "number") {
+              this.currentPrice = parseFloat(Number(bestBid).toFixed(6));
+            } else {
+              const lastTrade = this.tradeHistory[0];
+              if (lastTrade?.props) {
+                const { amountForSale, amountDesired } = lastTrade.props;
+                this.currentPrice =
+                  parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
+              }
+            }
           }
 
           // === FIX: Use throttled trigger instead of direct onUpdate ===
@@ -257,6 +303,13 @@ export class SpotOrderbookService implements OnDestroy {
       this.socketService.send('orderbook:leave', { marketKey: this.activeKey, network: net });
     }
 
+    // HARD RESET on market switch (matches futures semantics)
+    this._rawOrderbookData = [];
+    this.buyOrderbooks = [];
+    this.sellOrderbooks = [];
+    this.tradeHistory = [];
+    this.updateTrigger$.next();
+
     this.activeKey = newKey;
 
     this.socketService.send(
@@ -279,11 +332,16 @@ export class SpotOrderbookService implements OnDestroy {
 
   private _structureOrderbook(isBuy: boolean) {
     const propIdDesired = isBuy
-      ? this.selectedMarket.first_token.propertyId
-      : this.selectedMarket.second_token.propertyId;
+      ? this.selectedMarket?.first_token?.propertyId
+      : this.selectedMarket?.second_token?.propertyId;
     const propIdForSale = isBuy
-      ? this.selectedMarket.second_token.propertyId
-      : this.selectedMarket.first_token.propertyId;
+      ? this.selectedMarket?.second_token?.propertyId
+      : this.selectedMarket?.first_token?.propertyId;
+    
+    if (propIdDesired === undefined || propIdForSale === undefined) {
+      return [];
+    }
+
     const filteredOrderbook = this._rawOrderbookData.filter(
       (o) => o.props.id_desired === propIdDesired && o.props.id_for_sale === propIdForSale
     );
