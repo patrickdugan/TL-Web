@@ -68,16 +68,19 @@ const getPhantomBtc = (net?: TNETWORK | string): PhantomBtc | undefined => {
 export class WalletService {
   constructor(private rpc: RpcService) {
     const net = (this.rpc.NETWORK || '').toUpperCase();
-    this.baseUrl = net.includes('TEST')
-      ? 'https://testnet-api.layerwallet.com'
-      : 'https://api.layerwallet.com';
   }
 
   public provider$ = new BehaviorSubject<IWalletProvider | null>(null);
   public addresses$ = new BehaviorSubject<string[]>([]);
   public address$ = new BehaviorSubject<string | null>(null);
 
-  public baseUrl: string;
+  get baseUrl(): string {
+  const net = (this.rpc.NETWORK || "").toUpperCase();
+    return net.includes("TEST")
+      ? "https://testnet-api.layerwallet.com"
+      : "https://api.layerwallet.com";
+  }
+
 
   public isWalletAvailable(): boolean {
     return this.available().length > 0;

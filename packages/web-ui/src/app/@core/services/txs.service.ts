@@ -93,11 +93,6 @@ export class TxsService {
   private baseUrl = "https://api.layerwallet.com";
   private testUrl = "https://testnet-api.layerwallet.com"
   private network = this.rpcService.NETWORK
-  private relayerUrl =
-  String(this.network).includes("TEST")
-    ? this.testUrl
-    : this.baseUrl;
-
 
   constructor(
     private rpcService: RpcService,
@@ -109,13 +104,24 @@ export class TxsService {
     private walletService: WalletService
   ) {}
 
+  private get relayerUrl(): string {
+  return String(this.balanceService.NETWORK).includes("TEST")
+    ? this.testUrl
+    : this.baseUrl;
+  }
+
+
   async buildTradeTx(
     tradeConfig: IBuildTradeConfig
   ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {
     try {
-      const response = await axios.post(`${this.baseUrl}/tx/buildTradeTx`, tradeConfig );
-      console.log('trade build response '+JSON.stringify(response))
+      const url =
+        this.balanceService.NETWORK === "LTCTEST"
+          ? this.testUrl
+          : this.baseUrl;
 
+      const response = await axios.post(`${url}/tx/buildTradeTx`, tradeConfig);
+      console.log("trade build response " + JSON.stringify(response));
       return response.data;
     } catch (error: any) {
       console.error("Error in buildTradeTx:", error.message);
