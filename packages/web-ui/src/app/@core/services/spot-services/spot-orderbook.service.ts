@@ -43,11 +43,23 @@ export interface ISpotOrder {
   state?: "CANCELED" | "FILLED";
 }
 
+/** Simplified row for internal orderbook display */
+interface NormalizedOrderRow {
+  price: number;
+  amount: number;
+  sell: boolean;
+}
+
 @Injectable({
   providedIn: "root",
 })
 export class SpotOrderbookService implements OnDestroy {
+  // Internal storage - uses simplified normalized rows (like futures)
+  private _normalizedOrders: NormalizedOrderRow[] = [];
+  
+  // Legacy accessor for compatibility
   private _rawOrderbookData: ISpotOrder[] = [];
+  
   outsidePriceHandler: Subject<number> = new Subject();
   buyOrderbooks: { amount: number; price: number }[] = [];
   sellOrderbooks: { amount: number; price: number }[] = [];
@@ -61,10 +73,10 @@ export class SpotOrderbookService implements OnDestroy {
   // For rxjs event subscriptions
   private socketServiceSubscriptions: Subscription[] = [];
   
-  // === NEW: Proper lifecycle management ===
+  // === Proper lifecycle management ===
   private destroy$ = new Subject<void>();
   
-  // === NEW: Throttled update trigger ===
+  // === Throttled update trigger ===
   private updateTrigger$ = new Subject<void>();
 
   constructor(
@@ -75,9 +87,9 @@ export class SpotOrderbookService implements OnDestroy {
     private authService: AuthService,
     private rpcService: RpcService
   ) {
-    // === NEW: Throttled updates at ~30fps max ===
+    // Throttled updates at ~30fps max
     this.updateTrigger$.pipe(
-      auditTime(32), // ~30fps max, prevents CD storms
+      auditTime(32),
       takeUntil(this.destroy$)
     ).subscribe(() => {
       this.onUpdate?.();
@@ -125,7 +137,7 @@ export class SpotOrderbookService implements OnDestroy {
 
   set rawOrderbookData(value: ISpotOrder[]) {
     this._rawOrderbookData = value;
-    this.structureOrderBook();
+    // Don't call structureOrderBook here - we handle it separately for normalized data
   }
 
   get marketFilter() {
@@ -195,8 +207,7 @@ export class SpotOrderbookService implements OnDestroy {
           console.log('spot ob msg ' + JSON.stringify(msg));
           if (msg.event !== "orderbook-data") return;
 
-          // === UPDATED: Use ordersObj like futures service ===
-          // wrangleObMessageInPlace normalizes to ordersObj.bids / ordersObj.asks
+          // Get bids/asks from ordersObj (normalized by wrangler)
           const snap = msg.ordersObj;
           
           const bids: Array<{ price: number; amount?: number; quantity?: number }> =
@@ -205,68 +216,44 @@ export class SpotOrderbookService implements OnDestroy {
           const asks: Array<{ price: number; amount?: number; quantity?: number }> =
             Array.isArray(snap?.asks) ? snap.asks : [];
 
-          // Build UI rows - convert to ISpotOrder-compatible shape
-          // Note: These are simplified rows for display, not full ISpotOrder objects
-          this._rawOrderbookData = [
+          console.log('spot parsed bids:', bids.length, 'asks:', asks.length);
+
+          // Store as normalized rows (same pattern as futures)
+          this._normalizedOrders = [
             ...bids.map((b) => ({
-              action: "BUY" as const,
-              props: {
-                price: Number(b.price),
-                amount: Number(b.amount ?? b.quantity ?? 0),
-                id_desired: this.selectedMarket?.first_token?.propertyId ?? 0,
-                id_for_sale: this.selectedMarket?.second_token?.propertyId ?? 0,
-              },
-              type: "SPOT" as const,
-              uuid: '',
-              keypair: { address: '', pubkey: '' },
-              lock: false,
-              socketService_id: '',
-              timestamp: Date.now(),
+              price: Number(b.price),
+              amount: Number(b.amount ?? b.quantity ?? 0),
+              sell: false,
             })),
             ...asks.map((a) => ({
-              action: "SELL" as const,
-              props: {
-                price: Number(a.price),
-                amount: Number(a.amount ?? a.quantity ?? 0),
-                id_desired: this.selectedMarket?.second_token?.propertyId ?? 0,
-                id_for_sale: this.selectedMarket?.first_token?.propertyId ?? 0,
-              },
-              type: "SPOT" as const,
-              uuid: '',
-              keypair: { address: '', pubkey: '' },
-              lock: false,
-              socketService_id: '',
-              timestamp: Date.now(),
+              price: Number(a.price),
+              amount: Number(a.amount ?? a.quantity ?? 0),
+              sell: true,
             })),
-          ] as ISpotOrder[];
+          ];
 
-          // Trigger structure rebuild
+          // Rebuild UI orderbooks
           this.structureOrderBook();
 
           // History
           const rawHistory = msg.history;
           this.tradeHistory = Array.isArray(rawHistory) ? rawHistory : [];
 
-          // Price derivation
-          if (asks.length > 0 || bids.length > 0) {
-            const bestBid = bids[0]?.price;
-            const bestAsk = asks[0]?.price;
-
-            if (typeof bestAsk === "number") {
-              this.currentPrice = parseFloat(Number(bestAsk).toFixed(6));
-            } else if (typeof bestBid === "number") {
-              this.currentPrice = parseFloat(Number(bestBid).toFixed(6));
-            } else {
-              const lastTrade = this.tradeHistory[0];
-              if (lastTrade?.props) {
-                const { amountForSale, amountDesired } = lastTrade.props;
-                this.currentPrice =
-                  parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
-              }
+          // Price from best ask, fallback to best bid
+          if (asks.length > 0) {
+            this.currentPrice = parseFloat(Number(asks[0].price).toFixed(6));
+          } else if (bids.length > 0) {
+            this.currentPrice = parseFloat(Number(bids[0].price).toFixed(6));
+          } else {
+            const lastTrade = this.tradeHistory[0];
+            if (lastTrade?.props) {
+              const { amountForSale, amountDesired } = lastTrade.props;
+              this.currentPrice =
+                parseFloat((amountForSale / amountDesired).toFixed(6)) || 1;
             }
           }
 
-          // === FIX: Use throttled trigger instead of direct onUpdate ===
+          // Trigger UI update
           this.updateTrigger$.next();
         })
     );
@@ -288,8 +275,9 @@ export class SpotOrderbookService implements OnDestroy {
    * Rebuild local buy/sell arrays from raw orderbook data
    */
   private structureOrderBook() {
-    this.buyOrderbooks = this._structureOrderbook(true);
-    this.sellOrderbooks = this._structureOrderbook(false);
+    this.buyOrderbooks = this._structureOrderbook(false);   // bids (sell=false)
+    this.sellOrderbooks = this._structureOrderbook(true);   // asks (sell=true)
+    console.log('spot structured - buys:', this.buyOrderbooks.length, 'sells:', this.sellOrderbooks.length);
   }
 
   async switchMarket(
@@ -303,7 +291,8 @@ export class SpotOrderbookService implements OnDestroy {
       this.socketService.send('orderbook:leave', { marketKey: this.activeKey, network: net });
     }
 
-    // HARD RESET on market switch (matches futures semantics)
+    // HARD RESET on market switch
+    this._normalizedOrders = [];
     this._rawOrderbookData = [];
     this.buyOrderbooks = [];
     this.sellOrderbooks = [];
@@ -330,44 +319,44 @@ export class SpotOrderbookService implements OnDestroy {
     this.socketService.send('orderbook:join', { marketKey: newKey, network: net });
   }
 
-  private _structureOrderbook(isBuy: boolean) {
-    const propIdDesired = isBuy
-      ? this.selectedMarket?.first_token?.propertyId
-      : this.selectedMarket?.second_token?.propertyId;
-    const propIdForSale = isBuy
-      ? this.selectedMarket?.second_token?.propertyId
-      : this.selectedMarket?.first_token?.propertyId;
-    
-    if (propIdDesired === undefined || propIdForSale === undefined) {
-      return [];
-    }
+  private _structureOrderbook(isSell: boolean) {
+    // Filter normalized orders by side (same pattern as futures)
+    const rows = this._normalizedOrders.filter((o) => o.sell === isSell);
 
-    const filteredOrderbook = this._rawOrderbookData.filter(
-      (o) => o.props.id_desired === propIdDesired && o.props.id_for_sale === propIdForSale
-    );
     const range = 1000;
-    const result: { price: number; amount: number }[] = [];
-    filteredOrderbook.forEach((o) => {
-      const _price = Math.trunc(o.props.price * range);
-      const existing = result.find((_o) => Math.trunc(_o.price * range) === _price);
+    const buckets: { price: number; amount: number }[] = [];
+
+    rows.forEach((o) => {
+      const p = Number(o.price) || 0;
+      const a = Number(o.amount) || 0;
+      const bucketKey = Math.trunc(p * range);
+      const existing = buckets.find(
+        (b) => Math.trunc(b.price * range) === bucketKey
+      );
       if (existing) {
-        existing.amount += o.props.amount;
+        existing.amount += a;
       } else {
-        result.push({
-          price: parseFloat(o.props.price.toFixed(4)),
-          amount: o.props.amount,
-        });
+        buckets.push({ price: parseFloat(p.toFixed(4)), amount: a });
       }
     });
-    if (!isBuy) {
-      this.lastPrice =
-        result.sort((a, b) => b.price - a.price)?.[result.length - 1]?.price ||
-        this.currentPrice ||
-        1;
+
+    // Update lastPrice from asks (sell side)
+    if (isSell && buckets.length > 0) {
+      const sorted = [...buckets].sort((a, b) => a.price - b.price);
+      this.lastPrice = sorted[0]?.price ?? this.currentPrice ?? 1;
     }
 
-    return isBuy
-      ? result.sort((a, b) => b.price - a.price).slice(0, 9)
-      : result.sort((a, b) => b.price - a.price).slice(Math.max(result.length - 9, 0));
+    // Return sorted and sliced
+    if (isSell) {
+      // Asks: lowest prices first, take first 9
+      return [...buckets]
+        .sort((a, b) => a.price - b.price)
+        .slice(0, 9);
+    } else {
+      // Bids: highest prices first, take first 9
+      return [...buckets]
+        .sort((a, b) => b.price - a.price)
+        .slice(0, 9);
+    }
   }
 }
