@@ -120,6 +120,7 @@ export class TxsService {
           ? this.testUrl
           : this.baseUrl;
 
+          console.log('build trade url '+url)
       const response = await axios.post(`${url}/tx/buildTradeTx`, tradeConfig);
       console.log("trade build response " + JSON.stringify(response));
       return response.data;
