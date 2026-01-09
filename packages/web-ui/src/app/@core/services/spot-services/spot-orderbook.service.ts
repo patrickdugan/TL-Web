@@ -207,16 +207,15 @@ export class SpotOrderbookService implements OnDestroy {
           console.log('spot ob msg ' + JSON.stringify(msg));
           if (msg.event !== "orderbook-data") return;
 
-          // Get bids/asks from ordersObj (normalized by wrangler)
-          const snap = msg.ordersObj;
-          
+          // wrangleObMessageInPlace puts bids/asks at top level (not in ordersObj like futures)
+          // It also creates a flat `orders` array with side:"BUY"/"SELL"
           const bids: Array<{ price: number; amount?: number; quantity?: number }> =
-            Array.isArray(snap?.bids) ? snap.bids : [];
+            Array.isArray(msg.bids) ? msg.bids : [];
           
           const asks: Array<{ price: number; amount?: number; quantity?: number }> =
-            Array.isArray(snap?.asks) ? snap.asks : [];
+            Array.isArray(msg.asks) ? msg.asks : [];
 
-          console.log('spot parsed bids:', bids.length, 'asks:', asks.length);
+          console.log('spot parsed - bids:', bids.length, 'asks:', asks.length);
 
           // Store as normalized rows (same pattern as futures)
           this._normalizedOrders = [
