@@ -340,13 +340,16 @@ export class FuturesOrderbookService implements OnDestroy {
     }
 
     // Return sorted and sliced
+    // Standard orderbook display:
+    //   Asks (sells): highest at top, lowest at bottom (closest to spread)
+    //   Bids (buys): highest at top (closest to spread), lowest at bottom
     if (isSell) {
-      // Asks: lowest prices first, take bottom 9
+      // Asks: sort descending (high to low), so lowest price is at bottom near spread
       return [...buckets]
-        .sort((a, b) => a.price - b.price)
+        .sort((a, b) => b.price - a.price)
         .slice(0, 9);
     } else {
-      // Bids: highest prices first, take top 9
+      // Bids: sort descending (high to low), so highest price is at top near spread
       return [...buckets]
         .sort((a, b) => b.price - a.price)
         .slice(0, 9);
