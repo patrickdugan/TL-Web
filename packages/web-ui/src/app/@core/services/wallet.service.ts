@@ -81,6 +81,9 @@ export class WalletService {
       : "https://api.layerwallet.com";
   }
 
+  get network(): TNETWORK {
+  return this.rpc.NETWORK;
+  }
 
   public isWalletAvailable(): boolean {
     return this.available().length > 0;
@@ -192,7 +195,9 @@ export class WalletService {
     // 4. Custom extension: use wallet RPC, then cache
     //
     if (provider.kind === 'custom' && provider.addMultisig) {
-      const network = this.rpc.NETWORK || 'LTC';
+      const network = this.network ||'LTC';
+      console.log('network in build multisig '+network)
+
       const res = await provider.addMultisig(m, pubKeys, network);
 
       const msRec: MultisigRecord = {
