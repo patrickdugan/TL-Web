@@ -93,7 +93,9 @@ export class RpcService {
       private dialogService: DialogService,
       private toastrService: ToastrService,
       private loadingService: LoadingService,
-    ) {}
+    ) {
+      console.log('[RpcService] instance id', Math.random());
+    }
 
     onInit() {
       const ep = environment.ENDPOINTS.BTC;
