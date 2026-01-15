@@ -1,6 +1,7 @@
 // src/app/@core/services/wallet.service.ts
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, filter, firstValueFrom, Subject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
+import { filter, take } from 'rxjs/operators';
 import { RpcService, TNETWORK } from './rpc.service';
 
 // ---------------------------------------------------------------------------

@@ -111,6 +111,63 @@ export class TxsService {
   }
 
 
+async getContractInfo(contractId: number) {
+  try {
+    const res = await axios.get(
+      `${this.relayerUrl}/rpc/tl_getContractInfo`,
+      { params: { contractId } }
+    );
+    return res.data;
+  } catch (error: any) {
+    console.error('getContractInfo error:', error);
+    throw new Error(`Failed to get contract info: ${error.message}`);
+  }
+}
+
+async getInitMarginPerContract(contractId: number, price: number) {
+  try {
+    const res = await axios.get(
+      `${this.relayerUrl}/rpc/tl_getInitMargin`,
+      { params: { contractId, price } }
+    );
+    return Number(res.data);
+  } catch (error: any) {
+    console.error('getInitMarginPerContract error:', error);
+    throw new Error(`Failed to get init margin: ${error.message}`);
+  }
+}
+
+// Add this helper function for computing margins
+async computeMargin(
+  contractId: number,
+  amount: number,
+  price: number
+) {
+  const [contractInfo, perContractMargin] = await Promise.all([
+    this.getContractInfo(contractId),
+    this.getInitMarginPerContract(contractId, price),
+  ]);
+
+  if (!contractInfo || !perContractMargin) {
+    throw new Error('Failed to compute futures margin');
+  }
+
+  const initMargin = perContractMargin * amount;
+  const collateral = contractInfo.collateralPropertyId;
+
+  if (!collateral || initMargin <= 0) {
+    throw new Error('Invalid futures margin parameters');
+  }
+
+  return {
+    collateral,
+    initMargin,
+    perContractMargin,
+    inverse: contractInfo.inverse,
+    leverage: contractInfo.leverage,
+  };
+}
+
   async buildTradeTx(
     tradeConfig: IBuildTradeConfig
   ): Promise<{ data?: { rawtx: string; inputs: IUTXO[]; psbtHex?: string }; error?: string }> {

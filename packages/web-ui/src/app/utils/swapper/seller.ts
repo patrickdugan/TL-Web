@@ -127,51 +127,95 @@ this.multySigChannelData = ms as IMSChannelData;
         }
     }
 
-    private async onStep2(cpId: string) {
-        this.logTime('Step 2 Start');
-        try {
-            if (!this.multySigChannelData?.address || cpId !== this.cpInfo.socketId) {
-                throw new Error('Step 2: invalid channel setup or cpId mismatch');
-            }
+    // PATCHED SELLER onStep2 - Drop-in replacement for seller.ts
 
-            const fromKeyPair = { address: this.myInfo.keypair.address };
-            const toKeyPair = { address: this.multySigChannelData.address };
-            let payload: string;
-
-            if (this.typeTrade === ETradeType.SPOT && 'propIdDesired' in this.tradeInfo) {
-                const { propIdDesired, amountDesired, transfer = false } = this.tradeInfo;
-                const isA = await this.txsService.predictColumn(this.multySigChannelData.address,this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
-
-                payload = transfer
-                    ? ENCODER.encodeTransfer({ propertyId: propIdDesired, amount: amountDesired, isColumnA: isA, destinationAddr: toKeyPair.address })
-                    : ENCODER.encodeCommit({ propertyId: propIdDesired, amount: amountDesired, channelAddress: toKeyPair.address });
-            }else if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
-                const { contract_id, amount, price, initMargin, collateral, transfer = false } = this.tradeInfo;
-                const margin = initMargin
-                const isA = await this.txsService.predictColumn(this.multySigChannelData.address,this.myInfo.keypair.address, this.cpInfo.keypair.address) === 'A';
-    
-                payload = transfer
-                    ? ENCODER.encodeTransfer({ propertyId: collateral, amount: margin, isColumnA: isA, destinationAddr: toKeyPair.address })
-                    : ENCODER.encodeCommit({ propertyId: collateral, amount: margin, channelAddress: toKeyPair.address });
-            } else {
-                throw new Error('Unrecognized trade type');
-            }
-
-            const commitTx = await this.txsService.buildSignSendTxGrabUTXO({ fromKeyPair, toKeyPair, payload });
-            if (commitTx.error || !commitTx.txid || !commitTx.commitUTXO) throw new Error(`Commit TX failed: ${commitTx.error}`);
-
-            const utxo: IUTXO = {
-                ...commitTx.commitUTXO,
-                txid: commitTx.txid,
-                scriptPubKey: this.multySigChannelData.scriptPubKey,
-                redeemScript: this.multySigChannelData.redeemScript
-            };
-
-            this.socketService.send(`${this.myInfo.socketId}::swap`, new SwapEvent('SELLER:STEP3', this.myInfo.socketId, utxo).toJSON());
-        } catch (err: any) {
-            this.terminateTrade(`Step 2: ${err.message}`);
+private async onStep2(cpId: string) {
+    this.logTime('Step 2 Start');
+    try {
+        if (!this.multySigChannelData?.address || cpId !== this.cpInfo.socketId) {
+            throw new Error('Step 2: invalid channel setup or cpId mismatch');
         }
+
+        const fromKeyPair = { address: this.myInfo.keypair.address };
+        const toKeyPair = { address: this.multySigChannelData.address };
+        let payload: string;
+
+        // Determine column ONCE for the channel
+        const columnResult = await this.txsService.predictColumn(
+            this.multySigChannelData.address,
+            this.myInfo.keypair.address,
+            this.cpInfo.keypair.address
+        );
+        const isA = columnResult === 'A';
+
+        if (this.typeTrade === ETradeType.SPOT && 'propIdDesired' in this.tradeInfo) {
+            const { propIdDesired, amountDesired, transfer = false } = this.tradeInfo;
+
+            payload = transfer
+                ? ENCODER.encodeTransfer({ 
+                    propertyId: propIdDesired, 
+                    amount: amountDesired, 
+                    isColumnA: isA, 
+                    destinationAddr: toKeyPair.address 
+                })
+                : ENCODER.encodeCommit({ 
+                    propertyId: propIdDesired, 
+                    amount: amountDesired, 
+                    channelAddress: toKeyPair.address 
+                });
+
+        } else if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
+            const { contract_id, amount, price, transfer = false } = this.tradeInfo;
+
+            // Compute margin locally - NOT from trade props
+            const { initMargin, collateral } = await this.txsService.computeMargin(
+                contract_id,
+                amount,
+                price
+            );
+
+            payload = transfer
+                ? ENCODER.encodeTransfer({ 
+                    propertyId: collateral, 
+                    amount: initMargin, 
+                    isColumnA: isA, 
+                    destinationAddr: toKeyPair.address 
+                })
+                : ENCODER.encodeCommit({ 
+                    propertyId: collateral, 
+                    amount: initMargin, 
+                    channelAddress: toKeyPair.address 
+                });
+        } else {
+            throw new Error('Unrecognized trade type');
+        }
+
+        const commitTx = await this.txsService.buildSignSendTxGrabUTXO({ 
+            fromKeyPair, 
+            toKeyPair, 
+            payload 
+        });
+        
+        if (commitTx.error || !commitTx.txid || !commitTx.commitUTXO) {
+            throw new Error(`Commit TX failed: ${commitTx.error}`);
+        }
+
+        const utxo: IUTXO = {
+            ...commitTx.commitUTXO,
+            txid: commitTx.txid,
+            scriptPubKey: this.multySigChannelData.scriptPubKey,
+            redeemScript: this.multySigChannelData.redeemScript
+        };
+
+        this.socketService.send(
+            `${this.myInfo.socketId}::swap`, 
+            new SwapEvent('SELLER:STEP3', this.myInfo.socketId, utxo).toJSON()
+        );
+        
+    } catch (err: any) {
+        this.terminateTrade(`Step 2: ${err.message}`);
     }
+}
 
 private isSpotZeroTrade(): boolean {
   if (this.typeTrade !== ETradeType.SPOT) return false;

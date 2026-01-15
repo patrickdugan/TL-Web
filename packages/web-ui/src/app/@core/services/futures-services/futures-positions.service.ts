@@ -1,3 +1,8 @@
+// PATCHED WEB VERSION - futures-positions.service.ts
+// Changes: Uses relayer API (https://api.layerwallet.com/rpc/tl_getContractPosition)
+// Removes: Mempool scanning (desktop-only feature)
+// Keeps: Web-specific axios patterns
+
 import { Injectable } from "@angular/core";
 import { ToastrService } from "ngx-toastr";
 import { AuthService } from "../auth.service";
@@ -7,17 +12,16 @@ import { Subscription } from 'rxjs';
 import axios from 'axios';
 
 export interface IPosition {
-    "entry_price": string;
-    "position": string;
-    "BANKRUPTCY_PRICE": string;
-    "position_margin": string;
-    "upnl": string;
+    entry_price: string;
+    position: string;
+    BANKRUPTCY_PRICE: string;
+    position_margin: string;
+    upnl: string;
 }
 
 @Injectable({
     providedIn: 'root',
 })
-
 export class FuturesPositionsService {
     private _openedPosition: IPosition | null = null;
     private _selectedContractId: string | null = null;
@@ -39,7 +43,7 @@ export class FuturesPositionsService {
     }
 
     get activeFutureAddress(): string | undefined {
-                return this.authService.walletAddresses[0];
+        return this.authService.walletAddresses[0];
     }
 
     get tlApi() {
@@ -63,29 +67,32 @@ export class FuturesPositionsService {
         });
     }
 
-async updatePositions() {
-  if (!this.activeFutureAddress || !this.selectedContractId) return;
+    async updatePositions() {
+        if (!this.activeFutureAddress || !this.selectedContractId) return;
 
-  const address = this.activeFutureAddress;
-  const contractId = this.selectedContractId;
+        const address = this.activeFutureAddress;
+        const contractId = this.selectedContractId;
 
-  try {
-    const res = await axios.post('https://api.layerwallet.com/rpc/tl_getContractPosition', {
-      params: [address, contractId]
-    });
+        try {
+            const res = await axios.post('https://api.layerwallet.com/rpc/tl_getContractPosition', {
+                params: [address, contractId]
+            });
 
-    console.log('position update ' + JSON.stringify(res.data));
+            console.log('position update', JSON.stringify(res.data));
 
-    if (res.data?.error || !res.data?.data) {
-      this.toastrService.error(res.data?.error || 'Error getting opened position', 'Error');
-      this.openedPosition = null;
-      return;
-    }
+            if (res.data?.error || !res.data?.data) {
+                this.toastrService.error(
+                    res.data?.error || 'Error getting opened position',
+                    'Error'
+                );
+                this.openedPosition = null;
+                return;
+            }
 
-    const raw = res.data;
+            const raw = res.data.data || res.data;
 
-    const positionValue = parseFloat(raw.contracts || "0");
-            if (positionValue){
+            const positionValue = parseFloat(raw.contracts || "0");
+            if (positionValue) {
                 this.openedPosition = {
                     position: raw.contracts,
                     entry_price: raw.avgPrice,
@@ -93,13 +100,12 @@ async updatePositions() {
                     position_margin: raw.margin,
                     upnl: raw.unrealizedPNL,
                 };
-            }else {
+            } else {
                 this.openedPosition = null;
             }
-  } catch (err) {
-    console.error('❌ RPC error in updatePositions:', err);
-    this.toastrService.error('Network error fetching position', 'Error');
-  }
-}
-
+        } catch (err) {
+            console.error('❌ RPC error in updatePositions:', err);
+            this.toastrService.error('Network error fetching position', 'Error');
+        }
+    }
 }

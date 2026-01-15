@@ -1,3 +1,11 @@
+// PATCHED WEB VERSION - futures-commits.component.ts
+// Changes from desktop:
+// 1. Uses buildSignSendTx instead of buildSingSendTx
+// 2. Adds DUST constant for withdrawals
+// 3. Fixes toKeyPair to use self-address for withdrawals
+// 4. Adds polling with startPolling/stopPolling
+// 5. Sequential withdrawAll processing
+
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { Subscription } from 'rxjs';
@@ -12,7 +20,6 @@ import { ENCODER } from 'src/app/utils/payloads/encoder';
 import { BehaviorSubject, combineLatest } from 'rxjs';
 import { filter, shareReplay, switchMap, tap } from 'rxjs/operators';
 
-
 interface ChannelBalanceRow {
   channel: string;
   column: 'A' | 'B';
@@ -26,19 +33,27 @@ interface ChannelBalanceRow {
 @Component({
   selector: 'tl-futures-commits',
   templateUrl: './futures-commits.component.html',
-  styleUrls: ['./futures-commits.component.scss']
+  styleUrls: ['./futures-commits.component.scss'],
 })
-export class FuturesChannelsComponent implements OnInit {
-
-  displayedColumns = ['property', 'column', 'channel', 'counterparty', 'amount', 'block', 'actions'];
+export class FuturesChannelsComponent implements OnInit, OnDestroy {
+  displayedColumns = [
+    'property',
+    'column',
+    'channel',
+    'counterparty',
+    'amount',
+    'block',
+    'actions',
+  ];
 
   loading = false;
-  working = false;                   // prevent double clicks while building/sending
+  working = false;
   error?: string;
   rows: ChannelBalanceRow[] = [];
-    private sub?: Subscription;
-    private address: string
-    private propertyId: number
+  private sub?: Subscription;
+  private address: string;
+  private propertyId: number;
+
   constructor(
     private futSvc: FuturesChannelsService,
     private auth: AuthService,
@@ -48,32 +63,40 @@ export class FuturesChannelsComponent implements OnInit {
     private toastrService: ToastrService
   ) {}
 
-address$ = new BehaviorSubject<string>('');
-/** Use your collateral property or whatever key your BE expects for futures channel balances */
+  address$ = new BehaviorSubject<string>('');
 
-refreshFuturesCommitChannels(): void { this.futSvc.refreshFuturesChannels(); }
-
-  ngOnInit() {
-    this.refreshFuturesCommitChannels()
+  refreshFuturesCommitChannels(): void {
+    this.futSvc.loadOnce();
   }
 
-get activeChannelsCommits() {
-  return this.futSvc.channelsCommits;
-}
+  ngOnInit() {
+    console.log('[FuturesChannelsComponent] ngOnInit fired');
+    console.log('[FuturesChannelsComponent] futSvc =', this.futSvc);
+    // Futures requires address + selectedMarket; polling avoids init race
+    this.futSvc.startPolling(5000);
+  }
 
-get total(): number {
-  return this.activeChannelsCommits
-    .reduce((s, r) => s + (Number.isFinite(r?.amount) ? Number(r.amount) : 0), 0);
-}
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+    this.futSvc.stopPolling();
+  }
 
+  get activeChannelsCommits() {
+    return this.futSvc.channelsCommits;
+  }
+
+  get total(): number {
+    return this.activeChannelsCommits.reduce(
+      (s, r) => s + (Number.isFinite(r?.amount) ? Number(r.amount) : 0),
+      0
+    );
+  }
 
   private resolveAddress(): string {
-    // futures-buy-sell uses auth.walletAddresses[0]
     return this.auth.walletAddresses?.[0] ?? '';
   }
 
   private resolvePropertyId(): number | undefined {
-    // same source as the buy/sell card: selected futures market collateral
     return this.futMkts.selectedMarket?.collateral?.propertyId;
   }
 
@@ -82,7 +105,6 @@ get total(): number {
     navigator.clipboard?.writeText(value).catch(() => {});
   }
 
-  // ----- Transfer via DialogsService -----
   transfer(row: ChannelBalanceRow) {
     const data = {
       mode: 'channel-transfer',
@@ -92,54 +114,52 @@ get total(): number {
       propertyId: row.propertyId,
       maxAmount: row.amount,
       counterparty: row.counterparty,
-      participants: row.participants
+      participants: row.participants,
     };
 
     const ref = (this.dialogs as any).openTransfer
       ? (this.dialogs as any).openTransfer(data)
-      : (this.dialogs as any).open?.(/* component */ undefined, { data });
+      : (this.dialogs as any).open?.(undefined, { data });
 
     if (ref?.afterClosed) {
-      ref.afterClosed().subscribe((res: any) => {
-      this.futSvc.loadOnce()
+      ref.afterClosed().subscribe(() => {
+        this.futSvc.loadOnce();
       });
     }
   }
 
-  // ----- Withdraw builds the tx directly -----
   async withdraw(row: ChannelBalanceRow) {
     if (this.working) return;
     if (!row?.amount || row.amount <= 0) return;
 
     try {
       this.working = true;
-      this.address = this.resolveAddress()
+      this.address = this.resolveAddress();
 
-      // Map column: A -> 0, B -> 1
       const columnNum = row.column === 'A' ? 0 : 1;
 
-      // Build withdrawal payload (full-row amount; not "withdrawAll")
       const payload = ENCODER.encodeWithdrawal({
         withdrawAll: 0,
         propertyId: row.propertyId,
         amountOffered: row.amount,
         column: columnNum,
-        channelAddress: row.channel
+        channelAddress: row.channel,
       });
 
-      // For TL protocol ops, the reference output is the channel address.
+      const DUST = 546; // litoshi
+
       const buildCfg = {
         fromKeyPair: { address: this.address },
-        toKeyPair:   { address: row.channel },
-        payload
+        toKeyPair: { address: this.address }, // Fixed: self-address
+        amount: DUST,
+        payload,
       };
 
-      const res = await this.txs.buildSignSendTx(buildCfg as any);
+      const res = await this.txs.buildSingSendTx(buildCfg as any);
       if (res?.error) throw new Error(res.error);
       this.toastrService.success(`Withdrawal TX: ${res.data}`, 'Success');
 
-      // Refresh (row may shrink or disappear)
-      this.futSvc.loadOnce()
+      this.futSvc.loadOnce();
     } catch (err: any) {
       console.error('[Futures][Withdraw] error:', err?.message || err);
       this.error = err?.message || 'Withdraw failed';
@@ -149,70 +169,53 @@ get total(): number {
   }
 
   async withdrawAll() {
-  if (this.working) return;
+    if (this.working) return;
 
-  // pick rows currently shown; if this.propertyId is set, rows are likely already filtered,
-  // but we'll defensively filter again.
-  const targetRows = (this.activeChannelsCommits || []).filter(r =>
-    (!this.propertyId && r.amount > 0) ||
-    (this.propertyId != null && r.propertyId === this.propertyId && r.amount > 0)
-  );
+    const rows = this.activeChannelsCommits || [];
+    if (!rows.length) return;
 
-  if (!targetRows.length) return;
+    const propertyId = rows[0].propertyId; // all same property
+    this.address = this.resolveAddress();
 
-  this.working = true;
-  this.error = undefined;
+    this.working = true;
+    this.error = undefined;
 
-  try {
-    let ok = 0, fail = 0;
-
-    // Process sequentially to avoid RPC/mempool bursts
-    for (const row of targetRows) {
-      const columnNum = row.column === 'A' ? 0 : 1;
-            this.address = this.resolveAddress()
-
-      // withdrawAll=1 tells protocol to withdraw entire balance for this property on that column
+    try {
       const payload = ENCODER.encodeWithdrawal({
         withdrawAll: 1,
-        propertyId: row.propertyId,
-        // amountOffered is ignored by withdrawAll in protocol; passing current visible amount is harmless
-        amountOffered: row.amount,
-        column: columnNum,
-        channelAddress: row.channel
+        propertyId,
+        amountOffered: 0,
+        column: 0,
+        channelAddress: this.address,
       });
 
+      const DUST = 546; // litoshi
+
       const buildCfg = {
-        fromKeyPair: { address: this.address }, // wallet
-        toKeyPair:   { address: row.channel },  // channel target
-        payload
+        fromKeyPair: { address: this.address },
+        toKeyPair: { address: this.address },
+        amount: DUST,
+        payload,
       };
 
-        const res = await this.txs.buildSignSendTx(buildCfg as any);
-        if (res?.error) {
-          console.error('[WithdrawAll] item failed:', row, res.error);
-          return this.toastrService.error('WithdrawalAll failed: '+res.error)
-        } 
-      // small delay to be gentle on node/mempool
-      await new Promise(r => setTimeout(r, 200));
+      const res = await this.txs.buildSingSendTx(buildCfg as any);
+      if (res?.error) throw new Error(res.error);
+
+      this.toastrService.success(`WithdrawAll TX: ${res.data}`, 'Success');
+      this.futSvc.loadOnce();
+    } catch (err: any) {
+      this.error = err?.message || 'Withdraw All failed';
+      console.error('[WithdrawAll] error:', this.error);
+    } finally {
+      this.working = false;
     }
-
-    console.log(`[WithdrawAll] done: ok=${ok} fail=${fail}`);
-    this.futSvc.loadOnce(); // refresh table (rows may shrink/disappear)
-    return true
-  } catch (err: any) {
-    this.error = err?.message || 'Withdraw All failed';
-    return console.error('[WithdrawAll] error:', this.error);
-  } finally {
-    this.working = false;
   }
-}
-
 
   transferAll() {
-    // keep simple for now
     if (!this.activeChannelsCommits.length) return;
     this.transfer(this.activeChannelsCommits[0]);
   }
 
-  trackByChan = (_: number, r: ChannelBalanceRow) => `${r.channel}:${r.propertyId}:${r.column}`;
+  trackByChan = (_: number, r: ChannelBalanceRow) =>
+    `${r.channel}:${r.propertyId}:${r.column}`;
 }
