@@ -168,7 +168,7 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
         payload,
       };
 
-      const res = await this.txs.buildSingSendTx(buildCfg as any);
+      const res = await this.txs.buildSignSendTx(buildCfg as any);
       if (res?.error) throw new Error(res.error);
       this.toastrService.success(`Withdrawal TX: ${res.data}`, 'Success');
 
@@ -211,7 +211,7 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
         payload,
       };
 
-      const res = await this.txs.buildSingSendTx(buildCfg as any);
+      const res = await this.txs.buildSignSendTx(buildCfg as any);
       if (res?.error) throw new Error(res.error);
 
       this.toastrService.success(`WithdrawAll TX: ${res.data}`, 'Success');

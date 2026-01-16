@@ -755,7 +755,7 @@ function hexToBase64(hex: string): string {
 declare global {
   interface Window {
     myWallet?: {
-      sendRequest: (method: string, params: any) => Promise<any>;
+      sendRequest: (method: string, params?: any) => Promise<any>;
       on?: (ev: string, cb: (...a: any[]) => void) => void;
     };
   }

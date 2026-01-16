@@ -157,12 +157,16 @@ export class BuySwapper extends Swap {
             const bbData = parseFloat(chainInfo.blocks) + 10;
 
             if (this.typeTrade === ETradeType.FUTURES && 'contract_id' in this.tradeInfo) {
-                const { contract_id, amount, price, initMargin,collateral, transfer = false, sellerIsMaker } = this.tradeInfo;
+                const { contract_id, amount, price, transfer = false, sellerIsMaker } = this.tradeInfo;
+
+                const {initMargin, collateral } = await this.txsService.computeMargin(contract_id, amount, price)
+
                 const margin = initMargin
                 const column = await this.txsService.predictColumn(this.multySigChannelData.address, this.myInfo.keypair.address, this.cpInfo.keypair.address);
-                const isA = column === 'A' ? 1 : 0;
-                let columnAIsMaker = isA === 1 ? (sellerIsMaker ? 1 : 0)
-                                    : (!sellerIsMaker ? 1 : 0); // seller is B
+                const isA = column === 'A' ? 0 : 1;
+                const columnAIsMaker = (isA === 1)
+                    ? (sellerIsMaker ? 1 : 0)     // seller is A
+                    : (!sellerIsMaker ? 1 : 0);   // seller is B
             
             console.log('collat in futures buy step 3 '+collateral)
             console.log('initMargin calc '+margin+' '+price+' '+isA)
