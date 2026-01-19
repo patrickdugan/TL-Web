@@ -110,32 +110,22 @@ export class TxsService {
     : this.baseUrl;
   }
 
-
 async getContractInfo(contractId: number) {
-  try {
-    const res = await axios.get(
-      `${this.relayerUrl}/rpc/tl_getContractInfo`,
-      { params: { contractId } }
-    );
-    return res.data;
-  } catch (error: any) {
-    console.error('getContractInfo error:', error);
-    throw new Error(`Failed to get contract info: ${error.message}`);
-  }
+  const res = await axios.post(
+    `${this.relayerUrl}/rpc/tl_getContractInfo`,
+    { params: [{ contractId }] }
+  );
+  return res.data;
 }
 
 async getInitMarginPerContract(contractId: number, price: number) {
-  try {
-    const res = await axios.get(
-      `${this.relayerUrl}/rpc/tl_getInitMargin`,
-      { params: { contractId, price } }
-    );
-    return Number(res.data);
-  } catch (error: any) {
-    console.error('getInitMarginPerContract error:', error);
-    throw new Error(`Failed to get init margin: ${error.message}`);
-  }
+  const res = await axios.post(
+    `${this.relayerUrl}/rpc/tl_getInitMargin`,
+    { params: [{ contractId, price }] }
+  );
+  return Number(res.data);
 }
+
 
 // Add this helper function for computing margins
 async computeMargin(
