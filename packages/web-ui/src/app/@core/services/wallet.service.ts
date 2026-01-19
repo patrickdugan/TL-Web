@@ -23,6 +23,7 @@ interface MultisigRecord {
   address?: string;
 }
 
+
 interface IWalletProvider {
   kind: WalletKind;
   name: string;
@@ -109,6 +110,13 @@ export class WalletService {
 
   // For session refresh scheduling
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private customWalletNetwork(): string {
+    const n = (this.rpc.NETWORK || '').toUpperCase();
+    if (n === 'LTCTEST') return 'testnet';
+    if (n === 'LTC') return 'mainnet';
+    return n;
+  }
 
   get baseUrl(): string {
     const net = (this.rpc.NETWORK || "").toUpperCase();
@@ -455,6 +463,7 @@ export class WalletService {
   /** Canonical multisig builder */
   async addMultisig(m: number, pubKeys: string[]): Promise<MultisigRecord> {
     const provider = this.provider$.value || this.pick();
+    console.log('provider in addMultisig '+provider)
     if (!provider) throw new Error('Wallet not connected');
 
     const key = this.msigKey(m, pubKeys);
@@ -480,9 +489,9 @@ export class WalletService {
 
     // 4. Custom extension: use wallet RPC, then cache
     if (provider.kind === 'custom' && provider.addMultisig) {
-      const network = this.network || 'LTC';
+      
+      const network = this.customWalletNetwork();
       console.log('network in build multisig ' + network);
-
       const res = await provider.addMultisig(m, pubKeys, network);
 
       const msRec: MultisigRecord = {
