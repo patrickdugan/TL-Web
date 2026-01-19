@@ -175,6 +175,8 @@ private async onStep2(cpId: string) {
                 price
             );
 
+            console.log('computed margin '+initMargin+' '+collateral)
+
             payload = transfer
                 ? ENCODER.encodeTransfer({ 
                     propertyId: collateral, 
