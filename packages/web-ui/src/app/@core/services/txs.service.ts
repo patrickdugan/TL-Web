@@ -279,7 +279,7 @@ async computeMargin(
     buildTxConfig: IBuildTxConfig
   ): Promise<{ txid?: string; commitUTXO?: IUTXO; error?: string; data?: any }> {
     try {
-      this.loadingService.isLoading = true;
+      //this.loadingService.isLoading = true;
 
       const UTXOs =
         this.balanceService.allBalances[buildTxConfig.fromKeyPair.address]
@@ -401,7 +401,7 @@ async computeMargin(
     buildTxConfig: IBuildTxConfig
   ): Promise<{ data?: string; error?: string }> {
     try {
-      this.loadingService.isLoading = true;
+      //this.loadingService.isLoading = true;
 
       const provider = this.walletService.provider$.value || this.walletService["pick"]();
       const isPhantom = provider?.kind === "phantom-btc";
