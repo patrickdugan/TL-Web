@@ -22,7 +22,6 @@ import { SideNavComponent } from './components/side-nav/side-nav.component';
 import { InfoLineComponent } from '../@shared/components/info-line/info-line.component';
 import { DisconnectedLineComponent } from './components/disconnected-line/disconnected-line.component';
 import { OverlayLoadingComponent } from './components/overlay-loading/overlay-loading.component';
-
 import { SelectNetworkDialog } from './dialogs/select-network/select-network.component';
 //import { NewVersionDialog } from './dialogs/new-version/new-version.component';
 import { SyncNodeDialog } from './dialogs/sync-node/sync-node.component';

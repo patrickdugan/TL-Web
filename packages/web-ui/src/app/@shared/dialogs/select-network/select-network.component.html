@@ -3,7 +3,7 @@
 
   <mat-form-field appearance="fill" style="width:100%; margin-top:12px;">
     <mat-label>Network</mat-label>
-    <mat-select [(value)]="network">
+    <mat-select [(ngModel)]="network">
       <mat-option *ngFor="let opt of options" [value]="opt.value">
         {{ opt.label }}
       </mat-option>
