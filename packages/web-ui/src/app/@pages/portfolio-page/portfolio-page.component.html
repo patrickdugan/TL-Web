@@ -13,12 +13,12 @@
               <mat-cell *matCellDef="let element">
                 <ng-container [ngSwitch]="getAddressAttestationStatus(element.address)">
                   <mat-icon 
-                    *ngSwitchCase="true" 
+                    *ngSwitchCase="'ATTESTED'" 
                     (click)="selfAttestate(element.address)">
                     check
                   </mat-icon>
                   <mat-icon 
-                    *ngSwitchCase="false" 
+                    *ngSwitchCase="'NOT_ATTESTED'" 
                     (click)="selfAttestate(element.address)">
                     fingerprint
                   </mat-icon>
