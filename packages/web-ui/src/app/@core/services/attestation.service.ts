@@ -110,7 +110,7 @@ export class AttestationService {
         }
     }
 
-    getAttByAddress(address: string): boolean | 'PENDING' | false {
+    getAttByAddress(address: string): 'ATTESTED' | 'PENDING' | 'NOT_ATTESTED' {
         if (!this.looping) {
             this.startAttestationUpdateInterval();
         }
@@ -119,9 +119,9 @@ export class AttestationService {
 
         console.log('Attestation object:', JSON.stringify(attestation));
 
-        // If no attestation found, return false
+        // If no attestation found, return NOT_ATTESTED
         if (!attestation) {
-            return false;
+            return 'NOT_ATTESTED';
         }
 
         // If attestation is pending
@@ -129,8 +129,8 @@ export class AttestationService {
             return 'PENDING';
         }
 
-        // Explicitly cast attestation status to boolean for true/false
-        return !!attestation.isAttested;
+        // Return ATTESTED or NOT_ATTESTED based on status
+        return attestation.isAttested ? 'ATTESTED' : 'NOT_ATTESTED';
     }
 
     private removeAll() {
