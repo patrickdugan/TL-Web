@@ -378,9 +378,9 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
 isFutureAddressSelfAtt() {
     const attestationStatus = this.attestationService.getAttByAddress(this.futureAddress);
     switch (attestationStatus) {
-        case true:
+        case 'ATTESTED':
             return "YES";
-        case false:
+        case 'NOT_ATTESTED':
             return "REVOKED";
         case 'PENDING':
         default:
