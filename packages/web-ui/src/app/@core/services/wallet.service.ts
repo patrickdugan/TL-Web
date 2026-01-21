@@ -425,7 +425,7 @@ export class WalletService {
   }
 
   private msigKey(m: number, pubKeys: string[]): string {
-    return `${m}:${[...pubKeys].sort().join(',')}`;
+    return `${m}:${pubKeys.join(',')}`;
   }
 
   private loadLocalMsig(key: string): MultisigRecord | null {
@@ -460,7 +460,6 @@ export class WalletService {
     return response.data;
   }
 
-  /** Canonical multisig builder */
   async addMultisig(m: number, pubKeys: string[]): Promise<MultisigRecord> {
     const provider = this.provider$.value || this.pick();
     console.log('provider in addMultisig '+provider)

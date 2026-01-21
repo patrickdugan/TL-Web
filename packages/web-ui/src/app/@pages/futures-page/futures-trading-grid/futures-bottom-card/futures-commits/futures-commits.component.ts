@@ -200,7 +200,7 @@ export class FuturesChannelsComponent implements OnInit, OnDestroy {
           payload
         };
 
-        const res = await this.txs.buildSignwSendTx(buildCfg as any);
+        const res = await this.txs.buildSignSendTx(buildCfg as any);
         if (res?.error) { 
           this.toastrService.error('WithdrawalAll failed: ' + res.error);
           return
