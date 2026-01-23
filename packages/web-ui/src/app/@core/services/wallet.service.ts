@@ -113,9 +113,8 @@ export class WalletService {
 
   private customWalletNetwork(): string {
     const n = (this.rpc.NETWORK || '').toUpperCase();
-    if (n === 'LTCTEST') return 'testnet';
-    if (n === 'LTC') return 'mainnet';
-    return n;
+    // Return the actual network key, not 'mainnet'/'testnet'
+    return n || 'LTC';
   }
 
   get baseUrl(): string {
@@ -461,51 +460,7 @@ export class WalletService {
   }
 
   async addMultisig(m: number, pubKeys: string[]): Promise<MultisigRecord> {
-    const provider = this.provider$.value || this.pick();
-    console.log('provider in addMultisig '+provider)
-    if (!provider) throw new Error('Wallet not connected');
-
-    const key = this.msigKey(m, pubKeys);
-
-    // 1. Check in-memory cache
-    let cached = this.multisigCache.get(key);
-    if (cached) return cached;
-
-    // 2. Check localStorage
-    const local = this.loadLocalMsig(key);
-    if (local) {
-      this.multisigCache.set(key, local);
-      return local;
-    }
-
-    // 3. Phantom: must compute via relayer first, then cache
-    if (provider.kind === 'phantom-btc') {
-      const msRec = await this.fetchMsDataFromRelayer(m, pubKeys);
-      this.saveLocalMsig(key, msRec);
-      this.multisigCache.set(key, msRec);
-      return msRec;
-    }
-
-    // 4. Custom extension: use wallet RPC, then cache
-    if (provider.kind === 'custom' && provider.addMultisig) {
-      
-      const network = this.customWalletNetwork();
-      console.log('network in build multisig ' + network);
-      const res = await provider.addMultisig(m, pubKeys, network);
-
-      const msRec: MultisigRecord = {
-        m,
-        pubKeys,
-        redeemScript: res.redeemScript!,
-        address: res.address,
-      };
-
-      this.saveLocalMsig(key, msRec);
-      this.multisigCache.set(key, msRec);
-      return msRec;
-    }
-
-    throw new Error(`Unsupported wallet provider: ${provider.kind}`);
+    return this.fetchMsDataFromRelayer(m, pubKeys);
   }
 
   async signPsbtWithPhantom(psbtBase64: string): Promise<string> {

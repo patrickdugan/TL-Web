@@ -176,7 +176,7 @@ private async onStep2(cpId: string) {
             );
 
             console.log('computed margin '+initMargin+' '+collateral)
-
+            console.log('multisig before the tx '+JSON.stringify(this.multySigChannelData))
             payload = transfer
                 ? ENCODER.encodeTransfer({ 
                     propertyId: collateral, 
@@ -209,6 +209,8 @@ private async onStep2(cpId: string) {
             scriptPubKey: this.multySigChannelData.scriptPubKey,
             redeemScript: this.multySigChannelData.redeemScript
         };
+
+        console.log('commitUTXO '+JSON.stringify(commitTx.commitUTXO))
 
         this.socketService.send(
             `${this.myInfo.socketId}::swap`, 
