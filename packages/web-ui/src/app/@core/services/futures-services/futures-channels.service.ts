@@ -28,7 +28,7 @@ type FutOverride = { address?: string; contractId?: number; collateralPropertyId
 export class FuturesChannelsService {
   public channelsCommits: ChannelBalanceRow[] = [];
 
-  private readonly endpoint = 'https://api.layerwallet.com/rpc/tl_channelBalanceForCommiter';
+  private readonly endpoint = 'https://api.layerwallet.com/rpc/';
   private refreshMs = 20000;
   private pollId?: any;
   private isLoading = false;

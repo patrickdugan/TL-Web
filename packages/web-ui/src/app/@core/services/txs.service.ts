@@ -648,7 +648,7 @@ async computeMargin(
           }
 
           try {
-            const response = await axios.post('${this.baseUrl}/tx/decode',{rawTx});
+			const response = await axios.post(`${this.baseUrl}/tx/decode`, { rawTx });
             return response.data;
           } catch (error: any) {
             console.error('Error in decode:', error.message);

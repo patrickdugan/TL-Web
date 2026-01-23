@@ -117,6 +117,7 @@ export class SellSwapper extends Swap {
                     pubKeys = [this.cpInfo.keypair.pubkey, this.myInfo.keypair.pubkey];
                 }
             }
+            
             const ms = await this.walletService.addMultisig(2, pubKeys);
             console.log('ms '+JSON.stringify(ms)+' pubkeys'+this.myInfo.keypair.pubkey+' '+this.cpInfo.keypair.pubkey)
             if (!ms || !ms.address || !ms.redeemScript) throw new Error('Multisig setup failed');
@@ -241,8 +242,8 @@ private isSpotZeroTrade(): boolean {
             
             const skipRbf = this.isSpotZeroTrade();
             if (commitTxId && !skipRbf) {
-                const baseUrl = this.relayerUrl
-                const txRes = await axios.get(`{$baseUrl}/tx/${commitTxId}?verbose=true`);
+                const baseUrl = this.relayerUrl;
+                const txRes = await axios.get(`${baseUrl}/tx/${commitTxId}?verbose=true`);
                 const vins = txRes?.data?.vin || [];
                 const isRbf = vins.some((vin: any) => vin.sequence < 0xfffffffe);
                 if (isRbf) throw new Error('RBF-enabled commit tx detected');
