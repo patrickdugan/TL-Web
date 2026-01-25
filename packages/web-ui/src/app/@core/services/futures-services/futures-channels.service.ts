@@ -1,9 +1,11 @@
 // src/app/@core/services/futures-services/futures-channels.service.ts
 import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import axios, { AxiosResponse } from 'axios';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { AuthService } from 'src/app/@core/services/auth.service';
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
-import { RpcService } from "../rpc.service";
+import { RpcService, TNETWORK } from "../rpc.service";
 
 // NOTE: avoid import path issues by typing as any
 type FuturesMarketSvc = any;
@@ -39,9 +41,9 @@ export class FuturesChannelsService {
   private __rows$ = new BehaviorSubject<ChannelBalanceRow[]>([]);
   private __override: FutOverride | null = null;
   private accounts: { address: string; pubkey: string }[] = [];
-  private abortController?: AbortController;
 
   constructor(
+    private auth: AuthService,
     private walletService: WalletService,
     private futMarkets: FuturesMarketService,
     private rpcService: RpcService
@@ -87,7 +89,7 @@ export class FuturesChannelsService {
     try {
       // Get address using WalletService like BalanceService does
       let addr: string | undefined;
-
+      
       if (this.__override?.address) {
         addr = this.__override.address;
       } else {
@@ -124,35 +126,21 @@ export class FuturesChannelsService {
         return;
       }
 
-      // ---- FETCH (instead of axios) ----
-      this.abortController?.abort();
-      this.abortController = new AbortController();
-      const abortController = this.abortController;
+      const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
+        await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
+          params: [addr, collateralPropertyId],
+        });
 
-      const url = `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`;
-      const body = { params: [addr, Number(collateralPropertyId)] };
-
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: abortController.signal,
-      });
-
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-
-      const data = await r.json();
+      const data = res.data;
       const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
-      const rows = rawRows.map((row: any) => this.normalizeRow(row, addr!, { collateralPropertyId }));
+      const rows = rawRows.map(row => this.normalizeRow(row, addr!, { collateralPropertyId }));
 
       this.channelsCommits = rows.slice();
       this.__rows$.next(this.channelsCommits);
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        console.error('[futures-channels] load error:', err);
-        this.channelsCommits = [];
-        this.__rows$.next([]);
-      }
+    } catch (err) {
+      console.error('[futures-channels] load error:', err);
+      this.channelsCommits = [];
+      this.__rows$.next([]);
     } finally {
       this.isLoading = false;
     }
@@ -161,10 +149,10 @@ export class FuturesChannelsService {
   private extractIds(m: any): { contractId?: number; collateralPropertyId?: number } {
     // Your market structure uses contract_id (from logs: {contract_id: 3, collateral: {...}})
     const cid = m?.contract_id ?? m?.contractId ?? m?.id;
-
+    
     // Collateral is an object with propertyId
     const coll = m?.collateral?.propertyId ?? m?.collateralPropertyId ?? m?.collateralId;
-
+    
     return {
       contractId: cid !== undefined && cid !== null ? Number(cid) : undefined,
       collateralPropertyId: coll !== undefined && coll !== null ? Number(coll) : undefined,
