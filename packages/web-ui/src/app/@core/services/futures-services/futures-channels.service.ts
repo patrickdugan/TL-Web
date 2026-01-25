@@ -4,6 +4,8 @@ import axios, { AxiosResponse } from 'axios';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
+import { RpcService, TNETWORK } from "./rpc.service";
+
 // NOTE: avoid import path issues by typing as any
 type FuturesMarketSvc = any;
 
@@ -28,10 +30,12 @@ type FutOverride = { address?: string; contractId?: number; collateralPropertyId
 export class FuturesChannelsService {
   public channelsCommits: ChannelBalanceRow[] = [];
 
-  private readonly endpoint = 'https://api.layerwallet.com/rpc/';
   private refreshMs = 20000;
   private pollId?: any;
   private isLoading = false;
+  private baseUrl = "https://api.layerwallet.com";
+  private testUrl = "https://testnet-api.layerwallet.com"
+  private network = this.rpcService.NETWORK
 
   private __rows$ = new BehaviorSubject<ChannelBalanceRow[]>([]);
   private __override: FutOverride | null = null;
@@ -39,12 +43,24 @@ export class FuturesChannelsService {
   constructor(
     private auth: AuthService,
     private futMarkets: FuturesMarketService
+    private rpcService: RpcService
   ) {}
 
   refreshFuturesChannels(): void { this.refreshNow(); }
 
+  private get relayerUrl(): string {
+  return String(this.rpcService.NETWORK).includes("TEST")
+    ? this.testUrl
+    : this.baseUrl;
+  }
+
   ngOnInit() {
     this.refreshFuturesChannels()
+  }
+
+  set NETWORK(network: string) {
+    console.log('setting network '+network)
+    this._NETWORK = network; // Assign to the backing field
   }
 
   // ---------- Polling API ----------
@@ -91,7 +107,7 @@ export class FuturesChannelsService {
       }
 
       const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
-       await axios.post(`${this.endpoint}/tl_channelBalanceForCommiter`, {
+       await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
         params: [addr, collateralPropertyId],
         });
 

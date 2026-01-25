@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import axios, { AxiosResponse } from 'axios';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
+import { RpcService } from 'src/app/@core/services/futures-services/rpc.service';
 
 export interface ChannelBalanceRow {
   channel: string;
@@ -23,22 +24,31 @@ export class SpotChannelsService {
   /** UI binds to this */
   public channelsCommits: ChannelBalanceRow[] = [];
 
-  /** Hardcoded endpoint */
-  private readonly endpoint = 'https://api.layerwallet.com/rpc/tl_channelBalanceForCommiter';
-
   /** polling */
   private refreshMs = 20000;
   private pollId?: any;
   private isLoading = false;
 
+  /** relayer endpoints (testnet default) */
+  private baseUrl = 'https://api.layerwallet.com';
+  private testUrl = 'https://testnet-api.layerwallet.com';
+
   constructor(
     private authService: AuthService,
-    private spotMarkets: SpotMarketsService
+    private spotMarkets: SpotMarketsService,
+    private rpcService: RpcService
   ) {
     // Optional: live refresh on address/market change if streams exist
     this.authService.updateAddressesSubs$?.subscribe(() => this.refreshNow());
     (this.spotMarkets as any).selectedMarket$?.subscribe?.(() => this.refreshNow());
     (this.spotMarkets as any).marketChange$?.subscribe?.(() => this.refreshNow());
+  }
+
+  /** relayer selector (mirrors FuturesChannelsService) */
+  private get relayerUrl(): string {
+    return String(this.rpcService.NETWORK).includes('TEST')
+      ? this.testUrl
+      : this.baseUrl;
   }
 
   /** Start (or restart) polling */
@@ -93,17 +103,16 @@ export class SpotChannelsService {
 
     const counterparty = column === 'A' ? participants?.B : participants?.A;
 
-    // propertyId (0 is valid for LTC) — only replace if undefined/null
+    // propertyId (0 is valid for LTC)
     const pidRaw = r?.propertyId;
     const propertyId =
-      pidRaw !== undefined && pidRaw !== null ? Number(pidRaw)
-      : defaults.propertyId !== undefined ? Number(defaults.propertyId)
-      : 0;
+      pidRaw !== undefined && pidRaw !== null
+        ? Number(pidRaw)
+        : defaults.propertyId !== undefined
+          ? Number(defaults.propertyId)
+          : 0;
 
-    // amounts/blocks
-    const amount = Number(
-      r?.amount ?? r?.balance ?? r?.value ?? 0
-    );
+    const amount = Number(r?.amount ?? r?.balance ?? r?.value ?? 0);
 
     const lastCommitmentBlock = Number(
       r?.lastCommitmentBlock ?? r?.block ?? r?.height ?? undefined
@@ -123,7 +132,9 @@ export class SpotChannelsService {
       amount,
       participants,
       counterparty,
-      lastCommitmentBlock: Number.isFinite(lastCommitmentBlock) ? lastCommitmentBlock : undefined,
+      lastCommitmentBlock: Number.isFinite(lastCommitmentBlock)
+        ? lastCommitmentBlock
+        : undefined,
     };
   }
 
@@ -136,7 +147,8 @@ export class SpotChannelsService {
 
       // Use base/first token propertyId when not provided by backend (0 is valid)
       const pidRaw = m?.first_token?.propertyId;
-      const defaultPid = pidRaw !== undefined && pidRaw !== null ? Number(pidRaw) : undefined;
+      const defaultPid =
+        pidRaw !== undefined && pidRaw !== null ? Number(pidRaw) : undefined;
 
       if (!addr) {
         this.channelsCommits = [];
@@ -144,13 +156,23 @@ export class SpotChannelsService {
       }
 
       const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
-        await axios.post(this.endpoint, {
-        params: [addr,defaultPid], // or whatever values you need
-      });
+        await axios.post(
+          `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`,
+          {
+            params: [addr, defaultPid],
+          }
+        );
 
       const data = res.data;
-      const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
-      const rows = rawRows.map(row => this.normalizeRow(row, addr, { propertyId: defaultPid }));
+      const rawRows: any[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.rows)
+          ? data.rows
+          : [];
+
+      const rows = rawRows.map(row =>
+        this.normalizeRow(row, addr, { propertyId: defaultPid })
+      );
 
       // New array ref so Angular change detection triggers
       this.channelsCommits = rows.slice();
@@ -162,12 +184,11 @@ export class SpotChannelsService {
     }
   }
 
-    get activeSpotaddress() {
-        return this.authService.activeSpotKey?.address || null;
-    }
+  get activeSpotaddress() {
+    return this.authService.activeSpotKey?.address || null;
+  }
 
-    removeAll() {
-        this.channelsCommits = [];
-    }
+  removeAll() {
+    this.channelsCommits = [];
+  }
 }
-
