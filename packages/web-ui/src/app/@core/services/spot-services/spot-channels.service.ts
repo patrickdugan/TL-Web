@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import axios, { AxiosResponse } from 'axios';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
-import { RpcService } from 'src/app/@core/services/futures-services/rpc.service';
+import { RpcService } from 'src/app/@core/services/rpc.service';
 
 export interface ChannelBalanceRow {
   channel: string;

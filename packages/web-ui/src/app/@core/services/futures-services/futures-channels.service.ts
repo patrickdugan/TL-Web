@@ -4,7 +4,7 @@ import axios, { AxiosResponse } from 'axios';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
-import { RpcService, TNETWORK } from "./rpc.service";
+import { RpcService, TNETWORK } from "../rpc.service";
 
 // NOTE: avoid import path issues by typing as any
 type FuturesMarketSvc = any;
@@ -42,7 +42,7 @@ export class FuturesChannelsService {
 
   constructor(
     private auth: AuthService,
-    private futMarkets: FuturesMarketService
+    private futMarkets: FuturesMarketService,
     private rpcService: RpcService
   ) {}
 
@@ -56,11 +56,6 @@ export class FuturesChannelsService {
 
   ngOnInit() {
     this.refreshFuturesChannels()
-  }
-
-  set NETWORK(network: string) {
-    console.log('setting network '+network)
-    this._NETWORK = network; // Assign to the backing field
   }
 
   // ---------- Polling API ----------
