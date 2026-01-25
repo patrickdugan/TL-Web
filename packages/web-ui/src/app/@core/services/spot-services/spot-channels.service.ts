@@ -24,7 +24,7 @@ export class SpotChannelsService {
   public channelsCommits: ChannelBalanceRow[] = [];
 
   /** Hardcoded endpoint */
-  private readonly endpoint = 'https://api.layerwallet.com/tl_channelBalanceForCommiter';
+  private readonly endpoint = 'https://api.layerwallet.com/rpc/tl_channelBalanceForCommiter';
 
   /** polling */
   private refreshMs = 20000;
