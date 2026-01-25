@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import axios, { AxiosResponse } from 'axios';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
@@ -30,12 +30,15 @@ export class SpotChannelsService {
   private pollId?: any;
   private isLoading = false;
 
-  /** relayer endpoints (testnet default) */
-  private baseUrl = 'https://api.layerwallet.com';
-  private testUrl = 'https://testnet-api.layerwallet.com';
+  /** relayer endpoints */
+  private readonly baseUrl = 'https://api.layerwallet.com';
+  private readonly testUrl = 'https://testnet-api.layerwallet.com';
 
   /** Store accounts like BalanceService */
   private accounts: { address: string; pubkey: string }[] = [];
+
+  private __rows$ = new BehaviorSubject<ChannelBalanceRow[]>([]);
+  public readonly rows$: Observable<ChannelBalanceRow[]> = this.__rows$.asObservable();
 
   constructor(
     private authService: AuthService,
@@ -43,7 +46,6 @@ export class SpotChannelsService {
     private spotMarkets: SpotMarketsService,
     private rpcService: RpcService
   ) {
-    // Optional: live refresh on address/market change if streams exist
     this.authService.updateAddressesSubs$?.subscribe(() => this.refreshNow());
     (this.spotMarkets as any).selectedMarket$?.subscribe?.(() => this.refreshNow());
     (this.spotMarkets as any).marketChange$?.subscribe?.(() => this.refreshNow());
@@ -51,16 +53,15 @@ export class SpotChannelsService {
 
   /** relayer selector (mirrors FuturesChannelsService) */
   private get relayerUrl(): string {
-    return String(this.rpcService.NETWORK).includes('TEST')
-      ? this.testUrl
-      : this.baseUrl;
+    const net = String((this.rpcService as any)?.NETWORK ?? '');
+    return /TEST/i.test(net) ? this.testUrl : this.baseUrl;
   }
 
   /** Start (or restart) polling */
   startPolling(ms: number = this.refreshMs): void {
     this.stopPolling();
     this.refreshMs = Math.max(1000, ms | 0);
-    this.loadOnce(); // run immediately
+    this.loadOnce();
     this.pollId = setInterval(() => this.loadOnce(), this.refreshMs);
   }
 
@@ -81,34 +82,24 @@ export class SpotChannelsService {
     if (this.pollId) this.startPolling(this.refreshMs);
   }
 
-  // ---------- internals ----------
-
   private normalizeRow(
     r: any,
     addr: string,
     defaults: { propertyId?: number }
   ): ChannelBalanceRow {
-    // participants can come in various shapes; normalize
     const participants: { A?: string; B?: string } = r?.participants ?? {
       A: r?.participantA ?? r?.A ?? r?.partyA,
       B: r?.participantB ?? r?.B ?? r?.partyB,
     };
 
-    // Determine which side we are (prefer provided column, else infer)
     let column: 'A' | 'B';
-    if (r?.column === 'A' || r?.column === 'B') {
-      column = r.column;
-    } else if (participants?.A && addr && participants.A === addr) {
-      column = 'A';
-    } else if (participants?.B && addr && participants.B === addr) {
-      column = 'B';
-    } else {
-      column = 'A'; // fallback
-    }
+    if (r?.column === 'A' || r?.column === 'B') column = r.column;
+    else if (participants?.A && addr && participants.A === addr) column = 'A';
+    else if (participants?.B && addr && participants.B === addr) column = 'B';
+    else column = 'A';
 
     const counterparty = column === 'A' ? participants?.B : participants?.A;
 
-    // propertyId (0 is valid for LTC)
     const pidRaw = r?.propertyId;
     const propertyId =
       pidRaw !== undefined && pidRaw !== null
@@ -120,7 +111,7 @@ export class SpotChannelsService {
     const amount = Number(r?.amount ?? r?.balance ?? r?.value ?? 0);
 
     const lastCommitmentBlock = Number(
-      r?.lastCommitmentBlock ?? r?.block ?? r?.height ?? undefined
+      r?.lastCommitmentBlock ?? r?.block ?? r?.height ?? NaN
     );
 
     const channelId =
@@ -137,9 +128,7 @@ export class SpotChannelsService {
       amount,
       participants,
       counterparty,
-      lastCommitmentBlock: Number.isFinite(lastCommitmentBlock)
-        ? lastCommitmentBlock
-        : undefined,
+      lastCommitmentBlock: Number.isFinite(lastCommitmentBlock) ? lastCommitmentBlock : undefined,
     };
   }
 
@@ -148,57 +137,61 @@ export class SpotChannelsService {
     this.isLoading = true;
 
     try {
-      // Get address using WalletService like BalanceService does
-      let addr: string | undefined;
-      
-      try {
-        const network = this.rpcService.NETWORK ? String(this.rpcService.NETWORK) : undefined;
-        const accounts = await this.walletService.requestAccounts(network);
-        this.accounts = accounts.map((account) => ({
-          address: account.address,
-          pubkey: account.pubkey || '',
-        }));
-        addr = this.accounts[0]?.address;
-      } catch (error) {
-        console.error('[spot-channels] Failed to get accounts:', error);
-        this.channelsCommits = [];
-        return;
-      }
+      const url = `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`;
+
+      // address via WalletService
+      const net = (this.rpcService as any)?.NETWORK ? String((this.rpcService as any).NETWORK) : undefined;
+      const accounts = await this.walletService.requestAccounts(net);
+      this.accounts = (accounts || []).map((a: any) => ({ address: a.address, pubkey: a.pubkey || '' }));
+      const addr = this.accounts[0]?.address;
 
       if (!addr) {
         this.channelsCommits = [];
+        this.__rows$.next([]);
         return;
       }
 
-      const m = this.spotMarkets.selectedMarket;
+      const m: any = this.spotMarkets.selectedMarket;
 
-      // Use first_token.propertyId from IMarket interface (0 is valid for LTC)
-      const propertyId = m?.first_token?.propertyId;
+      // SpotMarketsService shape: first_token.propertyId, second_token.propertyId
+      const pidRaw = m?.first_token?.propertyId;
+      const propertyId = pidRaw !== undefined && pidRaw !== null ? Number(pidRaw) : undefined;
 
-      const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
-        await axios.post(
-          `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`,
-          {
-            params: [addr, propertyId],
-          }
-        );
+      if (propertyId === undefined || !Number.isFinite(propertyId)) {
+        this.channelsCommits = [];
+        this.__rows$.next([]);
+        return;
+      }
 
-      const data = res.data;
+      const body = { params: [addr, propertyId] };
+
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!r.ok) {
+        const text = await r.text().catch(() => '');
+        throw new Error(`HTTP ${r.status} ${r.statusText} ${text}`);
+      }
+
+      const data: ChannelBalancesResponse | ChannelBalanceRow[] | any = await r.json();
+
       const rawRows: any[] = Array.isArray(data)
         ? data
         : Array.isArray(data?.rows)
           ? data.rows
           : [];
 
-      const rows = rawRows.map(row =>
-        this.normalizeRow(row, addr!, { propertyId })
-      );
+      const rows = rawRows.map((row) => this.normalizeRow(row, addr, { propertyId }));
 
-      // New array ref so Angular change detection triggers
       this.channelsCommits = rows.slice();
+      this.__rows$.next(this.channelsCommits);
     } catch (err) {
       console.error('[spot-channels] load error:', err);
       this.channelsCommits = [];
+      this.__rows$.next([]);
     } finally {
       this.isLoading = false;
     }
@@ -210,5 +203,6 @@ export class SpotChannelsService {
 
   removeAll() {
     this.channelsCommits = [];
+    this.__rows$.next([]);
   }
 }

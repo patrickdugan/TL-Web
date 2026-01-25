@@ -1,14 +1,8 @@
-// src/app/@core/services/futures-services/futures-channels.service.ts
 import { Injectable } from '@angular/core';
-import axios, { AxiosResponse } from 'axios';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { AuthService } from 'src/app/@core/services/auth.service';
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
-import { RpcService, TNETWORK } from "../rpc.service";
-
-// NOTE: avoid import path issues by typing as any
-type FuturesMarketSvc = any;
+import { RpcService } from '../rpc.service';
 
 export interface ChannelBalanceRow {
   channel: string;
@@ -29,36 +23,38 @@ type FutOverride = { address?: string; contractId?: number; collateralPropertyId
 
 @Injectable({ providedIn: 'root' })
 export class FuturesChannelsService {
+  /** UI binds to this */
   public channelsCommits: ChannelBalanceRow[] = [];
 
+  /** polling */
   private refreshMs = 20000;
   private pollId?: any;
   private isLoading = false;
-  private baseUrl = "https://api.layerwallet.com";
-  private testUrl = "https://testnet-api.layerwallet.com"
-  private network = this.rpcService.NETWORK
+
+  /** endpoints */
+  private readonly baseUrl = 'https://api.layerwallet.com';
+  private readonly testUrl = 'https://testnet-api.layerwallet.com';
 
   private __rows$ = new BehaviorSubject<ChannelBalanceRow[]>([]);
+  public readonly rows$: Observable<ChannelBalanceRow[]> = this.__rows$.asObservable();
+
   private __override: FutOverride | null = null;
   private accounts: { address: string; pubkey: string }[] = [];
 
   constructor(
-    private auth: AuthService,
     private walletService: WalletService,
     private futMarkets: FuturesMarketService,
     private rpcService: RpcService
   ) {}
 
-  refreshFuturesChannels(): void { this.refreshNow(); }
-
-  private get relayerUrl(): string {
-    return String(this.rpcService.NETWORK).includes("TEST")
-      ? this.testUrl
-      : this.baseUrl;
+  refreshFuturesChannels(): void {
+    this.refreshNow();
   }
 
-  ngOnInit() {
-    this.refreshFuturesChannels()
+  /** Choose base/test URL based on CURRENT network (do not cache on field init) */
+  private get relayerUrl(): string {
+    const net = String((this.rpcService as any)?.NETWORK ?? '');
+    return /TEST/i.test(net) ? this.testUrl : this.baseUrl;
   }
 
   // ---------- Polling API ----------
@@ -74,7 +70,9 @@ export class FuturesChannelsService {
     this.pollId = undefined;
   }
 
-  refreshNow(): void { this.loadOnce(); }
+  refreshNow(): void {
+    this.loadOnce();
+  }
 
   setRefreshMs(ms: number): void {
     this.refreshMs = Math.max(1000, ms | 0);
@@ -87,38 +85,31 @@ export class FuturesChannelsService {
     this.isLoading = true;
 
     try {
-      // Get address using WalletService like BalanceService does
-      let addr: string | undefined;
-      
-      if (this.__override?.address) {
-        addr = this.__override.address;
-      } else {
-        try {
-          const network = this.network ? String(this.network) : undefined;
-          const accounts = await this.walletService.requestAccounts(network);
-          this.accounts = accounts.map((account) => ({
-            address: account.address,
-            pubkey: account.pubkey || '',
-          }));
-          addr = this.accounts[0]?.address;
-        } catch (error) {
-          console.error('[futures-channels] Failed to get accounts:', error);
-          this.channelsCommits = [];
-          this.__rows$.next([]);
-          return;
-        }
+      const url = `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`;
+
+      // --- address ---
+      let addr: string | undefined = this.__override?.address;
+      if (!addr) {
+        const net = (this.rpcService as any)?.NETWORK ? String((this.rpcService as any).NETWORK) : undefined;
+        const accounts = await this.walletService.requestAccounts(net);
+        this.accounts = (accounts || []).map((a: any) => ({ address: a.address, pubkey: a.pubkey || '' }));
+        addr = this.accounts[0]?.address;
       }
 
+      // --- market ids ---
       const mAny = this.futMarkets?.selectedMarket as any;
-
       const fromMarket = this.extractIds(mAny);
+
       const contractId = this.__override?.contractId ?? fromMarket.contractId;
-      const collateralPropertyId = this.__override?.collateralPropertyId ?? fromMarket.collateralPropertyId;
+      const collateralPropertyId =
+        this.__override?.collateralPropertyId ?? fromMarket.collateralPropertyId;
 
       const ok =
         !!addr &&
-        contractId !== undefined && Number.isFinite(Number(contractId)) &&
-        collateralPropertyId !== undefined && Number.isFinite(Number(collateralPropertyId));
+        contractId !== undefined &&
+        Number.isFinite(Number(contractId)) &&
+        collateralPropertyId !== undefined &&
+        Number.isFinite(Number(collateralPropertyId));
 
       if (!ok) {
         this.channelsCommits = [];
@@ -126,14 +117,31 @@ export class FuturesChannelsService {
         return;
       }
 
-      const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
-        await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
-          params: [addr, collateralPropertyId],
-        });
+      // NOTE: fetch POST is proven working in-browser for this endpoint
+      const body = { params: [addr, Number(collateralPropertyId)] };
 
-      const data = res.data;
-      const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
-      const rows = rawRows.map(row => this.normalizeRow(row, addr!, { collateralPropertyId }));
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!r.ok) {
+        const text = await r.text().catch(() => '');
+        throw new Error(`HTTP ${r.status} ${r.statusText} ${text}`);
+      }
+
+      const data: ChannelBalancesResponse | ChannelBalanceRow[] | any = await r.json();
+
+      const rawRows: any[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.rows)
+          ? data.rows
+          : [];
+
+      const rows = rawRows.map((row) =>
+        this.normalizeRow(row, addr!, { collateralPropertyId: Number(collateralPropertyId) })
+      );
 
       this.channelsCommits = rows.slice();
       this.__rows$.next(this.channelsCommits);
@@ -146,16 +154,29 @@ export class FuturesChannelsService {
     }
   }
 
+  /**
+   * FuturesMarketService selectedMarket shape (per your file):
+   *   contract_id: number
+   *   collateral: { propertyId: number }
+   */
   private extractIds(m: any): { contractId?: number; collateralPropertyId?: number } {
-    // Your market structure uses contract_id (from logs: {contract_id: 3, collateral: {...}})
-    const cid = m?.contract_id ?? m?.contractId ?? m?.id;
-    
-    // Collateral is an object with propertyId
-    const coll = m?.collateral?.propertyId ?? m?.collateralPropertyId ?? m?.collateralId;
-    
+    const cidRaw =
+      m?.contract_id ??                   // ✅ canonical in your futures markets
+      m?.contractId ??
+      m?.contract?.id ??
+      m?.contract?.contract_id ??
+      m?.id;
+
+    const collRaw =
+      m?.collateral?.propertyId ??        // ✅ canonical in your futures markets
+      m?.collateralPropertyId ??
+      m?.collateral_id ??
+      m?.collateralId ??
+      m?.marginAsset?.propertyId;
+
     return {
-      contractId: cid !== undefined && cid !== null ? Number(cid) : undefined,
-      collateralPropertyId: coll !== undefined && coll !== null ? Number(coll) : undefined,
+      contractId: cidRaw !== undefined && cidRaw !== null ? Number(cidRaw) : undefined,
+      collateralPropertyId: collRaw !== undefined && collRaw !== null ? Number(collRaw) : undefined,
     };
   }
 
@@ -201,5 +222,7 @@ export class FuturesChannelsService {
     };
   }
 
-  private get __rows__() { return this.__rows$; }
+  public setOverride(ov: FutOverride | null): void {
+    this.__override = ov;
+  }
 }
