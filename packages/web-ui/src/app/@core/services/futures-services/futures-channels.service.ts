@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import axios, { AxiosResponse } from 'axios';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService } from 'src/app/@core/services/auth.service';
+import { WalletService } from 'src/app/@core/services/wallet.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
 import { RpcService, TNETWORK } from "../rpc.service";
 
@@ -39,9 +40,11 @@ export class FuturesChannelsService {
 
   private __rows$ = new BehaviorSubject<ChannelBalanceRow[]>([]);
   private __override: FutOverride | null = null;
+  private accounts: { address: string; pubkey: string }[] = [];
 
   constructor(
     private auth: AuthService,
+    private walletService: WalletService,
     private futMarkets: FuturesMarketService,
     private rpcService: RpcService
   ) {}
@@ -49,9 +52,9 @@ export class FuturesChannelsService {
   refreshFuturesChannels(): void { this.refreshNow(); }
 
   private get relayerUrl(): string {
-  return String(this.rpcService.NETWORK).includes("TEST")
-    ? this.testUrl
-    : this.baseUrl;
+    return String(this.rpcService.NETWORK).includes("TEST")
+      ? this.testUrl
+      : this.baseUrl;
   }
 
   ngOnInit() {
@@ -79,70 +82,77 @@ export class FuturesChannelsService {
   }
 
   // ---------- Core fetch ----------
-	public async loadOnce(): Promise<void> {
-	  console.log('[1] Starting loadOnce');
-	  
-	  const addr = this.__override?.address ?? this.auth.walletAddresses?.[0];
-	  console.log('[2] Address:', addr);
-	  
-	  const mAny = this.futMarkets?.selectedMarket as any;
-	  console.log('[3] Market:', mAny);
+  public async loadOnce(): Promise<void> {
+    if (this.isLoading) return;
+    this.isLoading = true;
 
-	  const fromMarket = this.extractIds(mAny);
-	  console.log('[4] Extracted IDs:', fromMarket);
-	  
-	  const contractId = this.__override?.contractId ?? fromMarket.contractId;
-	  const collateralPropertyId = this.__override?.collateralPropertyId ?? fromMarket.collateralPropertyId;
-	  console.log('[5] ContractId:', contractId, 'CollateralPropertyId:', collateralPropertyId);
+    try {
+      // Get address using WalletService like BalanceService does
+      let addr: string | undefined;
+      
+      if (this.__override?.address) {
+        addr = this.__override.address;
+      } else {
+        try {
+          const network = this.network ? String(this.network) : undefined;
+          const accounts = await this.walletService.requestAccounts(network);
+          this.accounts = accounts.map((account) => ({
+            address: account.address,
+            pubkey: account.pubkey || '',
+          }));
+          addr = this.accounts[0]?.address;
+        } catch (error) {
+          console.error('[futures-channels] Failed to get accounts:', error);
+          this.channelsCommits = [];
+          this.__rows$.next([]);
+          return;
+        }
+      }
 
-	  const ok =
-	    !!addr &&
-	    contractId !== undefined && Number.isFinite(Number(contractId)) &&
-	    collateralPropertyId !== undefined && Number.isFinite(Number(collateralPropertyId));
+      const mAny = this.futMarkets?.selectedMarket as any;
 
-	  console.log('[6] Validation OK:', ok);
+      const fromMarket = this.extractIds(mAny);
+      const contractId = this.__override?.contractId ?? fromMarket.contractId;
+      const collateralPropertyId = this.__override?.collateralPropertyId ?? fromMarket.collateralPropertyId;
 
-	  if (!ok) {
-	    console.log('[7] Validation failed, clearing data');
-	    this.channelsCommits = [];
-	    this.__rows$.next([]);
-	    return;
-	  }
-	  
-	  console.log('[8] About to make axios call');
-	  console.log('[9] URL:', `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`);
-	  console.log('[10] Params:', [addr, collateralPropertyId]);
-	  
-	  const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
-	    await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
-	      params: [addr, collateralPropertyId],
-	    });
+      const ok =
+        !!addr &&
+        contractId !== undefined && Number.isFinite(Number(contractId)) &&
+        collateralPropertyId !== undefined && Number.isFinite(Number(collateralPropertyId));
 
-	  console.log('[11] Axios call completed');
-	  console.log('[12] Response status:', res.status);
-	  console.log('[13] Response data type:', typeof res.data, Array.isArray(res.data));
+      if (!ok) {
+        this.channelsCommits = [];
+        this.__rows$.next([]);
+        return;
+      }
 
-	  const data = res.data;
-	  console.log('[14] commit data:', JSON.stringify(data));
+      const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
+        await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
+          params: [addr, collateralPropertyId],
+        });
 
-	  const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
-	  console.log('[15] Raw rows count:', rawRows.length);
+      const data = res.data;
+      const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
+      const rows = rawRows.map(row => this.normalizeRow(row, addr!, { collateralPropertyId }));
 
-	  const rows = rawRows.map(row => this.normalizeRow(row, addr, { collateralPropertyId }));
-	  console.log('[16] Normalized rows count:', rows.length);
-
-	  this.channelsCommits = rows.slice();
-	  console.log('[17] Set channelsCommits');
-	  
-	  this.__rows$.next(this.channelsCommits);
-	  console.log('[18] Emitted to __rows$ observable');
-	}
+      this.channelsCommits = rows.slice();
+      this.__rows$.next(this.channelsCommits);
+    } catch (err) {
+      console.error('[futures-channels] load error:', err);
+      this.channelsCommits = [];
+      this.__rows$.next([]);
+    } finally {
+      this.isLoading = false;
+    }
+  }
 
   private extractIds(m: any): { contractId?: number; collateralPropertyId?: number } {
-    const cid =
-      m?.contractId ?? m?.contract?.id ?? m?.contract?.propertyId ?? m?.propertyId ?? m?.id;
-    const coll =
-      m?.collateralPropertyId ?? m?.collateralId ?? m?.collateral?.propertyId ?? m?.marginAsset?.propertyId;
+    // Your market structure uses contract_id (from logs: {contract_id: 3, collateral: {...}})
+    const cid = m?.contract_id ?? m?.contractId ?? m?.id;
+    
+    // Collateral is an object with propertyId
+    const coll = m?.collateral?.propertyId ?? m?.collateralPropertyId ?? m?.collateralId;
+    
     return {
       contractId: cid !== undefined && cid !== null ? Number(cid) : undefined,
       collateralPropertyId: coll !== undefined && coll !== null ? Number(coll) : undefined,

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import axios, { AxiosResponse } from 'axios';
 import { AuthService } from 'src/app/@core/services/auth.service';
+import { WalletService } from 'src/app/@core/services/wallet.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 
@@ -33,8 +34,12 @@ export class SpotChannelsService {
   private baseUrl = 'https://api.layerwallet.com';
   private testUrl = 'https://testnet-api.layerwallet.com';
 
+  /** Store accounts like BalanceService */
+  private accounts: { address: string; pubkey: string }[] = [];
+
   constructor(
     private authService: AuthService,
+    private walletService: WalletService,
     private spotMarkets: SpotMarketsService,
     private rpcService: RpcService
   ) {
@@ -141,25 +146,40 @@ export class SpotChannelsService {
   public async loadOnce(): Promise<void> {
     if (this.isLoading) return;
     this.isLoading = true;
-    try {
-      const addr = this.authService.walletAddresses?.[0];
-      const m = this.spotMarkets.selectedMarket;
 
-      // Use base/first token propertyId when not provided by backend (0 is valid)
-      const pidRaw = m?.first_token?.propertyId;
-      const defaultPid =
-        pidRaw !== undefined && pidRaw !== null ? Number(pidRaw) : undefined;
+    try {
+      // Get address using WalletService like BalanceService does
+      let addr: string | undefined;
+      
+      try {
+        const network = this.rpcService.NETWORK ? String(this.rpcService.NETWORK) : undefined;
+        const accounts = await this.walletService.requestAccounts(network);
+        this.accounts = accounts.map((account) => ({
+          address: account.address,
+          pubkey: account.pubkey || '',
+        }));
+        addr = this.accounts[0]?.address;
+      } catch (error) {
+        console.error('[spot-channels] Failed to get accounts:', error);
+        this.channelsCommits = [];
+        return;
+      }
 
       if (!addr) {
         this.channelsCommits = [];
         return;
       }
 
+      const m = this.spotMarkets.selectedMarket;
+
+      // Use first_token.propertyId from IMarket interface (0 is valid for LTC)
+      const propertyId = m?.first_token?.propertyId;
+
       const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
         await axios.post(
           `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`,
           {
-            params: [addr, defaultPid],
+            params: [addr, propertyId],
           }
         );
 
@@ -171,7 +191,7 @@ export class SpotChannelsService {
           : [];
 
       const rows = rawRows.map(row =>
-        this.normalizeRow(row, addr, { propertyId: defaultPid })
+        this.normalizeRow(row, addr!, { propertyId })
       );
 
       // New array ref so Angular change detection triggers
