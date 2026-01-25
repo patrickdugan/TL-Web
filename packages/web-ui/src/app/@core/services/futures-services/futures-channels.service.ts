@@ -82,6 +82,7 @@ export class FuturesChannelsService {
   public async loadOnce(): Promise<void> {
     if (this.isLoading) return;
     this.isLoading = true;
+    console.log('inside load once for fut channels '+`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`)
     try {
       const addr = this.__override?.address ?? this.auth.walletAddresses?.[0];
       const mAny = this.futMarkets?.selectedMarket as any;
