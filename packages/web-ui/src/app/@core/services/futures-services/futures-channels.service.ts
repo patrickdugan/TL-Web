@@ -79,51 +79,64 @@ export class FuturesChannelsService {
   }
 
   // ---------- Core fetch ----------
-  public async loadOnce(): Promise<void> {
-    //if (this.isLoading) return;
-    //this.isLoading = true;
-    console.log('inside load once for fut channels '+`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`)
-    //try {
-      const addr = this.__override?.address ?? this.auth.walletAddresses?.[0];
-      const mAny = this.futMarkets?.selectedMarket as any;
+	public async loadOnce(): Promise<void> {
+	  console.log('[1] Starting loadOnce');
+	  
+	  const addr = this.__override?.address ?? this.auth.walletAddresses?.[0];
+	  console.log('[2] Address:', addr);
+	  
+	  const mAny = this.futMarkets?.selectedMarket as any;
+	  console.log('[3] Market:', mAny);
 
-      const fromMarket = this.extractIds(mAny);
-      const contractId = this.__override?.contractId ?? fromMarket.contractId;
-      const collateralPropertyId = this.__override?.collateralPropertyId ?? fromMarket.collateralPropertyId;
+	  const fromMarket = this.extractIds(mAny);
+	  console.log('[4] Extracted IDs:', fromMarket);
+	  
+	  const contractId = this.__override?.contractId ?? fromMarket.contractId;
+	  const collateralPropertyId = this.__override?.collateralPropertyId ?? fromMarket.collateralPropertyId;
+	  console.log('[5] ContractId:', contractId, 'CollateralPropertyId:', collateralPropertyId);
 
-      const ok =
-        !!addr &&
-        contractId !== undefined && Number.isFinite(Number(contractId)) &&
-        collateralPropertyId !== undefined && Number.isFinite(Number(collateralPropertyId));
+	  const ok =
+	    !!addr &&
+	    contractId !== undefined && Number.isFinite(Number(contractId)) &&
+	    collateralPropertyId !== undefined && Number.isFinite(Number(collateralPropertyId));
 
-      if (!ok) {
-        this.channelsCommits = [];
-        this.__rows__.next([]);
-        return;
-      }
-      console.log('axios adapter', (axios as any).defaults?.adapter);
-      const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
-       await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
-        params: [addr, collateralPropertyId],
-        });
+	  console.log('[6] Validation OK:', ok);
 
+	  if (!ok) {
+	    console.log('[7] Validation failed, clearing data');
+	    this.channelsCommits = [];
+	    this.__rows$.next([]);
+	    return;
+	  }
+	  
+	  console.log('[8] About to make axios call');
+	  console.log('[9] URL:', `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`);
+	  console.log('[10] Params:', [addr, collateralPropertyId]);
+	  
+	  const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
+	    await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
+	      params: [addr, collateralPropertyId],
+	    });
 
-      const data = res.data;
+	  console.log('[11] Axios call completed');
+	  console.log('[12] Response status:', res.status);
+	  console.log('[13] Response data type:', typeof res.data, Array.isArray(res.data));
 
-      console.log('commit data '+JSON.stringify(res.data))
-      const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
-      const rows = rawRows.map(row => this.normalizeRow(row, addr, { collateralPropertyId }));
+	  const data = res.data;
+	  console.log('[14] commit data:', JSON.stringify(data));
 
-      this.channelsCommits = rows.slice();
-      this.__rows__.next(this.channelsCommits);
-    /*} catch (err) {
-      console.error('[futures-channels] load error:', err);
-      this.channelsCommits = [];
-      this.__rows__.next([]);
-    } finally {
-      this.isLoading = false;
-    }*/
-  }
+	  const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
+	  console.log('[15] Raw rows count:', rawRows.length);
+
+	  const rows = rawRows.map(row => this.normalizeRow(row, addr, { collateralPropertyId }));
+	  console.log('[16] Normalized rows count:', rows.length);
+
+	  this.channelsCommits = rows.slice();
+	  console.log('[17] Set channelsCommits');
+	  
+	  this.__rows$.next(this.channelsCommits);
+	  console.log('[18] Emitted to __rows$ observable');
+	}
 
   private extractIds(m: any): { contractId?: number; collateralPropertyId?: number } {
     const cid =
