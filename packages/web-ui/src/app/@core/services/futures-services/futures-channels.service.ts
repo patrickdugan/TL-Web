@@ -80,10 +80,10 @@ export class FuturesChannelsService {
 
   // ---------- Core fetch ----------
   public async loadOnce(): Promise<void> {
-    if (this.isLoading) return;
-    this.isLoading = true;
+    //if (this.isLoading) return;
+    //this.isLoading = true;
     console.log('inside load once for fut channels '+`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`)
-    try {
+    //try {
       const addr = this.__override?.address ?? this.auth.walletAddresses?.[0];
       const mAny = this.futMarkets?.selectedMarket as any;
 
@@ -101,7 +101,7 @@ export class FuturesChannelsService {
         this.__rows__.next([]);
         return;
       }
-
+      console.log('axios adapter', (axios as any).defaults?.adapter);
       const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
        await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
         params: [addr, collateralPropertyId],
@@ -109,18 +109,20 @@ export class FuturesChannelsService {
 
 
       const data = res.data;
+
+      console.log('commit data '+JSON.stringify(res.data))
       const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
       const rows = rawRows.map(row => this.normalizeRow(row, addr, { collateralPropertyId }));
 
       this.channelsCommits = rows.slice();
       this.__rows__.next(this.channelsCommits);
-    } catch (err) {
+    /*} catch (err) {
       console.error('[futures-channels] load error:', err);
       this.channelsCommits = [];
       this.__rows__.next([]);
     } finally {
       this.isLoading = false;
-    }
+    }*/
   }
 
   private extractIds(m: any): { contractId?: number; collateralPropertyId?: number } {
