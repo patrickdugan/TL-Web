@@ -29,9 +29,6 @@ export class AttestationService {
         private balanceService: BalanceService
     ) { }
 
-    private readonly CRIMINAL_IP_API_KEY = "RKohp7pZw3LsXBtbmU3vcaBByraHPzDGrDnE0w1vI0qTEredJnMPfXMRS7Rk";
-    private readonly IPINFO_TOKEN = "5992daa04f9275";
-
     get tlApi() {
         return this.apiService.newTlApi;
     }
@@ -105,7 +102,7 @@ export class AttestationService {
             return isAttested;
         } catch (error: any) {
             console.error('Error checking attestation:', error.message);
-            this.toastrService.error(error.message, `Error fetching attestation for ${address}`);
+            //this.toastrService.error(error.message, `Error fetching attestation for ${address}`);
             return false;
         }
     }
