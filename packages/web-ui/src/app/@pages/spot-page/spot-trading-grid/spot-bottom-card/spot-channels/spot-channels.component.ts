@@ -1,11 +1,5 @@
-// PATCHED WEB VERSION - spot-channels.component.ts
-// Changes from desktop:
-// 1. Uses buildSignSendTx instead of buildSingSendTx (typo fix)
-// 2. Adds DUST constant for withdrawals
-// 3. Fixes toKeyPair to use self-address for withdrawals
-// 4. Sequential withdrawAll processing
-
 import { AuthService } from 'src/app/@core/services/auth.service';
+import { WalletService } from 'src/app/@core/services/wallet.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { Subscription } from 'rxjs';
 import { LoadingService } from 'src/app/@core/services/loading.service';
@@ -67,6 +61,8 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
     private spotMkts: SpotMarketsService,
     private dialogs: DialogService,
     private auth: AuthService,
+    private walletService: WalletService,
+    private rpcService: RpcService,
     private txs: TxsService,
     private toastrService: ToastrService
   ) {}
@@ -86,8 +82,15 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
     this.spotSvc.stopPolling();
   }
 
-  private resolveAddress(): string {
-    return this.auth.walletAddresses?.[0] ?? '';
+  private async resolveAddress(): Promise<string> {
+    try {
+      const network = this.rpcService.NETWORK ? String(this.rpcService.NETWORK) : undefined;
+      const accounts = await this.walletService.requestAccounts(network);
+      return accounts[0]?.address ?? '';
+    } catch (error) {
+      console.error('[SpotChannels] Failed to get address:', error);
+      return '';
+    }
   }
 
   get activeChannelsCommits() {
@@ -118,10 +121,12 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
     navigator.clipboard?.writeText(value).catch(() => {});
   }
 
-  transfer(row: ChannelBalanceRow) {
+  async transfer(row: ChannelBalanceRow) {
+    const address = await this.resolveAddress();
+    
     const data = {
       mode: 'channel-transfer',
-      address: this.address,
+      address: address,
       channel: row.channel,
       column: row.column,
       propertyId: row.propertyId,
@@ -149,7 +154,11 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
       this.working = true;
 
       const columnNum = row.column === 'A' ? 0 : 1;
-      this.address = this.resolveAddress();
+      this.address = await this.resolveAddress();
+
+      if (!this.address) {
+        throw new Error('Could not get wallet address');
+      }
 
       const payload = ENCODER.encodeWithdrawal({
         withdrawAll: 0,
@@ -159,11 +168,11 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
         channelAddress: row.channel,
       });
 
-      const DUST = 546; // litoshi
+      const DUST = 546/1e8; // litoshi to LTC
 
       const buildCfg = {
         fromKeyPair: { address: this.address },
-        toKeyPair: { address: this.address }, // Fixed: self-address
+        toKeyPair: { address: this.address }, // withdrawal goes back to self
         amount: DUST,
         payload,
       };
@@ -176,6 +185,7 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
     } catch (err: any) {
       console.error('[Spot][Withdraw] error:', err?.message || err);
       this.error = err?.message || 'Withdraw failed';
+      this.toastrService.error(this.error, 'Withdraw Failed');
     } finally {
       this.working = false;
     }
@@ -189,7 +199,12 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
       (this.propertyId != null && r.propertyId === this.propertyId && r.amount > 0)
     );
 
-    this.address = this.resolveAddress();
+    this.address = await this.resolveAddress();
+
+    if (!this.address) {
+      this.toastrService.error('Could not get wallet address', 'Error');
+      return;
+    }
 
     this.working = true;
     this.error = undefined;
@@ -197,7 +212,6 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
     try {
       for (const row of targetRows) {
         const columnNum = row.column === 'A' ? 0 : 1;
-        this.address = this.resolveAddress();
 
         const payload = ENCODER.encodeWithdrawal({
           withdrawAll: 1,
@@ -209,15 +223,15 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
 
         const buildCfg = {
           fromKeyPair: { address: this.address },
-          toKeyPair:   { address: row.channel },
+          toKeyPair:   { address: this.address },
           amount: 0.00000560,
           payload
         };
 
         const res = await this.txs.buildSignSendTx(buildCfg as any);
         if (res?.error) { 
-          this.toastrService.error('WithdrawalAll failed: ' + res.error);
-          return
+          this.toastrService.error('WithdrawAll failed: ' + res.error);
+          return;
         }
 
         await new Promise(r => setTimeout(r, 200));
@@ -227,6 +241,7 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
     } catch (err: any) {
       this.error = err?.message || 'Withdraw All failed';
       console.error('[WithdrawAll] error:', this.error);
+      this.toastrService.error(this.error, 'WithdrawAll Failed');
     } finally {
       this.working = false;
     }
