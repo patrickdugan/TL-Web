@@ -142,6 +142,7 @@ export class FuturesChannelsService {
         });
 
       const data = res.data;
+      console.log('data res in channel '+data)
       const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
       const rows = rawRows.map(row => this.normalizeRow(row, addr!, { collateralPropertyId }));
 
