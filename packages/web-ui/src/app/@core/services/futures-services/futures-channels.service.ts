@@ -36,7 +36,6 @@ export class FuturesChannelsService {
   private isLoading = false;
   private baseUrl = "https://api.layerwallet.com";
   private testUrl = "https://testnet-api.layerwallet.com"
-  private network = this.rpcService.NETWORK
 
   private __rows$ = new BehaviorSubject<ChannelBalanceRow[]>([]);
   private __override: FutOverride | null = null;
@@ -87,6 +86,9 @@ export class FuturesChannelsService {
     this.isLoading = true;
 
     try {
+      console.log('[futures-channels] Network:', this.rpcService.NETWORK);
+      console.log('[futures-channels] Using URL:', this.relayerUrl);
+      
       // Get address using WalletService like BalanceService does
       let addr: string | undefined;
       
@@ -94,13 +96,15 @@ export class FuturesChannelsService {
         addr = this.__override.address;
       } else {
         try {
-          const network = this.network ? String(this.network) : undefined;
+          const network = this.rpcService.NETWORK ? String(this.rpcService.NETWORK) : undefined;
+          console.log('[futures-channels] Requesting accounts for network:', network);
           const accounts = await this.walletService.requestAccounts(network);
           this.accounts = accounts.map((account) => ({
             address: account.address,
             pubkey: account.pubkey || '',
           }));
           addr = this.accounts[0]?.address;
+          console.log('[futures-channels] Got address:', addr);
         } catch (error) {
           console.error('[futures-channels] Failed to get accounts:', error);
           this.channelsCommits = [];
@@ -108,14 +112,14 @@ export class FuturesChannelsService {
           return;
         }
       }
-      	  console.log('[2] Address:', addr);
+
       const mAny = this.futMarkets?.selectedMarket as any;
 
       const fromMarket = this.extractIds(mAny);
-      	  console.log('[4] Extracted IDs:', fromMarket);
-
       const contractId = this.__override?.contractId ?? fromMarket.contractId;
       const collateralPropertyId = this.__override?.collateralPropertyId ?? fromMarket.collateralPropertyId;
+
+      console.log('[futures-channels] Contract ID:', contractId, 'Collateral ID:', collateralPropertyId);
 
       const ok =
         !!addr &&
@@ -123,11 +127,15 @@ export class FuturesChannelsService {
         collateralPropertyId !== undefined && Number.isFinite(Number(collateralPropertyId));
 
       if (!ok) {
+        console.log('[futures-channels] Validation failed');
         this.channelsCommits = [];
         this.__rows$.next([]);
         return;
       }
-      console.log('collateralPropertyId '+collateralPropertyId)
+
+      console.log('[futures-channels] Making request to:', `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`);
+      console.log('[futures-channels] With params:', [addr, collateralPropertyId]);
+
       const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
         await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
           params: [addr, collateralPropertyId],
@@ -139,6 +147,7 @@ export class FuturesChannelsService {
 
       this.channelsCommits = rows.slice();
       this.__rows$.next(this.channelsCommits);
+      console.log('[futures-channels] Success! Loaded', rows.length, 'rows');
     } catch (err) {
       console.error('[futures-channels] load error:', err);
       this.channelsCommits = [];
