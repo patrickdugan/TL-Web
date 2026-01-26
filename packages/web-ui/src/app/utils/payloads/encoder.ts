@@ -158,7 +158,7 @@ type EncodeWithdrawalParams = {
 };
 
 const encodeWithdrawal = (params: EncodeWithdrawalParams): string => {
-  const amounts = new BigNumber(params.amountOffered).times(1e8).toString();
+  const amounts = new BigNumber(params.amountOffered).times(1e8).toString(36);
   const propertyIds = params.propertyId.toString(36);
   const payload = [
     params.withdrawAll,
