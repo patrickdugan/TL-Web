@@ -108,10 +108,12 @@ export class FuturesChannelsService {
           return;
         }
       }
-
+      	  console.log('[2] Address:', addr);
       const mAny = this.futMarkets?.selectedMarket as any;
 
       const fromMarket = this.extractIds(mAny);
+      	  console.log('[4] Extracted IDs:', fromMarket);
+
       const contractId = this.__override?.contractId ?? fromMarket.contractId;
       const collateralPropertyId = this.__override?.collateralPropertyId ?? fromMarket.collateralPropertyId;
 
@@ -125,7 +127,7 @@ export class FuturesChannelsService {
         this.__rows$.next([]);
         return;
       }
-
+      console.log('collateralPropertyId '+collateralPropertyId)
       const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
         await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
           params: [addr, collateralPropertyId],
