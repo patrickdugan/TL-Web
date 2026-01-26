@@ -158,7 +158,7 @@ export class FuturesChannelsComponent implements OnInit, OnDestroy {
 
       const buildCfg = {
         fromKeyPair: { address: this.address },
-        toKeyPair: { address: this.address }, // withdrawal goes back to self
+        toKeyPair: { address: row.channel }, 
         amount: DUST,
         payload,
       };
