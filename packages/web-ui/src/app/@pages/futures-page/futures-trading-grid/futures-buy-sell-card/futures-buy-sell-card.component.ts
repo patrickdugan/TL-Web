@@ -201,10 +201,13 @@ export class FuturesBuySellCardComponent implements OnInit, OnDestroy {
       }
 
       const collateralBalance = Math.max(available, channel);
+      const inOrder = this.getInOrderAmount(propId);
+      const netCollateral = safeNumber(collateralBalance - inOrder);
+      if (netCollateral <= 0) return 0;
       const leverage = market.leverage || 10;
       const notional = 1;
 
-      return safeNumber((collateralBalance * leverage) / (price * notional));
+      return safeNumber((netCollateral * leverage) / (price * notional));
     }
 
     async handleBuySell(isBuy: boolean) {
