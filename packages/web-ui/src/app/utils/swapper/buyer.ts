@@ -363,7 +363,7 @@ export class BuySwapper extends Swap {
 
     private async onStep5(cpId: string, psbtHex: string) {
         this.logTime('Step 5 Start');
-        const signRes = await this.txsService.signPsbt(psbtHex, false);
+        const signRes = await this.txsService.signPsbt(psbtHex, false,this.multySigChannelData?.redeemScript );
         if (!signRes.data?.finalHex) return this.terminateTrade('Step 5: Signing failed');
 
         const txidRes = await this.txsService.sendTxWithSpecRetry(signRes.data.finalHex);
@@ -376,4 +376,5 @@ export class BuySwapper extends Swap {
         this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent.toJSON());
         this.removePreviuesListeners();
     }
+
 }

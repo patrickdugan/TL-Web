@@ -249,7 +249,8 @@ private isSpotZeroTrade(): boolean {
                 if (isRbf) throw new Error('RBF-enabled commit tx detected');
             }
 
-            const signRes = await this.txsService.signPsbt(psbtHex,true);
+            const signRes = await this.txsService.signPsbt(psbtHex,true,
+            this.multySigChannelData?.redeemScript);
             if (signRes.error || !signRes.data?.psbtHex) throw new Error(`PSBT sign failed: ${signRes.error}`);
 
             this.socketService.send(`${this.myInfo.socketId}::swap`, new SwapEvent('SELLER:STEP5', this.myInfo.socketId, signRes.data.psbtHex).toJSON());
