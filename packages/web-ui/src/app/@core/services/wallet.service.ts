@@ -40,7 +40,12 @@ interface IWalletProvider {
 
   signPsbt(
     psbtBase64: string,
-    opts?: { autoFinalize?: boolean; broadcast?: boolean }
+    opts?: {
+      autoFinalize?: boolean;
+      broadcast?: boolean;
+      signingIndexes?: number[];
+      sigHash?: number;
+    }
   ): Promise<string>;
 
   signTransactionHex?(txHex: string, network: string): Promise<string>;
@@ -502,13 +507,30 @@ export class WalletService {
     signPsbt: async (psbtBase64, opts) => {
       const ph = getPhantomBtc();
       if (!ph) throw new Error('Phantom Bitcoin not available');
+
+      const params: any = {
+        psbt: psbtBase64,
+        autoFinalize: opts?.autoFinalize ?? true,
+        broadcast: opts?.broadcast ?? false,
+      };
+
+      // Phantom requires inputsToSign with signingIndexes when specified
+      if (opts?.signingIndexes?.length) {
+        const addr =
+          this.address$.value ||
+          (await this.requestAccounts())[0]?.address;
+        params.inputsToSign = [
+          {
+            address: addr,
+            signingIndexes: opts.signingIndexes,
+            ...(opts.sigHash != null ? { sigHash: opts.sigHash } : {}),
+          },
+        ];
+      }
+
       const r = await ph.request({
         method: 'btc_signPsbt',
-        params: {
-          psbt: psbtBase64,
-          autoFinalize: opts?.autoFinalize ?? true,
-          broadcast: opts?.broadcast ?? false,
-        },
+        params,
       });
       return r?.psbt ?? psbtBase64;
     },
@@ -540,11 +562,13 @@ export class WalletService {
       return window.myWallet!.sendRequest('signMessage', { message: msg });
     },
 
-    signPsbt: async (psbtBase64) => {
+    signPsbt: async (psbtBase64, opts) => {
       const hex = base64ToHex(psbtBase64);
       const r = await window.myWallet!.sendRequest('signPSBT', {
         transaction: hex,
         network: this.rpc.NETWORK,
+        ...(opts?.signingIndexes ? { signingIndexes: opts.signingIndexes } : {}),
+        ...(opts?.sigHash != null ? { sigHash: opts.sigHash } : {}),
       });
       const out =
         typeof r === 'string' ? r : r?.psbt ?? r?.transaction ?? hex;
@@ -670,7 +694,12 @@ export class WalletService {
 
   async signPsbt(
     psbtBase64: string,
-    opts?: { autoFinalize?: boolean; broadcast?: boolean }
+    opts?: {
+      autoFinalize?: boolean;
+      broadcast?: boolean;
+      signingIndexes?: number[];
+      sigHash?: number;
+    }
   ): Promise<string> {
     const p = this.provider$.value || this.pick();
     if (!p) throw new Error('Wallet not connected');

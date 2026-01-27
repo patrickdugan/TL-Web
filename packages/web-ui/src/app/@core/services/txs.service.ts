@@ -511,11 +511,17 @@ export class TxsService {
         let signedPsbtBase64: string | undefined;
 
         if (isPhantom) {
-          console.log("Signing PSBT via Phantom", psbtBase64);
+          // Determine signing indexes: seller signs vIn 0 only, buyer signs the rest
+          const signingIndexes = sellerFlag
+            ? [0]
+            : Array.from({ length: this.getPsbtInputCount(psbtHex) - 1 }, (_, i) => i + 1);
+
+          console.log("Signing PSBT via Phantom", psbtBase64, "signingIndexes", signingIndexes);
 
           const res = await provider.signPsbt(psbtBase64!, {
             autoFinalize: false,
             broadcast: false,
+            signingIndexes,
           });
 
           signedPsbtBase64 = res;
@@ -742,5 +748,50 @@ export class TxsService {
       };
 
       return _sendTxWithRetry(rawTx, 15, 800);
+    }
+
+    /** Parse PSBT hex to get the number of inputs in the unsigned tx. */
+    private getPsbtInputCount(psbtHex: string): number {
+      try {
+        const bytes = new Uint8Array(
+          psbtHex.match(/.{1,2}/g)!.map(b => parseInt(b, 16))
+        );
+        // PSBT: magic(4) + 0xff(1) + global key-value pairs
+        let offset = 5;
+        while (offset < bytes.length) {
+          const keyLen = this.readVarInt(bytes, offset);
+          offset += this.varIntSize(keyLen);
+          if (keyLen === 0) break; // separator
+          const keyType = bytes[offset];
+          offset += keyLen; // skip entire key
+          const valLen = this.readVarInt(bytes, offset);
+          offset += this.varIntSize(valLen);
+          if (keyType === 0x00) {
+            // Value is the unsigned tx: version(4) + varint(inputCount)
+            return this.readVarInt(bytes, offset + 4);
+          }
+          offset += valLen;
+        }
+      } catch (e) {
+        console.warn("[getPsbtInputCount] parse error, defaulting to 4", e);
+      }
+      return 4;
+    }
+
+    private readVarInt(bytes: Uint8Array, offset: number): number {
+      const first = bytes[offset];
+      if (first < 0xfd) return first;
+      if (first === 0xfd) return bytes[offset + 1] | (bytes[offset + 2] << 8);
+      if (first === 0xfe)
+        return bytes[offset + 1] | (bytes[offset + 2] << 8) |
+               (bytes[offset + 3] << 16) | (bytes[offset + 4] << 24);
+      return bytes[offset + 1] | (bytes[offset + 2] << 8); // 0xff, truncated
+    }
+
+    private varIntSize(value: number): number {
+      if (value < 0xfd) return 1;
+      if (value <= 0xffff) return 3;
+      if (value <= 0xffffffff) return 5;
+      return 9;
     }
 }

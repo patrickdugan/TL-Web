@@ -119,7 +119,7 @@ export class SellSwapper extends Swap {
             }
             
             const ms = await this.walletService.addMultisig(2, pubKeys);
-            console.log('ms '+JSON.stringify(ms)+' pubkeys'+this.myInfo.keypair.pubkey+' '+this.cpInfo.keypair.pubkey)
+            console.log('multisig from relayer '+JSON.stringify(ms)+' pubkeys'+this.myInfo.keypair.pubkey+' '+this.cpInfo.keypair.pubkey)
             if (!ms || !ms.address || !ms.redeemScript) throw new Error('Multisig setup failed');
 this.multySigChannelData = ms as IMSChannelData;
             const swapEvent = new SwapEvent('SELLER:STEP1', this.myInfo.socketId, this.multySigChannelData);
