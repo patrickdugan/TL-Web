@@ -263,6 +263,21 @@ export class SpotChartCardComponent implements AfterViewInit, OnDestroy {
     return {};
   }
 
+  private secsToGranularity(secs: number): string {
+    const map: Record<number, string> = {
+      5: 'ONE_MINUTE',      // sub-minute falls back to 1m data
+      60: 'ONE_MINUTE',
+      300: 'FIVE_MINUTE',
+      900: 'FIFTEEN_MINUTE',
+      1800: 'THIRTY_MINUTE',
+      3600: 'ONE_HOUR',
+      7200: 'TWO_HOUR',
+      21600: 'SIX_HOUR',
+      86400: 'ONE_DAY',
+    };
+    return map[secs] || 'ONE_MINUTE';
+  }
+
   private async loadHistory(symbol: string, intervalSec: number) {
     if (!this.candleStickSeries) return;
 
@@ -273,26 +288,26 @@ export class SpotChartCardComponent implements AfterViewInit, OnDestroy {
       const lookbackBars = this.maxBars;
       const start = now - lookbackBars * intervalSec;
 
+      const granularity = this.secsToGranularity(intervalSec);
       const url =
-        `https://api.exchange.coinbase.com/products/${cbSymbol}/candles` +
-        `?granularity=${intervalSec}` +
-        `&start=${new Date(start * 1000).toISOString()}` +
-        `&end=${new Date(now * 1000).toISOString()}`;
+        `https://api.coinbase.com/api/v3/brokerage/market/products/${cbSymbol}/candles` +
+        `?start=${start}&end=${now}&granularity=${granularity}`;
 
       const res = await fetch(url);
       if (!res.ok) return;
 
-      const raw = await res.json();
+      const data = await res.json();
+      const raw = data?.candles;
       if (!Array.isArray(raw)) return;
 
       const candles: ICandle[] = raw
-        .map((c: any[]) => ({
-          time: c[0],
-          low: Number(c[1]),
-          high: Number(c[2]),
-          open: Number(c[3]),
-          close: Number(c[4]),
-          volume: Number(c[5] ?? 0),
+        .map((c: any) => ({
+          time: Number(c.start),
+          low: Number(c.low),
+          high: Number(c.high),
+          open: Number(c.open),
+          close: Number(c.close),
+          volume: Number(c.volume ?? 0),
         }))
         .sort((a, b) => a.time - b.time)
         .slice(-this.maxBars);
