@@ -61,11 +61,12 @@ export class SwapService {
                 ? new BuySwapper(type, props, buyer, seller, socket,this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService,key)
                 : new SellSwapper(type, props, seller, buyer, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService,key);
 
-            swapper.eventSubs$.subscribe(eventData => {
+            const sub1 = swapper.eventSubs$.subscribe(eventData => {
                 this.toastrService.info(eventData.eventName, 'Trade Info', { timeOut: 3000 });
             });
 
             const res = await swapper.onReady();
+            sub1.unsubscribe();
             return res;
         } else if (type === "FUTURES") {
             const { transfer } = props as IFuturesTradeProps;
@@ -74,11 +75,12 @@ export class SwapService {
                 ? new BuySwapper(type, props, buyer, seller, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService,key)
                 : new SellSwapper(type, props, seller, buyer, socket, this.txsService, this.toastrService,this.walletService,this.rpcService,this.socketService,key);
 
-            swapper.eventSubs$.subscribe(eventData => {
+            const sub2 = swapper.eventSubs$.subscribe(eventData => {
                 this.toastrService.info(eventData.eventName, 'Trade Info', { timeOut: 3000 });
             });
 
             const res = await swapper.onReady();
+            sub2.unsubscribe();
             return res;
         } else {
             throw new Error(`Unsupported trade type: ${type}`);

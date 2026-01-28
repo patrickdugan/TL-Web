@@ -57,6 +57,7 @@ interface IWalletProvider {
   ): Promise<{ address: string; redeemScript?: string }>;
 
   on?(ev: 'accountsChanged' | 'networkChanged', cb: (...a: any[]) => void): void;
+  off?(ev: 'accountsChanged' | 'networkChanged', cb: (...a: any[]) => void): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -617,7 +618,25 @@ export class WalletService {
   // Connect logic
   // -------------------------------------------------------------------------
 
+  private _prevProvider: IWalletProvider | null = null;
+  private _onAccountsChanged = (accs: string[]) => {
+    this.addresses$.next(accs || []);
+    this.address$.next(accs?.[0] ?? null);
+    this.sessionState$.next({
+      token: null, address: null, expiresAt: null, wsAuthed: false,
+    });
+  };
+  private _onNetworkChanged = (newNet: string) => {
+    console.log('[wallet] networkChanged', newNet);
+  };
+
   private async finishConnect(p: IWalletProvider) {
+    // Remove listeners from previous provider
+    if (this._prevProvider) {
+      this._prevProvider.off?.('accountsChanged', this._onAccountsChanged);
+      this._prevProvider.off?.('networkChanged', this._onNetworkChanged);
+    }
+
     const net = this.providerNet();
     await p.connect?.(net);
 
@@ -627,21 +646,9 @@ export class WalletService {
     this.addresses$.next(addrs);
     this.address$.next(addrs[0] ?? null);
 
-    p.on?.('accountsChanged', (accs) => {
-      this.addresses$.next(accs || []);
-      this.address$.next(accs?.[0] ?? null);
-      // Clear session on account change - will need to re-auth
-      this.sessionState$.next({
-        token: null,
-        address: null,
-        expiresAt: null,
-        wsAuthed: false,
-      });
-    });
-
-    p.on?.('networkChanged', (newNet) => {
-      console.log('[wallet] networkChanged', newNet);
-    });
+    p.on?.('accountsChanged', this._onAccountsChanged);
+    p.on?.('networkChanged', this._onNetworkChanged);
+    this._prevProvider = p;
   }
 
   async connectPreferred(): Promise<void> {
