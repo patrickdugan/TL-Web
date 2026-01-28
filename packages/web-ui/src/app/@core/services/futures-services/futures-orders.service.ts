@@ -67,6 +67,13 @@ export class FuturesOrdersService {
         const msg = { ...orderConf, network: net }
 
         this.socketService.send('new-order', msg);
+
+        // Optimistic: add to local openedOrders so balance updates immediately
+        const tempUuid = `pending-${Date.now()}`;
+        this._openedOrders = [
+          ...this._openedOrders,
+          { uuid: tempUuid, props: { ...orderConf.props } } as IFuturesOrderRow,
+        ];
   }
 
   // Alias some UI calls use
@@ -84,6 +91,9 @@ export class FuturesOrdersService {
     const ctx = sel ? { contract_id: sel.contract_id } : {};
     const net = this.rpcService.NETWORK
     this.socketService.send("close-order", { orderUUID: uuid, ...ctx, network: net});
+
+    // Optimistic: remove from local openedOrders
+    this._openedOrders = this._openedOrders.filter(o => o?.uuid !== uuid);
   }
 
   closeAllOrders() {

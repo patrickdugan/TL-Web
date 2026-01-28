@@ -234,23 +234,35 @@ private isSpotZeroTrade(): boolean {
   return false
 }
 
+    private async checkRbf(rawTxOrTxid: string): Promise<boolean> {
+        try {
+            const baseUrl = this.relayerUrl;
+            // If it looks like a raw tx hex (long), decode it; otherwise fetch by txid
+            const txData = rawTxOrTxid.length > 80
+                ? await axios.post(`${baseUrl}/tx/decode`, { rawtx: rawTxOrTxid }).then(r => r.data)
+                : await axios.get(`${baseUrl}/tx/${rawTxOrTxid}?verbose=true`).then(r => r.data);
+            const vins = txData?.vin || [];
+            return vins.some((vin: any) => vin.sequence < 0xfffffffe);
+        } catch (err: any) {
+            console.warn('RBF check failed (non-fatal):', err.message);
+            return false;
+        }
+    }
+
     private async onStep4(cpId: string, psbtHex: string, commitTxId?: string) {
         this.logTime('Step 4 Start');
         try {
             if (cpId !== this.cpInfo.socketId) throw new Error('Step 4: p2p mismatch');
             if (!psbtHex) throw new Error('Step 4: missing PSBT');
-            
+
             const skipRbf = this.isSpotZeroTrade();
             if (commitTxId && !skipRbf) {
-                const baseUrl = this.relayerUrl;
-                const txRes = await axios.get(`${baseUrl}/tx/${commitTxId}?verbose=true`);
-                const vins = txRes?.data?.vin || [];
-                const isRbf = vins.some((vin: any) => vin.sequence < 0xfffffffe);
+                const isRbf = await this.checkRbf(commitTxId);
                 if (isRbf) throw new Error('RBF-enabled commit tx detected');
             }
 
-            const signRes = await this.txsService.signPsbt(psbtHex,true,
-            this.multySigChannelData?.redeemScript);
+            const signRes = await this.txsService.signPsbt(psbtHex, true,
+                this.multySigChannelData?.redeemScript);
             if (signRes.error || !signRes.data?.psbtHex) throw new Error(`PSBT sign failed: ${signRes.error}`);
 
             this.socketService.send(`${this.myInfo.socketId}::swap`, new SwapEvent('SELLER:STEP5', this.myInfo.socketId, signRes.data.psbtHex).toJSON());

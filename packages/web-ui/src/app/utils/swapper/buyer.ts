@@ -301,26 +301,13 @@ export class BuySwapper extends Swap {
                         toKeyPair: { address: this.multySigChannelData.address },
                         payload
                     });
-                    if (commitTxRes.error || !commitTxRes.data?.rawtx) throw new Error(`Build Commit TX: ${commitTxRes.error}`);
+                    if (commitTxRes.error || !commitTxRes.txid || !commitTxRes.commitUTXO) throw new Error(`Build Commit TX: ${commitTxRes.error}`);
 
-                    const { rawtx } = commitTxRes.data;
-                    const commitTxSignRes = await this.txsService.signRawTxWithWallet(rawtx);
-                    if (commitTxSignRes.error || !commitTxSignRes.data?.signedHex) throw new Error(`Sign Commit TX: ${commitTxSignRes.error}`);
-
-                    const signedHex = commitTxSignRes.data.signedHex;
-                    const commitTxSendRes = await this.txsService.sendTx(signedHex);
-                    if (commitTxSendRes.error || !commitTxSendRes.data) throw new Error(`Send Commit TX: ${commitTxSendRes.error}`);
-
-                    const drtRes = await this.txsService.decode(rawtx);
-                    const decodedData = typeof drtRes.data === 'string' ? JSON.parse(drtRes.data) : drtRes.data;
-                    const vout = decodedData.vout.find((o: any) => o.scriptPubKey?.addresses?.[0] === this.multySigChannelData?.address);
-                    if (!vout) throw new Error(`decoderawtransaction (2): output not found`);
+                    const rawtx = commitTxRes.data?.rawtx;
 
                     const utxoData: IUTXO = {
-                        amount: commitTxRes.commitUTXO?.amount ?? 0,
-                        vout: vout.n,
-                        confirmations: 0,
-                        txid: commitTxSendRes.data,
+                        ...commitTxRes.commitUTXO,
+                        txid: commitTxRes.txid,
                         scriptPubKey: this.multySigChannelData.scriptPubKey,
                         redeemScript: this.multySigChannelData.redeemScript
                     };
@@ -350,8 +337,8 @@ export class BuySwapper extends Swap {
                     if (rawHexRes.error || !rawHexRes.data?.rawtx) throw new Error(`Build Trade: ${rawHexRes.error}`);
 
                     const swapEvent = new SwapEvent('BUYER:STEP4', this.myInfo.socketId, {
-                    psbtHex: rawHexRes.data.rawtx,
-                    commitHex: rawtx, commitTxId: commitTxSendRes.data});
+                    psbtHex: rawHexRes.data.psbtHex,
+                    commitTxId: rawtx});
                     this.socketService.send(`${this.myInfo.socketId}::swap`, swapEvent.toJSON());
                 }
             }

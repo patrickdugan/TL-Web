@@ -70,6 +70,13 @@ export class SpotOrdersService {
         const msg = { ...orderConf, network: net } 
 
         this.socketService.send('new-order', msg);
+
+        // Optimistic: add to local openedOrders so balance updates immediately
+        const tempUuid = `pending-${Date.now()}`;
+        this._openedOrders = [
+          ...this._openedOrders,
+          { uuid: tempUuid, props: { ...orderConf.props } } as ISpotOrderRow,
+        ];
   }
 
   // Alias some UI calls use
@@ -98,6 +105,9 @@ export class SpotOrdersService {
       id_desired: quote,
       network: net
     });
+
+    // Optimistic: remove from local openedOrders
+    this._openedOrders = this._openedOrders.filter(o => o?.uuid !== uuid);
   }
 
   closeAllOrders() {
