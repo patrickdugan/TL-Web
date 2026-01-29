@@ -509,6 +509,8 @@ export class TxsService {
         //-----------------------------------------------------------
         let signedPsbtHex: string | undefined;
         let signedPsbtBase64: string | undefined;
+        let finalHex: string | undefined = undefined;
+        let isFinished = false;
 
         if (isPhantom) {
           // Determine signing indexes: seller signs vIn 0 only, buyer signs the rest
@@ -534,7 +536,7 @@ export class TxsService {
             psbtHex,
             network: this.balanceService.NETWORK,
             sellerFlag,
-            redeemScript  // ← ADDED: Pass redeemScript to extension
+            redeemScript,
           });
 
           if (!response || !response.success) {
@@ -542,6 +544,8 @@ export class TxsService {
           }
 
           signedPsbtHex = response.data.psbtHex;
+          finalHex = response.data?.rawTx;
+          isFinished = response.data?.isFinished ?? !!finalHex;
         }
 
         if (!signedPsbtHex) {
@@ -549,11 +553,8 @@ export class TxsService {
         }
 
         //-----------------------------------------------------------
-        // 2. FINALIZATION (Phantom needs relayer; custom may already be final)
+        // 2. FINALIZATION (Phantom needs relayer; custom already handled above)
         //-----------------------------------------------------------
-        let finalHex: string | undefined = undefined;
-        let isFinished = false;
-
         if (isPhantom) {
           if (!sellerFlag) {
             const finalizeRes = await axios.post(
@@ -576,16 +577,6 @@ export class TxsService {
             finalHex = undefined;
             isFinished = false;
           }
-        } else if (isCustom) {
-          const response = await window.myWallet!.sendRequest("signPsbt", {
-            psbtHex,
-            network: this.balanceService.NETWORK,
-            sellerFlag,
-            redeemScript  // ← ADDED: Pass redeemScript to extension
-          });
-
-          finalHex = response.data?.rawTx;
-          isFinished = response.data?.isFinished ?? !!finalHex;
         }
 
         //-----------------------------------------------------------

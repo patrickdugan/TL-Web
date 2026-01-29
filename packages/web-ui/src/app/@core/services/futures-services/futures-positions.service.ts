@@ -95,7 +95,7 @@ export class FuturesPositionsService {
 
 	    try {
 	        const res = await axios.post(
-	            `${this.relayerUrl}/rpc/contractPosition`,
+	            `${this.relayerUrl}/rpc/tl_contractPosition`,
 	            {
 	                params: [{
 	                    address,
