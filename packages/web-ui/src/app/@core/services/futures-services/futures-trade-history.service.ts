@@ -13,6 +13,13 @@ export interface FuturesTradeRow {
   yourRole: string;
   yourFee?: number;
   txid?: string;
+  counterparty?: string;
+  // UI aliases (do not remove existing bindings)
+  amount?: number;
+  total?: number;
+  role?: string;
+  fee?: number;
+  tx?: string;
   buyer?: string;
   seller?: string;
   // you can add other fields your template might use
@@ -106,40 +113,83 @@ export class FuturesTradeHistoryService {
       });
 
       const payload = res.data?.result ?? res.data;
-      const rawRows: any[] = Array.isArray(payload) ? payload : (payload?.rows ?? []);
+      const rawRows: any[] = Array.isArray(payload)
+        ? payload
+        : (payload?.rows ?? payload?.history ?? []);
 
       // normalize backend → UI
       const rows: FuturesTradeRow[] = rawRows.map((r: any) => {
-        // Many backends expose buyer/seller for futures fills as well.
-        // If yours uses "long/short" or "maker/taker" instead, tweak here.
-        const side: 'BUY' | 'SELL' | string =
-          r?.buyer && addr ? (r.buyer === addr ? 'BUY' : 'SELL') : (r?.side ?? '');
+        const trade = r?.trade ?? {};
+        const addrL = String(addr || '').toLowerCase();
 
-        const qty = Number(
-          r?.amount ??
-          r?.quantity ??
-          r?.qty ??
-          r?.baseAmount ??
-          r?.size ??
-          r?.contractAmount ??
-          0
-        );
+        const buyerAddr = String(trade?.buyerAddress ?? '');
+        const sellerAddr = String(trade?.sellerAddress ?? '');
 
-        const price = Number(r?.price ?? r?.fillPrice ?? r?.tradePrice ?? 0);
+        const isBuyer = buyerAddr.toLowerCase() === addrL;
+        const isSeller = sellerAddr.toLowerCase() === addrL;
+
+        const side = isBuyer ? 'BUY' : isSeller ? 'SELL' : '';
+
+        const qty = Number(trade?.amount ?? 0);
+        const price = Number(trade?.price ?? 0);
+
         const baseAmount = Math.abs(qty);
         const totalQuote = baseAmount * price;
 
+        let yourRole = '';
+
+        const buyerFee = Number(r?.trade?.buyerFee ?? 0);
+        const sellerFee = Number(r?.trade?.sellerFee ?? 0);
+
+        if (buyerFee === sellerFee) {
+          yourRole = 'Split';
+        } else if (isBuyer) {
+          yourRole = buyerFee > sellerFee ? 'Taker' : 'Maker';
+        } else if (isSeller) {
+          yourRole = sellerFee > buyerFee ? 'Taker' : 'Maker';
+        }
+
+        const yourFee = Number(
+          isBuyer ? trade?.buyerFee :
+          isSeller ? trade?.sellerFee :
+          0
+        );
+
+        const txid = String(
+          r?.txid ??
+          trade?.txid ??
+          r?._id ??
+          ''
+        );
+
+        const counterparty = String(
+          isBuyer ? sellerAddr :
+          isSeller ? buyerAddr :
+          ''
+        );
+
         return {
-          block: Number(r?.block ?? r?.height ?? 0),
+          block: Number(
+            trade?.block ??
+            r?.block ??
+            r?.blockHeight ??
+            0
+          ),
           side,
           baseAmount,
           price,
           totalQuote,
-          yourRole: side,                 // mirrors spot; adjust if you show "Maker/Taker" instead
-          yourFee: Number(r?.takerFee ?? r?.fee ?? 0),
-          txid: r?.txid ?? r?._id ?? '',
-          buyer: r?.buyer,
-          seller: r?.seller,
+          yourRole,
+          yourFee,
+          txid,
+          counterparty,
+          amount: baseAmount,
+          total: totalQuote,
+          role: yourRole,
+          fee: yourFee,
+          tx: txid,
+          buyer: buyerAddr,
+          seller: sellerAddr,
         };
       });
 
