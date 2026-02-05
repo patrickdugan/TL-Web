@@ -10,8 +10,6 @@ import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-ma
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
 import { DialogService } from 'src/app/@core/services/dialogs.service';
 
-type NetworkOpt = { value: ENetwork; label: string };
-
 @Component({
   selector: 'select-network-dialog',
   templateUrl: './select-network.component.html',
@@ -38,23 +36,9 @@ export class SelectNetworkDialog implements OnInit {
     this.dialogRef.afterClosed().subscribe(() => {
       console.log('[SelectNetworkDialog] closed');
     });
-    if (typeof window !== 'undefined') {
-      (window as any).__pm_networkOptions = this.networkOptions;
-    }
   }
 
   ngOnInit(): void { }
-
-  get networkOptions(): NetworkOpt[] {
-    const defaults: ENetwork[] = [ENetwork.BTC, ENetwork.LTC, ENetwork.LTCTEST];
-    const opts = defaults.map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
-
-    if (!opts.some(o => o.value === this.network)) {
-      this.network = opts[0]?.value ?? this.network;
-    }
-
-    return opts;
-  }
 
   async selectNetwork(): Promise<void> {
     try {
