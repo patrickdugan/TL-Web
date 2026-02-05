@@ -32,6 +32,17 @@ body {
     user-select: none;
 }
 
+/* Force Angular CDK overlays above dialog/backdrop (Firefox overlay stacking issues) */
+.cdk-overlay-container,
+.cdk-global-overlay-wrapper {
+  position: fixed;
+  z-index: 2000;
+}
+
+.cdk-overlay-pane {
+  pointer-events: auto;
+}
+
 .drawer-container {
   background-color: var(--background);
   height: 100%;
