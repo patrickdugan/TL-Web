@@ -48,3 +48,50 @@
         }
     }
 }
+
+.dialog-body {
+    padding: 1rem 1.25rem;
+}
+
+.field {
+    margin-top: 0.75rem;
+}
+
+.field-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--softGrey);
+    font-size: 0.9rem;
+}
+
+.field-control {
+    width: 100%;
+}
+
+.native-select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--violet2);
+    color: var(--softGrey);
+    border: 1px solid var(--greyBlue);
+    border-radius: 4px;
+}
+
+.firefox-only {
+    display: none;
+}
+
+/* Show native select in Firefox, hide mat-select to avoid overlay bugs */
+@supports (-moz-appearance: none) {
+    .firefox-only {
+        display: block;
+    }
+    .mat-select-field {
+        display: none;
+    }
+}
+
+.native-select:focus {
+    outline: 2px solid var(--lightBlue);
+    outline-offset: 1px;
+}
