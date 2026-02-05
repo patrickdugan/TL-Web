@@ -22,7 +22,7 @@ const server = http.createServer((req, res) => {
         '.ttf': 'application/font-ttf',
         '.eot': 'application/vnd.ms-fontobject',
         '.otf': 'application/font-otf',
-        '.svg': 'application/image/svg+xml',
+        '.svg': 'image/svg+xml',
     };
 
     const contentType = mimeTypes[extname] || 'application/octet-stream';

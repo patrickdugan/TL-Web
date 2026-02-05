@@ -232,7 +232,7 @@ async connectWallet() {
       case 'BTC':     return 'assets/icons/btc.svg';
       case 'LTC':     return 'assets/icons/ltc.svg';
       case 'LTCTEST': return 'assets/icons/ltc-test.svg';
-      default:        return 'assets/icons/net.svg';
+      default:        return 'assets/icons/tl_logo_circle_only_small.png';
     }
   }
 
