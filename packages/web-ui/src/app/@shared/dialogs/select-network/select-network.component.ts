@@ -8,6 +8,7 @@ import { WindowsService } from 'src/app/@core/services/windows.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
+import { DialogService } from 'src/app/@core/services/dialogs.service';
 
 type NetworkOpt = { value: ENetwork; label: string };
 
@@ -18,7 +19,6 @@ type NetworkOpt = { value: ENetwork; label: string };
 })
 export class SelectNetworkDialog implements OnInit {
   public network: ENetwork = ENetwork.LTC; // default like old version
-  public options: NetworkOpt[] = [];
 
   constructor(
     private rpcService: RpcService,
@@ -29,36 +29,31 @@ export class SelectNetworkDialog implements OnInit {
     private windowsService: WindowsService,
     private balanceService: BalanceService,
     private futures: FuturesMarketService,
-    private spot: SpotMarketsService
+    private spot: SpotMarketsService,
+    private dialogService: DialogService
   ) {
     // enable click-off close
     this.dialogRef.disableClose = false;
     this.dialogRef.backdropClick().subscribe(() => this.cancel());
+    this.dialogRef.afterClosed().subscribe(() => {
+      console.log('[SelectNetworkDialog] closed');
+    });
+    if (typeof window !== 'undefined') {
+      (window as any).__pm_networkOptions = this.networkOptions;
+    }
   }
 
-  ngOnInit(): void {
-    // Build options from ENetwork; fall back if enum is empty at runtime
-    const enumObj = (ENetwork as any) || {};
-    const keys = Object.keys(enumObj).filter(k => isNaN(Number(k)));
-    if (keys.length) {
-      this.options = keys.map(k => ({
-        value: enumObj[k] as ENetwork,
-        label: k.replace(/_/g, ' ')
-      }));
-    } else {
-      // Fallback list so the modal is never empty
-      this.options = [
-        { value: ENetwork.LTC, label: 'LTC' },
-        // add others if your enum normally has them
-      ];
+  ngOnInit(): void { }
+
+  get networkOptions(): NetworkOpt[] {
+    const defaults: ENetwork[] = [ENetwork.BTC, ENetwork.LTC, ENetwork.LTCTEST];
+    const opts = defaults.map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
+
+    if (!opts.some(o => o.value === this.network)) {
+      this.network = opts[0]?.value ?? this.network;
     }
 
-    // Ensure the selected value is one of the options
-    if (!this.options.some(o => o.value === this.network)) {
-      this.network = this.options[0]?.value ?? this.network;
-    }
-
-    // No manual change detection needed; Angular will render options on init
+    return opts;
   }
 
   async selectNetwork(): Promise<void> {
@@ -92,6 +87,14 @@ export class SelectNetworkDialog implements OnInit {
   }
 
   cancel(): void {
+    console.log('[SelectNetworkDialog] cancel clicked');
     this.dialogRef.close(false);
+    this.dialogService.closeAllDialogs();
+    setTimeout(() => {
+      const overlay = document.querySelector('.cdk-overlay-container');
+      if (!overlay) return;
+      overlay.querySelectorAll('.cdk-overlay-pane, .cdk-overlay-backdrop')
+        .forEach((el) => el.remove());
+    }, 0);
   }
 }
