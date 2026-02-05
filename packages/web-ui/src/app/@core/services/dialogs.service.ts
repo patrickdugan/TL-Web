@@ -52,7 +52,17 @@ export class DialogService {
     openDialog(dialogType: DialogTypes, opts: MatDialogConfig = { disableClose: true }) {
         const dialog = dialogs[dialogType];
         if (!dialog) return;
-        return this.matDialogService.open(dialog, opts);
+
+        const normalizedOpts: MatDialogConfig = { ...opts };
+
+        // Firefox focus-trap deadlocks are common with mat-select inside dialogs.
+        // Disable autofocus/restoreFocus for the select-network dialog unless the caller overrides.
+        if (dialogType === DialogTypes.SELECT_NETOWRK) {
+            if (normalizedOpts.autoFocus === undefined) normalizedOpts.autoFocus = false;
+            if (normalizedOpts.restoreFocus === undefined) normalizedOpts.restoreFocus = false;
+        }
+
+        return this.matDialogService.open(dialog, normalizedOpts);
     }
 
     closeAllDialogs() {
