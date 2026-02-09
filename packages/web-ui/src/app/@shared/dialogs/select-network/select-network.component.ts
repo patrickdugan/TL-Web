@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
@@ -8,7 +8,8 @@ import { WindowsService } from 'src/app/@core/services/windows.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
-import { DialogService } from 'src/app/@core/services/dialogs.service';
+
+type NetworkOpt = { value: ENetwork; label: string };
 
 @Component({
   selector: 'select-network-dialog',
@@ -17,6 +18,7 @@ import { DialogService } from 'src/app/@core/services/dialogs.service';
 })
 export class SelectNetworkDialog implements OnInit {
   public network: ENetwork = ENetwork.LTC; // default like old version
+  public options: NetworkOpt[] = [];
 
   constructor(
     private rpcService: RpcService,
@@ -26,19 +28,34 @@ export class SelectNetworkDialog implements OnInit {
     private loadingService: LoadingService,
     private windowsService: WindowsService,
     private balanceService: BalanceService,
+    private cdr: ChangeDetectorRef,
     private futures: FuturesMarketService,
-    private spot: SpotMarketsService,
-    private dialogService: DialogService
+    private spot: SpotMarketsService
   ) {
     // enable click-off close
     this.dialogRef.disableClose = false;
     this.dialogRef.backdropClick().subscribe(() => this.cancel());
-    this.dialogRef.afterClosed().subscribe(() => {
-      console.log('[SelectNetworkDialog] closed');
-    });
   }
 
-  ngOnInit(): void { }
+  ngOnInit(): void {
+    const enumObj = (ENetwork as any) || {};
+    const keys = Object.keys(enumObj).filter((k) => isNaN(Number(k)));
+
+    if (keys.length) {
+      this.options = keys.map((k) => ({
+        value: enumObj[k] as ENetwork,
+        label: k.replace(/_/g, ' '),
+      }));
+    } else {
+      this.options = [{ value: ENetwork.LTC, label: 'LTC' }];
+    }
+
+    if (!this.options.some((o) => o.value === this.network)) {
+      this.network = this.options[0]?.value ?? this.network;
+    }
+
+    Promise.resolve().then(() => this.cdr.detectChanges());
+  }
 
   async selectNetwork(): Promise<void> {
     try {
@@ -71,14 +88,6 @@ export class SelectNetworkDialog implements OnInit {
   }
 
   cancel(): void {
-    console.log('[SelectNetworkDialog] cancel clicked');
     this.dialogRef.close(false);
-    this.dialogService.closeAllDialogs();
-    setTimeout(() => {
-      const overlay = document.querySelector('.cdk-overlay-container');
-      if (!overlay) return;
-      overlay.querySelectorAll('.cdk-overlay-pane, .cdk-overlay-backdrop')
-        .forEach((el) => el.remove());
-    }, 0);
   }
 }

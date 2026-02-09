@@ -44,6 +44,11 @@ export class DialogService {
         private matDialogService: MatDialog,
     ) {}
 
+    private get isFirefox(): boolean {
+        if (typeof navigator === 'undefined') return false;
+        return /firefox/i.test(navigator.userAgent);
+    }
+
     openEncKeyDialog(encKey: string) {
         const dialogOpts: MatDialogConfig = { disableClose: true, data: encKey };
         return this.openDialog(DialogTypes.ENC_KEY, dialogOpts)
@@ -57,7 +62,7 @@ export class DialogService {
 
         // Firefox focus-trap deadlocks are common with mat-select inside dialogs.
         // Disable autofocus/restoreFocus for the select-network dialog unless the caller overrides.
-        if (dialogType === DialogTypes.SELECT_NETOWRK) {
+        if (dialogType === DialogTypes.SELECT_NETOWRK && this.isFirefox) {
             if (normalizedOpts.autoFocus === undefined) normalizedOpts.autoFocus = false;
             if (normalizedOpts.restoreFocus === undefined) normalizedOpts.restoreFocus = false;
         }

@@ -6,20 +6,20 @@
     <mat-form-field appearance="fill" class="field-control mat-select-field">
       <mat-label>Network</mat-label>
       <mat-select [(ngModel)]="network">
-        <mat-option [value]="'BTC'">BTC</mat-option>
-        <mat-option [value]="'LTC'">LTC</mat-option>
-        <mat-option [value]="'LTCTEST'">LTCTEST</mat-option>
+        <mat-option *ngFor="let opt of options" [value]="opt.value">
+          {{ opt.label }}
+        </mat-option>
       </mat-select>
     </mat-form-field>
     <select class="native-select firefox-only" [(ngModel)]="network">
-      <option [ngValue]="'BTC'">BTC</option>
-      <option [ngValue]="'LTC'">LTC</option>
-      <option [ngValue]="'LTCTEST'">LTCTEST</option>
+      <option *ngFor="let opt of options" [ngValue]="opt.value">
+        {{ opt.label }}
+      </option>
     </select>
   </div>
 
   <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px;">
-    <button mat-button type="button" [mat-dialog-close]="false" (click)="cancel()">Cancel</button>
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
     <button mat-raised-button color="primary" type="button" (click)="confirm()" [disabled]="!network">
       Select Network
     </button>
