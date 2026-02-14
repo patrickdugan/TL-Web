@@ -9,7 +9,7 @@ import { AuthService } from "../auth.service";
 import { RpcService } from "../rpc.service";
 import { ApiService } from "../api.service";
 import { Subscription } from 'rxjs';
-import axios from 'axios';
+import { RelayerWsService } from "../relayer-ws.service";
 
 export interface IPosition {
     entry_price: string;
@@ -44,6 +44,7 @@ export class FuturesPositionsService {
         private authService: AuthService,
         private toastrService: ToastrService,
         private apiService: ApiService,
+        private relayerWsService: RelayerWsService,
     ) {}
 
     get pendingPositionDelta() {
@@ -94,17 +95,18 @@ export class FuturesPositionsService {
 	    const contractId = this.selectedContractId;
 
 	    try {
-	        const res = await axios.post(
-	            `${this.relayerUrl}/rpc/tl_contractPosition`,
-	            {
-	                params: [{
-	                    address,
-	                    contractId
-	                }]
-	            }
-	        );
+          this.relayerWsService.setBaseUrl(this.relayerUrl);
+	        const res = await this.relayerWsService.request<any>(`/rpc/tl_contractPosition`, {
+            method: "POST",
+            body: {
+              params: [{
+                address,
+                contractId
+              }]
+            }
+          });
 
-	        const raw = res.data?.data ?? res.data;
+	        const raw = res?.data ?? res;
 
 	        if (raw?.error || !raw) {
 	            this.toastrService.error(
@@ -143,12 +145,13 @@ export class FuturesPositionsService {
 	  const cid = Number(this.selectedContractId);
 
 	  try {
-	    const mempoolRes = await axios.post(
-	      `${this.relayerUrl}/rpc/getrawmempool`,
-	      { params: [true] }
-	    );
+      this.relayerWsService.setBaseUrl(this.relayerUrl);
+	    const mempoolRes = await this.relayerWsService.request<any>(`/rpc/getrawmempool`, {
+        method: "POST",
+        body: { params: [true] }
+      });
 
-	    const mempool = mempoolRes.data?.data ?? mempoolRes.data;
+	    const mempool = mempoolRes?.data ?? mempoolRes;
 	    const txids = Object.keys(mempool || {});
 
 	    if (!txids.length) {
@@ -162,14 +165,14 @@ export class FuturesPositionsService {
 
 	    for (const txid of txids.slice(0, limit)) {
 	      try {
-	        const txRes = await axios.post(
-	          `${this.relayerUrl}/rpc/getrawtransaction`,
-	          { params: [txid, true] }
-	        );
+	        const txRes = await this.relayerWsService.request<any>(`/rpc/getrawtransaction`, {
+            method: "POST",
+            body: { params: [txid, true] }
+          });
 
 	        checked++;
 
-	        const tx = txRes.data?.data ?? txRes.data;
+	        const tx = txRes?.data ?? txRes;
 	        if (!tx) continue;
 
 	        const channelAddress =
@@ -227,17 +230,14 @@ export class FuturesPositionsService {
 	    channelAddress: string
 	): Promise<'A' | 'B' | null> {
 	    try {
-	        const res = await axios.post(
-	            `${this.relayerUrl}/rpc/tl_getChannel`,
-	            {
-	                params: [],
-	            },
-	            {
-	                params: { address: channelAddress }
-	            }
-	        );
+          this.relayerWsService.setBaseUrl(this.relayerUrl);
+	        const res = await this.relayerWsService.request<any>(`/rpc/tl_getChannel`, {
+            method: "POST",
+            query: { address: channelAddress },
+            body: { params: [] },
+          });
 
-	        const channel = res.data?.data ?? res.data;
+	        const channel = res?.data ?? res;
 	        const participants = channel?.participants ?? channel?.data?.participants;
 
 	        if (!participants) {

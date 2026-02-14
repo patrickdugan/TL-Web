@@ -12,7 +12,6 @@ import { TxsService } from 'src/app/@core/services/txs.service';
 import { PasswordDialog } from 'src/app/@shared/dialogs/password/password.component';
 import { ENCODER } from 'src/app/utils/payloads/encoder';
 import { WalletService } from 'src/app/@core/services/wallet.service'
-import axios from 'axios';
 
 @Component({
   selector: 'tl-portoflio-page',
@@ -167,7 +166,8 @@ export class PortfolioPageComponent implements OnInit {
 
       const payload = { pubkey:_pubkey };
       console.log('attestation utxo query and payload '+`${this.url}/address/utxo/${_address}` + JSON.stringify(payload))
-      const { data: unspentUtxos } = await axios.post(`${this.url}/address/utxo/${_address}`, payload);
+      const utxoRes = await this.txsService.fetchUTXOs(_address, _pubkey);
+      const unspentUtxos = (utxoRes as any)?.data || utxoRes;
 
 
       const res = await this.txsService.buildSignSendTx({

@@ -5,7 +5,7 @@ import { RpcService } from "./rpc.service";
 import { ApiService } from "./api.service";
 import {WalletService} from "./wallet.service"
 import {BalanceService} from "./balance.service"
-import axios from 'axios'
+import { RelayerWsService } from "./relayer-ws.service";
 
 @Injectable({
     providedIn: 'root',
@@ -26,7 +26,8 @@ export class AttestationService {
         private apiService: ApiService,
         private walletService: WalletService,
         private toastrService: ToastrService,
-        private balanceService: BalanceService
+        private balanceService: BalanceService,
+        private relayerWsService: RelayerWsService
     ) { }
 
     get tlApi() {
@@ -75,9 +76,16 @@ export class AttestationService {
 
         try {
             const payload = { address, id: 0 };
-            const response = await axios.post(`${url}/rpc/tl_getAttestations`, payload);
+            this.relayerWsService.setBaseUrl(url);
+            const response = await this.relayerWsService.request<any>(
+              `/rpc/tl_getAttestations`,
+              {
+                method: "POST",
+                body: payload,
+              }
+            );
 
-            const attestationArray = response?.data || [];
+            const attestationArray = response?.data || response || [];
             const attestationData = attestationArray.find(
                 (entry: any) => entry?.data?.status === 'active'
             );

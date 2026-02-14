@@ -1,9 +1,9 @@
 import { Injectable } from '@angular/core';
-import axios, { AxiosResponse } from 'axios';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
+import { RelayerWsService } from '../relayer-ws.service';
 
 export interface ChannelBalanceRow {
   channel: string;
@@ -41,7 +41,8 @@ export class SpotChannelsService {
     private authService: AuthService,
     private walletService: WalletService,
     private spotMarkets: SpotMarketsService,
-    private rpcService: RpcService
+    private rpcService: RpcService,
+    private relayerWsService: RelayerWsService
   ) {
     // Optional: live refresh on address/market change if streams exist
     this.authService.updateAddressesSubs$?.subscribe(() => this.refreshNow());
@@ -175,15 +176,14 @@ export class SpotChannelsService {
       // Use first_token.propertyId from IMarket interface (0 is valid for LTC)
       const propertyId = m?.first_token?.propertyId;
 
-      const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
-        await axios.post(
-          `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`,
-          {
-            params: [addr, propertyId],
-          }
-        );
-
-      const data = res.data;
+      this.relayerWsService.setBaseUrl(this.relayerUrl);
+      const data = await this.relayerWsService.request<any>(
+        `/rpc/tl_channelBalanceForCommiter`,
+        {
+          method: "POST",
+          body: { params: [addr, propertyId] },
+        }
+      );
       const rawRows: any[] = Array.isArray(data)
         ? data
         : Array.isArray(data?.rows)

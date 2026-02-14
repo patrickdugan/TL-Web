@@ -4,7 +4,7 @@ import { SocketService } from "../socket.service";
 import { FuturesPositionsService } from "./futures-positions.service";
 import { RpcService, ENetwork } from 'src/app/@core/services/rpc.service';
 import { ENDPOINTS } from 'src/environments/endpoints.conf';
-import axios from 'axios';
+import { RelayerWsService } from '../relayer-ws.service';
 
 export interface IFuturesMarketType {
     name: string;
@@ -48,6 +48,7 @@ export class FuturesMarketService {
         private socketService: SocketService,
         private futuresPositionsService: FuturesPositionsService,
         private rpcService: RpcService,
+        private relayerWsService: RelayerWsService,
     ) {}
 
     // --- Removed socket getter! ---
@@ -161,14 +162,16 @@ export class FuturesMarketService {
         for (const market of allMarkets) {
             try {
                 const rpcUrl = this.relayerUrl.replace(/\/+$/, '') + '/rpc/tl_listContractSeries';
-
-                const res = await axios.post(rpcUrl, {
-                  jsonrpc: "2.0",
-                  id: 1,
-                  params: [market.contract_id]
+                const base = rpcUrl.replace(/\/rpc\/tl_listContractSeries$/, '');
+                this.relayerWsService.setBaseUrl(base);
+                const info = await this.relayerWsService.request<any>(`/rpc/tl_listContractSeries`, {
+                  method: "POST",
+                  body: {
+                    jsonrpc: "2.0",
+                    id: 1,
+                    params: [market.contract_id]
+                  },
                 });
-
-                const info = res.data;
                 market.leverage = info?.leverage ?? undefined;
                 market.notional = info?.notionalValue ?? undefined;
                 market.inverse = info?.inverse ?? undefined;

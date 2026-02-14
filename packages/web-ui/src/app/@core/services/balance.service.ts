@@ -3,8 +3,7 @@ import { ToastrService } from 'ngx-toastr';
 import { AuthService } from './auth.service';
 import { WalletService } from './wallet.service';
 import { RpcService, TNETWORK } from "./rpc.service";
-
-import axios from 'axios';
+import { RelayerWsService } from './relayer-ws.service';
 
 const minBlocksForBalanceConf: number = 1;
 const emptyBalanceObj = {
@@ -41,7 +40,8 @@ export class BalanceService {
     private authService: AuthService,
     private toastrService: ToastrService,
     private walletService: WalletService,
-    private rpcService: RpcService
+    private rpcService: RpcService,
+    private relayerWsService: RelayerWsService
   ) {}
 
   get allBalances() {
@@ -139,11 +139,14 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     try {
       const payload = { pubkey };
       console.log('balance utxo query '+`${this.url}/address/utxo/${address}` +JSON.stringify(payload))
-      const { data: unspentUtxos } = await axios.post(
-          `${this.url}/address/utxo/${address}`,
-          payload,
-          { headers: { 'Content-Type': 'application/json' } }
-        );
+      this.relayerWsService.setBaseUrl(this.url);
+      const unspentUtxos = await this.relayerWsService.request<any[]>(
+        `/address/utxo/${address}`,
+        {
+          method: 'POST',
+          body: payload,
+        }
+      );
 
       const confirmed = unspentUtxos
         .filter((utxo: any) => utxo.confirmations >= minBlocksForBalanceConf)
@@ -169,7 +172,11 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     if (!address) throw new Error('No address provided for updating the token balance');
 
     try {
-      const { data: tokens } = await axios.get(`${this.url}/address/balance/${address}`);
+      this.relayerWsService.setBaseUrl(this.url);
+      const tokens = await this.relayerWsService.request<any[]>(
+        `/address/balance/${address}`,
+        { method: 'GET' }
+      );
       if (!this._allBalancesObj[address]) this._allBalancesObj[address] = emptyBalanceObj;
 
       this._allBalancesObj[address].tokensBalance = tokens.map((token: any) => ({

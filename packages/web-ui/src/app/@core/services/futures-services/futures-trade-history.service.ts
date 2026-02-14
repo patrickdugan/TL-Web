@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import axios, { AxiosResponse } from 'axios';
 import { ApiService } from 'src/app/@core/services/api.service';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
+import { RelayerWsService } from '../relayer-ws.service';
 
 export interface FuturesTradeRow {
   block: number;
@@ -40,7 +40,8 @@ export class FuturesTradeHistoryService {
   constructor(
     private api: ApiService,
     private auth: AuthService,
-    private futMarkets: FuturesMarketService
+    private futMarkets: FuturesMarketService,
+    private relayerWsService: RelayerWsService
   ) {
     this.start();
 
@@ -107,12 +108,13 @@ export class FuturesTradeHistoryService {
       }
 
       const uri = this.baseURL;
-
-      const res: AxiosResponse<any> = await axios.post(uri, {
-        params: [contractId, collateralPropertyId, addr],
+      const base = uri.replace(/\/rpc\/tl_contractTradeHistoryForAddress$/, '');
+      this.relayerWsService.setBaseUrl(base);
+      const res = await this.relayerWsService.request<any>(`/rpc/tl_contractTradeHistoryForAddress`, {
+        method: "POST",
+        body: { params: [contractId, collateralPropertyId, addr] },
       });
-
-      const payload = res.data?.result ?? res.data;
+      const payload = res?.result ?? res;
       const rawRows: any[] = Array.isArray(payload)
         ? payload
         : (payload?.rows ?? payload?.history ?? []);

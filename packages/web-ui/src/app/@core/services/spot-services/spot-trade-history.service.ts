@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { ApiService } from 'src/app/@core/services/api.service';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
-import axios from 'axios'
+import { RelayerWsService } from '../relayer-ws.service';
 
 export interface SpotTradeRecord {
   txid: string;
@@ -24,7 +24,8 @@ export class SpotTradeHistoryService {
   constructor(
     private apiService: ApiService,
     private authService: AuthService,
-    private spotMarkets: SpotMarketsService
+    private spotMarkets: SpotMarketsService,
+    private relayerWsService: RelayerWsService
   ) {}
 
   /** Convenience accessor (matches your pattern) */
@@ -85,15 +86,17 @@ export class SpotTradeHistoryService {
       }
 
       const uri = this.baseURL+'tl_tokenTradeHistoryForAddress'
-      
-      const res = await axios.post(uri, {
-        params: [p1, p2, addr],
+      const base = this.baseURL.replace(/\/rpc\/$/, '');
+      this.relayerWsService.setBaseUrl(base);
+      const res = await this.relayerWsService.request<any>(`/rpc/tl_tokenTradeHistoryForAddress`, {
+        method: "POST",
+        body: { params: [p1, p2, addr] },
       });
 
 
       console.log('spot token trade history res '+JSON.stringify(res))
 
-     const payload = (res.data && res.data.result !== undefined) ? res.data.result: res.data;
+     const payload = (res?.data && res.data.result !== undefined) ? res.data.result: (res?.result ?? res?.data ?? res);
       const rawRows = Array.isArray(payload) ? payload : (payload?.rows ?? []);
 
       // normalize backend → UI

@@ -6,7 +6,7 @@ import { BalanceService } from "./balance.service";
 import { LoadingService } from "./loading.service";
 import { RpcService, TNETWORK } from "./rpc.service";
 import {WalletService} from "./wallet.service"
-import axios from "axios";
+import { RelayerWsService } from "./relayer-ws.service";
 
 export interface IUTXO {
   amount: number;
@@ -101,7 +101,8 @@ export class TxsService {
     private loadingService: LoadingService,
     private toastrService: ToastrService,
     private balanceService: BalanceService,
-    private walletService: WalletService
+    private walletService: WalletService,
+    private relayerWsService: RelayerWsService
   ) {}
 
   private get relayerUrl(): string {
@@ -111,19 +112,20 @@ export class TxsService {
   }
 
   async getContractInfo(contractId: number) {
-    const res = await axios.post(
-      `${this.relayerUrl}/rpc/tl_getContractInfo`,
-      { params: [{ contractId }] }
-    );
-    return res.data;
+    this.relayerWsService.setBaseUrl(this.relayerUrl);
+    return this.relayerWsService.request(`/rpc/tl_getContractInfo`, {
+      method: "POST",
+      body: { params: [{ contractId }] },
+    });
   }
 
   async getInitMarginPerContract(contractId: number, price: number) {
-    const res = await axios.post(
-      `${this.relayerUrl}/rpc/tl_getInitMargin`,
-      { params: [{ contractId, price }] }
-    );
-    return Number(res.data);
+    this.relayerWsService.setBaseUrl(this.relayerUrl);
+    const res = await this.relayerWsService.request(`/rpc/tl_getInitMargin`, {
+      method: "POST",
+      body: { params: [{ contractId, price }] },
+    });
+    return Number(res);
   }
 
 
@@ -168,9 +170,13 @@ export class TxsService {
           : this.baseUrl;
 
           console.log('build trade url '+url)
-      const response = await axios.post(`${url}/tx/buildTradeTx`, tradeConfig);
+      this.relayerWsService.setBaseUrl(url);
+      const response = await this.relayerWsService.request(`${'/tx/buildTradeTx'}`, {
+        method: "POST",
+        body: tradeConfig,
+      });
       console.log("trade build response " + JSON.stringify(response));
-      return response.data;
+      return response as any;
     } catch (error: any) {
       console.error("Error in buildTradeTx:", error.message);
       return { error: error.message };
@@ -199,9 +205,13 @@ export class TxsService {
             console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
       }
       const uri = this.baseUrl+'/tx/buildLTCTradeTx'
-      const response = await axios.post(uri,{buildLTCITTxConfig});
+      this.relayerWsService.setBaseUrl(this.baseUrl);
+      const response = await this.relayerWsService.request(uri.replace(this.baseUrl, ''), {
+        method: "POST",
+        body: { buildLTCITTxConfig },
+      });
       console.log('utxo build response '+JSON.stringify(response))
-      return response.data;
+      return response as any;
     } catch (error: any) {
       console.error("Error in buildLTCITTx:", error.message);
       return { error: error.message };
@@ -216,8 +226,12 @@ export class TxsService {
       const uri = this.baseUrl+'/address/utxo/'+address 
       console.log(uri)
       try {
-        const response = await axios.post(uri,{pubkey});
-        return response.data;
+        this.relayerWsService.setBaseUrl(this.baseUrl);
+        const response = await this.relayerWsService.request(uri.replace(this.baseUrl, ''), {
+          method: "POST",
+          body: { pubkey },
+        });
+        return response as any;
       } catch (error: any) {
         console.error('Error in fetch UTXOs:', error.message);
         return error;
@@ -557,21 +571,24 @@ export class TxsService {
         //-----------------------------------------------------------
         if (isPhantom) {
           if (!sellerFlag) {
-            const finalizeRes = await axios.post(
-              `${this.relayerUrl}/tx/finalizePsbt`,
-              { psbt: signedPsbtBase64 },
-              { headers: { "Content-Type": "application/json" } }
+            this.relayerWsService.setBaseUrl(this.relayerUrl);
+            const finalizeRes = await this.relayerWsService.request<any>(
+              `/tx/finalizePsbt`,
+              {
+                method: "POST",
+                body: { psbt: signedPsbtBase64 },
+              }
             );
 
-            if (!finalizeRes?.data?.success) {
+            if (!finalizeRes?.success) {
               return {
                 error:
-                  finalizeRes?.data?.error ||
+                  finalizeRes?.error ||
                   "Relayer failed to finalize Phantom PSBT.",
               };
             }
 
-            finalHex = finalizeRes.data.finalHex;
+            finalHex = finalizeRes.finalHex;
             isFinished = true;
           } else {
             finalHex = undefined;
@@ -646,12 +663,32 @@ export class TxsService {
           }
 
           try {
-			const response = await axios.post(`${this.baseUrl}/tx/decode`, { rawTx });
-            return response.data;
+            this.relayerWsService.setBaseUrl(this.baseUrl);
+			const response = await this.relayerWsService.request(`/tx/decode`, {
+        method: "POST",
+        body: { rawtx: rawTx },
+      });
+            return response as any;
           } catch (error: any) {
             console.error('Error in decode:', error.message);
             return error;
           }
+    }
+
+    async getTx(txid: string): Promise<{ data?: any; error?: string }> {
+      if (this.balanceService.NETWORK == "LTCTEST") {
+        this.baseUrl = "https://testnet-api.layerwallet.com";
+      }
+      try {
+        this.relayerWsService.setBaseUrl(this.baseUrl);
+        const response = await this.relayerWsService.request<any>(`/tx/${txid}`, {
+          method: "GET",
+        });
+        return response;
+      } catch (error: any) {
+        console.error("Error in getTx:", error.message);
+        return { error: error.message };
+      }
     }
 
     async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
@@ -660,14 +697,18 @@ export class TxsService {
           console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
         }
       try {
-        const response = await axios.post(`${this.baseUrl}/tx/sendTx`, { rawTx });
+        this.relayerWsService.setBaseUrl(this.baseUrl);
+        const response = await this.relayerWsService.request<any>(`/tx/sendTx`, {
+          method: "POST",
+          body: { rawTx },
+        });
         console.log('send response:', JSON.stringify(response));
 
-        if (response.data.error) {
-          return { error: response.data.error };
+        if (response.error) {
+          return { error: response.error };
         }
 
-        const txid = response.data.txid?.data;
+        const txid = response.txid?.data;
 
         return { data: txid }; // Ensure the returned type matches the Promise<{ data?: string; error?: string }>
       } catch (error: any) {
@@ -683,8 +724,9 @@ export class TxsService {
           }
 
           try {
-            const response = await axios.get(`${this.baseUrl}/chain/info`);
-            return response.data;
+            this.relayerWsService.setBaseUrl(this.baseUrl);
+            const response = await this.relayerWsService.request(`/chain/info`, { method: "GET" });
+            return response as any;
           } catch (error: any) {
             console.error('Error in getChainInfo:', error.message);
             return error;
@@ -697,8 +739,12 @@ export class TxsService {
           console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
         }
         try {
-          const response = await axios.post(`${this.baseUrl}/rpc/tl_getChannelColumn`, {channelAddress, myAddress, cpAddress });
-          return response.data;
+          this.relayerWsService.setBaseUrl(this.baseUrl);
+          const response = await this.relayerWsService.request(`/rpc/tl_getChannelColumn`, {
+            method: "POST",
+            body: { channelAddress, myAddress, cpAddress },
+          });
+          return response as any;
         } catch (error: any) {
           console.error('Error in predictColumn:', error.message);
           return error;
@@ -726,9 +772,13 @@ export class TxsService {
         console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
       }
         try {
-          const result = await axios.post(`${this.baseUrl}/tx/sendTx`, {rawTx});
+          this.relayerWsService.setBaseUrl(this.baseUrl);
+          const result = await this.relayerWsService.request<any>(`/tx/sendTx`, {
+            method: "POST",
+            body: { rawTx },
+          });
           console.log('result in send tx 0'+JSON.stringify(result))
-          return result.data.txid;
+          return result.txid;
         } catch (error: any) {
           if (retriesLeft > 0 && error.message.includes('bad-txns-inputs-missingorspent')) {
             await new Promise((resolve) => setTimeout(resolve, ms));

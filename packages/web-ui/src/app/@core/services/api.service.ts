@@ -5,6 +5,7 @@ import { MarketApiService } from "../apis/market-api.service";
 import { TradeLayerApiService } from "../apis/relayer-api.service";
 import { TNETWORK } from "./rpc.service";
 import { NewTradeLayerApiService } from "../apis/tl-api.service";
+import { RelayerWsService } from "./relayer-ws.service";
 
 
 @Injectable({
@@ -22,7 +23,10 @@ export class ApiService {
         private tradeLayerApiService: TradeLayerApiService,
         private keysApiService: KeysApiService,
         private newTLApiService: NewTradeLayerApiService,
-    ) {}
+        private relayerWsService: RelayerWsService,
+    ) {
+        this.relayerWsService.setBaseUrl(this._apiUrl);
+    }
 
     get network() {
         return this._network;
@@ -42,6 +46,7 @@ export class ApiService {
         this._apiUrl = value;
         this.mainApi.setApiUrl(value).toPromise();
         this.tradeLayerApiService.setApiUrl(value);
+        this.relayerWsService.setBaseUrl(value);
         console.log(`API: ${value}`);
     }
     
