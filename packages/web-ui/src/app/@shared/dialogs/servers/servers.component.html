@@ -84,6 +84,33 @@
                         </div>
                     </div>
                 </div> -->
+
+                <div class="servers-conteiner">
+                    <div class="title">Collator Manifest (TL-CSv1)</div>
+                    <div class="server" style="cursor: default;">
+                        <div class="is-selected" style="visibility: visible;">
+                            <p [ngStyle]="{'background-color': collatorManifest?.verified ? 'green' : 'red'}"></p>
+                        </div>
+                        <input
+                            type="text"
+                            class="input_url"
+                            placeholder="ws://127.0.0.1:8787/ws"
+                            [(ngModel)]="collatorWsUrl"
+                        >
+                        <div class="buttons" style="visibility: visible;">
+                            <button class="greenButton" mat-button (click)="fetchCollatorManifest()">Fetch</button>
+                        </div>
+                    </div>
+                    <div *ngIf="collatorManifest" style="font-size: 12px; opacity: 0.9; padding: 6px 0;">
+                        <div>manifestUrl: {{ collatorManifest.manifestUrl }}</div>
+                        <div>verified: {{ collatorManifest.verified ? 'yes' : 'no' }} <span *ngIf="!collatorManifest.verified">({{ collatorManifest.reason }})</span></div>
+                        <div *ngIf="collatorManifest.manifest">
+                            <div>collatorId: {{ collatorManifest.manifest.collatorId }}</div>
+                            <div>build: {{ collatorManifest.manifest.build?.version || '-' }} {{ collatorManifest.manifest.build?.gitSha || '' }}</div>
+                            <div>policy.network: ipLogging={{ collatorManifest.manifest.policy?.network?.ipLogging || '-' }}, vpn={{ collatorManifest.manifest.policy?.network?.vpnFilterMode || '-' }}, asn={{ collatorManifest.manifest.policy?.network?.asnBlockMode || '-' }}</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </mat-dialog-content>
     </div>

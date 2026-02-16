@@ -5,6 +5,7 @@ import { ConnectionService } from 'src/app/@core/services/connections.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { SocketService } from 'src/app/@core/services/socket.service';
+import { CollatorManifestService, ManifestFetchResult } from 'src/app/@core/services/collator-manifest.service';
 import { environment } from 'src/environments/environment';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -24,6 +25,9 @@ export class ServersDialog implements OnInit, OnDestroy {
   selectedOrderbookServer: string = this.orderbookServers[0];
   selectedApiServer: string = this.apiServers[0];
 
+  collatorWsUrl: string = 'ws://127.0.0.1:8787/ws';
+  collatorManifest: ManifestFetchResult | null = null;
+
   // FIX: Declare the subscription array properly!
   private socketSubscriptions: Subscription[] = [];
 
@@ -34,6 +38,7 @@ export class ServersDialog implements OnInit, OnDestroy {
     private toastrService: ToastrService,
     private apiService: ApiService,
     private loadingService: LoadingService,
+    private collatorManifests: CollatorManifestService,
   ) {}
 
   get isOrderbookConnected() {
@@ -122,5 +127,19 @@ export class ServersDialog implements OnInit, OnDestroy {
 
   disconnectApiServer() {
     this.apiService.apiUrl = null;
+  }
+
+  async fetchCollatorManifest() {
+    try {
+      this.loadingService.isLoading = true;
+      this.collatorManifest = await this.collatorManifests.fetch(this.collatorWsUrl);
+      if (!this.collatorManifest.verified) {
+        this.toastrService.warning(this.collatorManifest.reason || 'manifest unverified', 'Collator Manifest');
+      }
+    } catch (e: any) {
+      this.toastrService.error(e?.message || String(e), 'Collator Manifest');
+    } finally {
+      this.loadingService.isLoading = false;
+    }
   }
 }
