@@ -105,29 +105,29 @@
          <div class="tr" *ngFor="let r of discovery; let i = index">
           <div class="td w-56">{{ i + 1 }}</div>
           <div class="td">
-            <div class="name">{{ r.meta?.name || r.name }}</div>
+            <div class="name">{{ r.icon || '' }} {{ r.name }}</div>
             <div class="sub">
-              {{ r.meta?.symbol || '—' }}
-              • {{ r.meta?.mode || 'SPOT' }}
-              <ng-container *ngIf="r.meta?.venue">• {{ r.meta?.venue }}</ng-container>
-              <ng-container *ngIf="r.meta?.timeframe">• TF: {{ r.meta?.timeframe }}</ng-container>
+              {{ r.symbol || '-' }}
+              - {{ r.mode || 'SPOT' }}
+              <ng-container *ngIf="r.venue">- {{ r.venue }}</ng-container>
+              <ng-container *ngIf="r.frequencyLabel">- {{ r.frequencyLabel }}</ng-container>
             </div>
           </div>
 
 
           <div class="td w-140 right">
-            {{ ((r.meta?.size ?? r.size) / 1024) | number:'1.0-0' }} KB
+            {{ ((r.size ?? 0) / 1024) | number:'1.0-0' }} KB
           </div>
 
-          <div class="td w-260 nowrap" title="{{ (r.meta?.createdAt ?? r.createdAt) | date:'yyyy-MM-dd HH:mm:ss Z' }}">
-             {{ (r.meta?.createdAt ?? r.createdAt) | date:'yy-MM-dd · HH:mm' }}
+          <div class="td w-260 nowrap" title="{{ r.createdAt | date:'yyyy-MM-dd HH:mm:ss Z' }}">
+             {{ r.createdAt | date:'yy-MM-dd HH:mm' }}
           </div>
 
           <div class="td w-120">
             <span class="badge"
-                  [class.badge-running]="(r.meta?.status ?? r.status)==='running'"
-                  [class.badge-stopped]="(r.meta?.status ?? r.status)!=='running'">
-              {{ (r.meta?.status ?? r.status) || 'stopped' }}
+                  [class.badge-running]="r.status==='running'"
+                  [class.badge-stopped]="r.status!=='running'">
+              {{ r.status || 'stopped' }}
             </span>
           </div>
 
@@ -231,3 +231,5 @@
     </div>
   </div>
 </div>
+
+
