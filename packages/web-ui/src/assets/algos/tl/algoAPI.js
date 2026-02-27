@@ -40,6 +40,7 @@ const {
   getEphemeralKey,
   setEphemeralKey,
   clearEphemeralKey: clearEphemeralKeyStore,
+  setEphemeralKeyStoreMode,
 } = require('./keyStore.js');
 
 
@@ -85,8 +86,26 @@ function fillPath(path, params = {}) {
   return path.replace(/:([A-Za-z_]\w*)/g, (_, k) => encodeURIComponent(params[k] ?? ''));
 }
 
+function normalizeSecurityPolicy(policy = {}) {
+  const p = policy && typeof policy === 'object' ? policy : {};
+  return {
+    // hot key mode: memory | session | local
+    hotKeyPersistence: p.hotKeyPersistence || 'session',
+    // require clearlist identifier on outbound orders
+    requireClearlist: !!p.requireClearlist,
+    // if provided, only these groups are allowed
+    allowedClearlistGroupIds: Array.isArray(p.allowedClearlistGroupIds) ? p.allowedClearlistGroupIds : [],
+    // optional MM pubkey allowlist
+    allowedCounterpartyPubkeys: Array.isArray(p.allowedCounterpartyPubkeys) ? p.allowedCounterpartyPubkeys : [],
+    // optional safety cap
+    maxOrderNotional: Number.isFinite(Number(p.maxOrderNotional)) ? Number(p.maxOrderNotional) : null,
+    // require explicit mm pubkey in rapid mode
+    requireCounterpartyForRapid: !!p.requireCounterpartyForRapid,
+  };
+}
+
 class ApiWrapper {
-  constructor(baseURL, port, test, tlAlreadyOn = false, address, pubkey, network, apiMode = false, relayerBase) {
+  constructor(baseURL, port, test, tlAlreadyOn = false, address, pubkey, network, apiMode = false, relayerBase, securityPolicy = null) {
     this.baseURL = baseURL;
     this.port = port;
     this.test = !!test;
@@ -114,11 +133,20 @@ class ApiWrapper {
       ? 'https://testnet-api.layerwallet.com'
       : 'https://api.layerwallet.com';
 
+    const relayerBaseUrl = (typeof relayerBase === 'string' && relayerBase)
+      ? relayerBase
+      : (securityPolicy && typeof securityPolicy === 'object' && typeof securityPolicy.relayerBase === 'string'
+        ? securityPolicy.relayerBase
+        : defaultRelayer);
+
     this.relayer = axios.create({
-      baseURL: relayerBase || defaultRelayer,
+      baseURL: relayerBaseUrl,
       timeout: 25000,
       headers: { 'Content-Type': 'application/json' },
     });
+
+    this.securityPolicy = normalizeSecurityPolicy(securityPolicy || (typeof relayerBase === 'object' ? relayerBase : {}));
+    setEphemeralKeyStoreMode(this.securityPolicy.hotKeyPersistence);
 
     // Orderbook session (optional, when not using relayer for books)
     this.orderbookSession = OrderbookSession ? new OrderbookSession() : null;
@@ -154,6 +182,62 @@ class ApiWrapper {
     }
     this.sessionKey = null;
     clearEphemeralKeyStore();
+  }
+
+  setSecurityPolicy(nextPolicy = {}) {
+    this.securityPolicy = normalizeSecurityPolicy({
+      ...this.securityPolicy,
+      ...nextPolicy,
+    });
+    setEphemeralKeyStoreMode(this.securityPolicy.hotKeyPersistence);
+    return this.securityPolicy;
+  }
+
+  _resolveOrderClearlistGroup(order = {}) {
+    return (
+      order.clearlistGroupId ??
+      order.groupId ??
+      order?.props?.clearlistGroupId ??
+      order?.props?.groupId ??
+      null
+    );
+  }
+
+  _resolveCounterpartyPubkey(order = {}) {
+    return (
+      order.counterpartyPubkey ||
+      order?.counterparty?.pubkey ||
+      order?.props?.counterpartyPubkey ||
+      null
+    );
+  }
+
+  _assertOrderSecurityPolicy(order = {}) {
+    const sp = this.securityPolicy || {};
+    const groupId = this._resolveOrderClearlistGroup(order);
+    const cpPubkey = this._resolveCounterpartyPubkey(order);
+    const allowedGroups = new Set((sp.allowedClearlistGroupIds || []).map((x) => String(x)));
+    const allowedMM = new Set((sp.allowedCounterpartyPubkeys || []).map((x) => String(x).toLowerCase()));
+
+    if (sp.requireClearlist && (groupId === null || groupId === undefined || groupId === '')) {
+      throw new Error('Order blocked: missing clearlistGroupId under active policy');
+    }
+    if (allowedGroups.size > 0 && groupId != null && !allowedGroups.has(String(groupId))) {
+      throw new Error(`Order blocked: clearlistGroupId ${groupId} is not in allowed policy set`);
+    }
+    if (sp.requireCounterpartyForRapid && !cpPubkey) {
+      throw new Error('Order blocked: counterparty pubkey required under rapid-signing policy');
+    }
+    if (allowedMM.size > 0 && cpPubkey && !allowedMM.has(String(cpPubkey).toLowerCase())) {
+      throw new Error('Order blocked: counterparty pubkey is not allowlisted');
+    }
+
+    const price = Number(order?.props?.price ?? order?.price ?? 0);
+    const amount = Number(order?.props?.amount ?? order?.amount ?? 0);
+    const notional = Number.isFinite(price * amount) ? price * amount : 0;
+    if (sp.maxOrderNotional != null && notional > Number(sp.maxOrderNotional)) {
+      throw new Error(`Order blocked: notional ${notional} exceeds policy max ${sp.maxOrderNotional}`);
+    }
   }
 
   // --- Socket setup (assigns this.socket if created) ---
@@ -393,6 +477,8 @@ _initializeSocket() {
       this.sessionKey = setEphemeralKey(makeNewAddress(this.network || 'LTCTEST'));
     }
 
+    this._assertOrderSecurityPolicy(order || {});
+
     order.keypair = {
       address: this.sessionKey.address,
       pubkey: this.sessionKey.pubkey,
@@ -447,6 +533,8 @@ async getSpotMarkets() {
 /** submit a SPOT or FUTURES order */
 async sendOrder(order) {
   try {
+    this._assertOrderSecurityPolicy(order || {});
+
     if (this.apiMode) {
       // direct REST submission
       const { data } = await this.relayer.post('/orders/place', order);
