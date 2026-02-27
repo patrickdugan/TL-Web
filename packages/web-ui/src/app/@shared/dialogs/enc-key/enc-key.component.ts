@@ -29,13 +29,14 @@ export class EncKeyDialog {
 
     async decode() {
         const passDialog = this.matDialog.open(PasswordDialog);
-        const password = await passDialog.afterClosed()
+        let password = await passDialog.afterClosed()
             .pipe(first())
             .toPromise();
 
         if (!password) return;
         const encKey = this.data;
         const decryptResult = decrypt(encKey, password);
+        password = '';
         if (!decryptResult) {
             this.toastrService.error('Wrong Password', 'Error');
         } else {

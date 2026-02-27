@@ -28,7 +28,7 @@
             </div>
             <mat-form-field class='priv-key-field'>
                 <mat-label>Private Key</mat-label>
-                <input matInput type='text' [value]='privKeys?.[i] || ""' (keyup)='updatePrivKeyValue($event, i)'>
+                <input matInput type='password' [value]='privKeys?.[i] || ""' (keyup)='updatePrivKeyValue($event, i)'>
             </mat-form-field>
         </div>
     </div>
