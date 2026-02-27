@@ -36,7 +36,11 @@ let OrderbookSession;
 try { OrderbookSession = require('./orderbook.js'); } catch { OrderbookSession = null; }
 let createTransport;
 try { ({ createTransport } = require('./ws-transport')); } catch { createTransport = null; }
-const { getEphemeralKey, setEphemeralKey } = require('./keyStore.js');
+const {
+  getEphemeralKey,
+  setEphemeralKey,
+  clearEphemeralKey: clearEphemeralKeyStore,
+} = require('./keyStore.js');
 
 
 const { createLitecoinClient, createBitcoinClient } = (() => {
@@ -118,7 +122,10 @@ class ApiWrapper {
 
     // Orderbook session (optional, when not using relayer for books)
     this.orderbookSession = OrderbookSession ? new OrderbookSession() : null;
-    this.sessionKey = this.loadEphemeralKey();
+    this.sessionKey = getEphemeralKey();
+    if (!this.sessionKey) {
+      this.sessionKey = setEphemeralKey(makeNewAddress(this.network || 'LTCTEST'));
+    }
     // Socket handle
     this.socket = null;
     this._initializeSocket();
@@ -135,45 +142,19 @@ class ApiWrapper {
 
   async generateEphemeralKey(network = 'LTCTEST') {
     const keyObj = makeNewAddress(network);
-    this.sessionKey = keyObj;
-    this.saveEphemeralKey(keyObj);
-    return keyObj;
+    this.sessionKey = setEphemeralKey(keyObj);
+    return this.sessionKey;
   }
 
   clearEphemeralKey() {
+    if (this.sessionKey && typeof this.sessionKey === 'object') {
+      this.sessionKey.wif = null;
+      this.sessionKey.pubkey = null;
+      this.sessionKey.address = null;
+    }
     this.sessionKey = null;
-    //clearEphemeralKey();
+    clearEphemeralKeyStore();
   }
-
-loadEphemeralKey() {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const raw = localStorage.getItem('ephemeral_key');
-      if (raw){ 
-        return JSON.parse(raw);
-      }else{
-        this.generateEphemeralKey()
-      }
-
-    }
-  } catch (err) {
-    console.warn('[EphemeralKey] localStorage read failed', err);
-  }
-  return null;
-}
-
-saveEphemeralKey(eph) {
-  try {
-    if (typeof localStorage !== 'undefined' && eph) {
-      localStorage.setItem('ephemeral_key', JSON.stringify(eph));
-      return true;
-    }
-  } catch (err) {
-    console.warn('[EphemeralKey] localStorage save failed', err);
-  }
-  return false;
-}
-
 
   // --- Socket setup (assigns this.socket if created) ---
  // Function to initialize a socket connection
@@ -409,9 +390,7 @@ _initializeSocket() {
 
   async placeOrder(order) {
     if (!this.sessionKey) {
-      const keyObj = makeNewAddress(this.network || 'LTCTEST');
-      this.sessionKey = keyObj;
-      setEphemeralKey(keyObj);
+      this.sessionKey = setEphemeralKey(makeNewAddress(this.network || 'LTCTEST'));
     }
 
     order.keypair = {

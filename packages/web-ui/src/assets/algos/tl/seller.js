@@ -336,8 +336,14 @@ class SellSwapper {
       console.log('decoded ' + JSON.stringify(decoded));
       console.log('created commit tx ' + crtRes + ' type of ' + typeof(crtRes));
 
-      const wif = await this.dumpprivkeyAsync(this.myInfo.keypair.address);
-      const signResKey = await this.signrawtransactionwithkeyAsync(crtRes, [wif]);
+      let wif = null;
+      let signResKey = null;
+      try {
+        wif = await this.dumpprivkeyAsync(this.myInfo.keypair.address);
+        signResKey = await this.signrawtransactionwithkeyAsync(crtRes, [wif]);
+      } finally {
+        if (typeof wif === 'string') wif = '';
+      }
       console.log('signed with key ' + JSON.stringify(signResKey));
 
       const sendRes = await this.sendrawtransactionAsync(signResKey?.hex);
@@ -402,8 +408,14 @@ class SellSwapper {
 
         // 3) pick network + sign PSBT with our WIF (your existing flow)
         let network = this.test ? 'LTCTEST' : 'LTC';
-        const wif = await this.dumpprivkeyAsync(this.myInfo.keypair.address);
-        const signRes = await signPsbtRawTx({ wif, network, psbtHex }, this.client);
+        let wif = null;
+        let signRes = null;
+        try {
+          wif = await this.dumpprivkeyAsync(this.myInfo.keypair.address);
+          signRes = await signPsbtRawTx({ wif, network, psbtHex }, this.client);
+        } finally {
+          if (typeof wif === 'string') wif = '';
+        }
         if (!signRes?.data?.psbtHex) return new Error(`Failed to sign the PSBT`);
         console.log('sign res '+JSON.stringify(signRes))
         if(signRes.data.isFinished){
