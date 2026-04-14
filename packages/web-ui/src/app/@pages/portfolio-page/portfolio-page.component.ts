@@ -1,17 +1,17 @@
-import { AfterViewInit, Component, ElementRef, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { HttpClient } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
-import { first } from 'rxjs/operators';
 import { AttestationService } from 'src/app/@core/services/attestation.service';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 import { DialogService, DialogTypes } from 'src/app/@core/services/dialogs.service';
 import { LoadingService } from 'src/app/@core/services/loading.service';
-import { RpcService, TNETWORK } from 'src/app/@core/services/rpc.service';
+import { RpcService } from 'src/app/@core/services/rpc.service';
 import { TxsService } from 'src/app/@core/services/txs.service';
-import { PasswordDialog } from 'src/app/@shared/dialogs/password/password.component';
 import { ENCODER } from 'src/app/utils/payloads/encoder';
 import { WalletService } from 'src/app/@core/services/wallet.service'
+import { ProceduralRuntimeConfig, ProceduralRuntimeService } from 'src/app/@core/services/procedural-runtime.service';
 
 @Component({
   selector: 'tl-portoflio-page',
@@ -23,6 +23,8 @@ export class PortfolioPageComponent implements OnInit {
   tokensBalanceColums: string[] = ['propertyid', 'name', 'available', 'reserved', 'margin', 'channel', 'actions'];
   selectedAddress: string = '';
   private url = "https://api.layerwallet.com";
+  receiptPropertyId: number | null = null;
+  proceduralConfig: ProceduralRuntimeConfig | null = null;
 
   constructor(
     private balanceService: BalanceService,
@@ -35,7 +37,9 @@ export class PortfolioPageComponent implements OnInit {
     private txsService: TxsService,
     private attestationService: AttestationService,
     private loadingService: LoadingService,
-    private walletService: WalletService
+    private walletService: WalletService,
+    private http: HttpClient,
+    private proceduralRuntime: ProceduralRuntimeService
   ) {}
 
   get coinBalance() {
@@ -57,8 +61,31 @@ export class PortfolioPageComponent implements OnInit {
     return this.rpcService.isSynced;
   }
 
+  get nativeAssetLabel() {
+    return this.balanceService.NETWORK === 'BTC' ? 'tBTC' : 'tLTC';
+  }
+
+  get isLtctest() {
+    return this.balanceService.NETWORK === 'LTCTEST';
+  }
+
+  get hasProceduralSupport() {
+    return this.proceduralRuntime.isExecutableConfig(this.proceduralConfig);
+  }
+
+  get underlyingAssetLabel() {
+    return this.balanceService.NETWORK === 'BTC' ? 'BTC' : 'LTC';
+  }
+
+  get relayerRpcBase() {
+    return this.isLtctest
+      ? 'https://testnet-api.layerwallet.com/rpc'
+      : 'https://api.layerwallet.com/rpc';
+  }
+
   ngOnInit(): void {
     this.authService.listOfallAddresses; // Placeholder for actual logic
+    this.loadProceduralRuntime();
   }
 
   shouldShowVesting(propertyId: number): boolean {
@@ -73,8 +100,12 @@ export class PortfolioPageComponent implements OnInit {
     }
   }
 
-  openDialog(dialog: string, address?: any, _propId?: number, _amount?:number) {
-    const data = { address, propId: _propId, amount: _amount };
+  isProceduralReceiptRow(row: any): boolean {
+    return Number(row?.propertyid) === Number(this.receiptPropertyId || 0);
+  }
+
+  openDialog(dialog: string, address?: any, _propId?: number | string, _amount?:number, extraData: any = {}) {
+    const data = { address, propId: _propId, amount: _amount, available: _amount, ...extraData };
 
     let TYPE = null;
     if (dialog === 'deposit') {
@@ -86,7 +117,88 @@ export class PortfolioPageComponent implements OnInit {
     }
 
     if (!TYPE || !data) return;
-    this.dialogService.openDialog(TYPE, { disableClose: false, data });
+    const dialogRef = this.dialogService.openDialog(TYPE, { disableClose: false, data });
+    if (dialog === 'synth') {
+      dialogRef?.afterClosed()?.subscribe(() => {
+        this.loadProceduralRuntime();
+      });
+    }
+  }
+
+  openTokenizeDialog(address: string, amount?: number) {
+    if (!this.isLtctest) {
+      this.toastrService.error(
+        this.proceduralConfig?.contextErrors?.[0]
+          || this.proceduralConfig?.contextWarnings?.[0]
+          || 'Procedural mint is only configured for LTC testnet.'
+      );
+      return;
+    }
+
+    const canonicalAmount = Number(this.proceduralConfig?.fundedAmountLtc ?? amount ?? 0);
+    this.openDialog(
+      'synth',
+      address,
+      Number(this.receiptPropertyId || this.proceduralConfig?.receiptPropertyId || 1),
+      canonicalAmount > 0 ? canonicalAmount : amount,
+      {
+        mode: 'mint',
+        flow: 'proceduralReceipt',
+        title: `Mint ${this.underlyingAssetLabel}`,
+        actionLabel: `Mint ${this.underlyingAssetLabel}`,
+        underlyingAssetLabel: this.underlyingAssetLabel,
+        refreshProceduralArtifacts: true,
+        underlyingPropertyId: 0,
+        proceduralArtifactMode: 'fresh',
+        proceduralPathName: this.proceduralConfig?.selectedPathId || 'roll',
+      }
+    );
+  }
+
+  openTokenActionDialog(address: string, row: any) {
+    const isProceduralReceipt = this.isProceduralReceiptRow(row);
+    if (!isProceduralReceipt) {
+      return;
+    }
+    this.openDialog('synth', address, row.rawPropertyId || row.propertyid, row.available, {
+      mode: 'redeem',
+      flow: 'proceduralReceipt',
+      title: `Redeem ${this.underlyingAssetLabel}`,
+      actionLabel: `Redeem ${this.underlyingAssetLabel}`,
+      underlyingAssetLabel: this.underlyingAssetLabel,
+      refreshProceduralArtifacts: true,
+      underlyingPropertyId: 0,
+      proceduralArtifactMode: 'replay',
+      proceduralPathName: this.proceduralConfig?.selectedPathId || 'roll',
+    });
+  }
+
+  async loadReceiptPropertyId() {
+    if (this.proceduralConfig?.receiptPropertyId) {
+      this.receiptPropertyId = Number(this.proceduralConfig.receiptPropertyId);
+      return;
+    }
+
+    try {
+      const properties: any = await this.http
+        .post(`${this.relayerRpcBase}/tl_listProperties`, {})
+        .toPromise();
+      const propertyList = Array.isArray(properties?.data) ? properties.data : Array.isArray(properties) ? properties : [];
+      const receiptTicker = String(this.proceduralConfig?.receiptTicker || '').toUpperCase();
+      const match = propertyList.find((property: any) => {
+        return String(property?.ticker || '').toUpperCase() === receiptTicker;
+      });
+
+      this.receiptPropertyId = match?.id != null ? Number(match.id) : null;
+    } catch (error) {
+      console.error('Error resolving procedural receipt property id:', error);
+      this.receiptPropertyId = null;
+    }
+  }
+
+  async loadProceduralRuntime() {
+    this.proceduralConfig = await this.proceduralRuntime.loadConfig();
+    await this.loadReceiptPropertyId();
   }
 
   async newAddress() {

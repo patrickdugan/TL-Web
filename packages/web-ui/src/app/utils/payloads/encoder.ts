@@ -149,6 +149,17 @@ type EncodeAttestationParams = {
   metaData: string;
 };
 
+type EncodeTokenIssueParams = {
+  initialAmount: number | string;
+  ticker: string;
+  whitelists?: number[];
+  managed?: boolean;
+  backupAddress?: string;
+  nft?: boolean;
+  coloredCoinHybrid?: boolean;
+  proceduralType?: number | null;
+};
+
 type EncodeWithdrawalParams = {
   withdrawAll: number; // 1 for true, 0 for false
   propertyId: number;
@@ -180,6 +191,21 @@ const encodeWithdrawal = (p: EncodeWithdrawalParams): string => {
   return out;
 };
 
+const encodeTokenIssue = (params: EncodeTokenIssueParams): string => {
+  const payload = [
+    Number(params.initialAmount || 0).toString(36),
+    params.ticker || '',
+    (params.whitelists || []).map((val) => Number(val).toString(36)).join(','),
+    params.managed ? '1' : '0',
+    params.backupAddress || '',
+    params.nft ? '1' : '0',
+    params.coloredCoinHybrid ? '1' : '0',
+    params.proceduralType == null ? '' : Number(params.proceduralType).toString(36),
+  ];
+
+  return marker + (1).toString(36) + payload.join(',');
+};
+
 const encodeAttestation = (params: EncodeAttestationParams): string => {
   const payload = [
     params.revoke.toString(36),
@@ -190,7 +216,103 @@ const encodeAttestation = (params: EncodeAttestationParams): string => {
   return marker + '9' + payload.join(',');
 };
 
+type EncodeGrantManagedTokenParams = {
+  propertyId?: number;
+  propertyid?: number;
+  amountGranted: number | string;
+  addressToGrantTo?: string;
+  redeemAddress?: string;
+  dlcTemplateId?: string;
+  dlcContractId?: string;
+  settlementState?: string;
+  dlcHash?: string;
+  commitClearlistId?: number;
+};
+
+const encodeGrantManagedToken = (params: EncodeGrantManagedTokenParams): string => {
+  const payload = [
+    Number(params.propertyid ?? params.propertyId).toString(36),
+    new BigNumber(params.amountGranted).times(1e8).integerValue(BigNumber.ROUND_DOWN).toString(36),
+    params.redeemAddress || params.addressToGrantTo || '',
+    '',
+    params.dlcTemplateId || '',
+    params.dlcContractId || '',
+    params.settlementState || '',
+    params.dlcHash || '',
+  ];
+  if (Number.isInteger(params.commitClearlistId)) {
+    payload.push(Number(params.commitClearlistId).toString(36));
+  }
+
+  return marker + (11).toString(36) + payload.join(',');
+};
+
+type EncodeRedeemManagedTokenParams = {
+  propertyId?: number;
+  propertyid?: number;
+  amountDestroyed: number | string;
+  dlcTemplateId?: string;
+  dlcContractId?: string;
+  settlementState?: string;
+};
+
+const encodeRedeemManagedToken = (params: EncodeRedeemManagedTokenParams): string => {
+  const payload = [
+    Number(params.propertyid ?? params.propertyId).toString(36),
+    new BigNumber(params.amountDestroyed).times(1e8).integerValue(BigNumber.ROUND_DOWN).toString(36),
+    params.dlcTemplateId || '',
+    params.dlcContractId || '',
+  ];
+
+  return marker + (12).toString(36) + payload.join(',');
+};
+
+export type EncodeMintSyntheticParams = {
+  propertyId: number;
+  contractId: number;
+  amount: string | number;
+};
+
+export const encodeMintSynthetic = (params: EncodeMintSyntheticParams): string => {
+  const typeStr = (24).toString(36);
+  const amt36 = new BigNumber(params.amount)
+    .times(1e8)
+    .integerValue(BigNumber.ROUND_DOWN)
+    .toString(36);
+
+  const payload = [
+    Number(params.propertyId).toString(36),
+    Number(params.contractId).toString(36),
+    amt36,
+  ];
+
+  return marker + typeStr + payload.join(',');
+};
+
+export type EncodeRedeemSyntheticParams = {
+  propertyId: string;
+  contractId: number;
+  amount: string | number;
+};
+
+export const encodeRedeemSynthetic = (params: EncodeRedeemSyntheticParams): string => {
+  const typeStr = (25).toString(36);
+  const amt36 = new BigNumber(params.amount)
+    .times(1e8)
+    .integerValue(BigNumber.ROUND_DOWN)
+    .toString(36);
+
+  const payload = [
+    Number(params.propertyId).toString(36),
+    Number(params.contractId).toString(36),
+    amt36,
+  ];
+
+  return marker + typeStr + payload.join(',');
+};
+
 export const ENCODER = {
+  encodeTokenIssue,
   encodeSend,
   encodeTradeTokensChannel,
   encodeTradeContractChannel,
@@ -198,6 +320,10 @@ export const ENCODER = {
   encodeCommit,
   encodeTransfer,
   encodeAttestation,
-  encodeWithdrawal
+  encodeGrantManagedToken,
+  encodeRedeemManagedToken,
+  encodeWithdrawal,
+  encodeMintSynthetic,
+  encodeRedeemSynthetic,
 };
 

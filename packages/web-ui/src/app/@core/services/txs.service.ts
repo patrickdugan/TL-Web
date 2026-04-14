@@ -7,6 +7,9 @@ import { LoadingService } from "./loading.service";
 import { RpcService, TNETWORK } from "./rpc.service";
 import {WalletService} from "./wallet.service"
 import { RelayerWsService } from "./relayer-ws.service";
+import { ENCODER } from "src/app/utils/payloads/encoder";
+import { ProceduralReceiptConfig } from "../constants/procedural.constants";
+import { MainApiService } from "../apis/main-api.service";
 
 export interface IUTXO {
   amount: number;
@@ -102,7 +105,8 @@ export class TxsService {
     private toastrService: ToastrService,
     private balanceService: BalanceService,
     private walletService: WalletService,
-    private relayerWsService: RelayerWsService
+    private relayerWsService: RelayerWsService,
+    private mainApi: MainApiService
   ) {}
 
   private get relayerUrl(): string {
@@ -493,6 +497,196 @@ export class TxsService {
     } finally {
       this.loadingService.isLoading = false;
     }
+  }
+
+  async sendToken(params: {
+    fromAddress: string;
+    toAddress: string;
+    amount: number | string;
+    propertyId: number;
+  }): Promise<{ data?: string; error?: string }> {
+    const payload = ENCODER.encodeSend({
+      sendAll: false,
+      address: params.toAddress,
+      propertyId: params.propertyId,
+      amount: Number(params.amount),
+    });
+
+    return this.buildSignSendTx({
+      fromKeyPair: { address: params.fromAddress },
+      toKeyPair: { address: params.toAddress },
+      payload,
+    });
+  }
+
+  async sendNativeCoin(params: {
+    fromAddress: string;
+    toAddress: string;
+    amount: number | string;
+  }): Promise<{ data?: string; error?: string }> {
+    return this.buildSignSendTx({
+      fromKeyPair: { address: params.fromAddress },
+      toKeyPair: { address: params.toAddress },
+      amount: Number(params.amount),
+    });
+  }
+
+  async mintProceduralReceipt(params: {
+    recipientAddress: string;
+    amount: number | string;
+  }): Promise<{ data?: string; error?: string }> {
+    const res = await this.mainApi.bitvmProceduralMint({
+      recipientAddress: params.recipientAddress,
+      amount: params.amount,
+    });
+    if (res?.error || !res?.data?.mintTxid) {
+      return { error: res?.error || 'Failed to mint procedural receipt.' };
+    }
+    return { data: res.data.mintTxid };
+  }
+
+  async redeemProceduralReceipt(params: {
+    holderAddress: string;
+    propertyId: number;
+    amount: number | string;
+    dlcTemplateId?: string;
+    dlcContractId?: string;
+    settlementState?: string;
+  }): Promise<{ data?: string; error?: string }> {
+    const payload = ENCODER.encodeRedeemManagedToken({
+      propertyId: params.propertyId,
+      amountDestroyed: params.amount,
+      dlcTemplateId: params.dlcTemplateId,
+      dlcContractId: params.dlcContractId,
+      settlementState: params.settlementState,
+    });
+
+    return this.buildSignSendTx({
+      fromKeyPair: { address: params.holderAddress },
+      toKeyPair: { address: params.holderAddress },
+      payload,
+    });
+  }
+
+  async tokenizeProceduralReceipt(params: {
+    depositorAddress: string;
+    amount: number | string;
+    config: ProceduralReceiptConfig;
+  }): Promise<{ data?: { depositTxid: string; mintTxid: string }; error?: string }> {
+    const expectations = this.requireProceduralExecutionContext(params.config);
+    const receiptPropertyId = Number(params.config.receiptPropertyId || 0);
+    if (!receiptPropertyId) {
+      return { error: 'Receipt property is not configured.' };
+    }
+    if (!params.config.fundingTxid) {
+      return { error: 'Canonical funding txid is missing for procedural mint.' };
+    }
+    if (!params.config.fundedAmountLtc) {
+      return { error: 'Canonical funded amount is missing for procedural mint.' };
+    }
+
+    const requestedAmount = Number(params.amount);
+    const canonicalAmount = Number(params.config.fundedAmountLtc);
+    if (!Number.isFinite(requestedAmount) || !Number.isFinite(canonicalAmount) || requestedAmount <= 0 || canonicalAmount <= 0) {
+      return { error: 'Canonical procedural mint amount is invalid.' };
+    }
+    if (requestedAmount.toFixed(8) !== canonicalAmount.toFixed(8)) {
+      return { error: `Procedural mint amount must match canonical funded amount ${canonicalAmount.toFixed(8)} LTC.` };
+    }
+
+    const mintRes = await this.mainApi.bitvmProceduralMint({
+      recipientAddress: params.depositorAddress,
+      amount: canonicalAmount,
+      depositTxid: params.config.fundingTxid,
+      ...expectations,
+    });
+    if (mintRes?.error || !mintRes?.data?.mintTxid) {
+      return { error: mintRes.error || 'Failed to mint receipt token.' };
+    }
+
+    return { data: { depositTxid: params.config.fundingTxid, mintTxid: mintRes.data.mintTxid } };
+  }
+
+  async redeemProceduralReceiptWithRelease(params: {
+    holderAddress: string;
+    amount: number | string;
+    config: ProceduralReceiptConfig;
+    recipientAddress?: string;
+  }): Promise<{ data?: { redeemTxid: string; releaseTxid: string }; error?: string }> {
+    const expectations = this.requireProceduralExecutionContext(params.config);
+    const receiptPropertyId = Number(params.config.receiptPropertyId || 0);
+    if (!receiptPropertyId) {
+      return { error: 'Receipt property is not configured.' };
+    }
+    if (params.config.releaseReady !== true) {
+      return {
+        error: params.config.contextErrors?.[0]
+          || params.config.contextWarnings?.[0]
+          || 'Canonical BitVM release is disabled for the current execution context.',
+      };
+    }
+
+    const redeemRes = await this.redeemProceduralReceipt({
+      holderAddress: params.holderAddress,
+      propertyId: receiptPropertyId,
+      amount: params.amount,
+      dlcTemplateId: params.config.templateId,
+      dlcContractId: params.config.contractId,
+      settlementState: params.config.redeemSettlementState,
+    });
+    if (redeemRes.error || !redeemRes.data) {
+      return { error: redeemRes.error || 'Failed to redeem receipt token.' };
+    }
+
+    const releaseRes = await this.mainApi.bitvmProceduralRelease({
+      recipientAddress: params.recipientAddress || params.holderAddress,
+      amount: params.amount,
+      redeemTxid: redeemRes.data,
+      ...expectations,
+    });
+    if (releaseRes?.error || !releaseRes?.data?.releaseTxid) {
+      return { error: releaseRes?.error || 'Failed to release native collateral.' };
+    }
+
+    return { data: { redeemTxid: redeemRes.data, releaseTxid: releaseRes.data.releaseTxid } };
+  }
+
+  private requireProceduralExecutionContext(config: ProceduralReceiptConfig): {
+    expectedExecutionContextId: string;
+    expectedExecutionContextHash: string;
+    expectedFundingTxid: string;
+    expectedSelectedPathId: string;
+    expectedTemplateId: string;
+    expectedContractId: string;
+  } {
+    if (config.executionContextReady !== true || config.ready === false) {
+      throw new Error(
+        config.contextErrors?.[0]
+          || config.contextWarnings?.[0]
+          || 'Procedural execution context is not ready.'
+      );
+    }
+    if (!config.executionContextId || !config.executionContextHash) {
+      throw new Error('Procedural execution context identifiers are missing.');
+    }
+    if (!config.fundingTxid || !config.selectedPathId) {
+      throw new Error('Procedural funding or selected-path references are missing.');
+    }
+    if (!config.templateId || !config.contractId) {
+      throw new Error('Procedural template or contract references are missing.');
+    }
+    if (!config.vaultAddress) {
+      throw new Error('Procedural deposit address is missing.');
+    }
+
+    return {
+      expectedExecutionContextId: config.executionContextId,
+      expectedExecutionContextHash: config.executionContextHash,
+      expectedFundingTxid: config.fundingTxid,
+      expectedSelectedPathId: config.selectedPathId,
+      expectedTemplateId: config.templateId,
+      expectedContractId: config.contractId,
+    };
   }
 
   async signPsbt(psbtHex: string, sellerFlag: boolean, redeemScript?: string): Promise<{

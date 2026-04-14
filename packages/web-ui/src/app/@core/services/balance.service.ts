@@ -181,7 +181,8 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
 
       this._allBalancesObj[address].tokensBalance = tokens.map((token: any) => ({
         name: token.ticker || '-',
-        propertyid: parseInt(token.propertyId || '0', 10),
+        propertyid: /^\d+$/.test(String(token.propertyId || '')) ? parseInt(token.propertyId || '0', 10) : 0,
+        rawPropertyId: token.propertyId != null ? String(token.propertyId) : '',
         amount: token.amount || 0,
         available: token.available || 0,
         reserved: token.reserved || 0,

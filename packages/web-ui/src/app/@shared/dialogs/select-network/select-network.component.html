@@ -12,7 +12,7 @@
       </mat-select>
     </mat-form-field>
     <select class="native-select firefox-only" [(ngModel)]="network">
-      <option *ngFor="let opt of options" [ngValue]="opt.value">
+      <option *ngFor="let opt of options" [value]="opt.value">
         {{ opt.label }}
       </option>
     </select>

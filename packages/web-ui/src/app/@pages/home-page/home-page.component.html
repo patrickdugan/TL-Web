@@ -1,7 +1,43 @@
 <div class="home-page-container">
-    <div class="logo">
-        <span class='big' style='color: var(--softGrey)'>Welcome to</span>
-        <span class='big' style='color: var(--lightBlue)'>TradeLayer Wallet</span>
-        <span class='small' style='color: var(--softGrey)'>Your Own Decentralized Trading Infrastructure</span>
-    </div>
+    <section class="launch-hero">
+        <div class="logo">
+            <span class="big">TradeLayer Wallet Launch</span>
+            <span class="small">Your decentralized trading infrastructure with automation-first funding flows.</span>
+        </div>
+
+        <div class="cta-grid">
+            <button class="cta-card" *ngFor="let button of launchButtons" (click)="launchAlgo(button)">
+                <div class="cta-icon">{{ button.icon }}</div>
+                <div class="cta-copy">
+                    <div class="cta-title">{{ button.title }}</div>
+                    <div class="cta-subtitle">{{ button.subtitle }}</div>
+                    <div class="cta-status">{{ button.strategyId ? 'Ready' : 'Loading' }}</div>
+                </div>
+            </button>
+        </div>
+
+        <div class="ico-widget">
+            <div class="ico-header">
+                <div class="ico-title">ICO Tracker</div>
+                <div class="ico-kpi">${{ icoRaisedUsd | number:'1.0-0' }} / ${{ icoTargetUsd | number:'1.0-0' }}</div>
+            </div>
+            <div class="ico-progress-wrap">
+                <div class="ico-progress-fill" [style.width.%]="icoProgressPercent"></div>
+            </div>
+            <div class="ico-meta">
+                <span>Progress {{ icoProgressPercent | number:'1.0-1' }}%</span>
+                <span>Running algos: {{ runningAlgoCount }}</span>
+                <span>Profits: ${{ algoProfitUsd | number:'1.2-2' }}</span>
+                <span>Contribution: ${{ icoContributionUsd | number:'1.2-2' }}</span>
+            </div>
+            <label class="ico-toggle">
+                <input
+                    type="checkbox"
+                    [checked]="allocateProfitToIco"
+                    (change)="onToggleIcoAllocation($any($event.target).checked)"
+                />
+                Put 10% of profits into the ICO
+            </label>
+        </div>
+    </section>
 </div>

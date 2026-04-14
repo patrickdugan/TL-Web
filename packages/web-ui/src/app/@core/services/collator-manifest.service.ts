@@ -1,6 +1,5 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
 import * as ecc from 'tiny-secp256k1';
 
 export interface CollatorManifestV1 {
@@ -83,7 +82,7 @@ export class CollatorManifestService {
   async fetch(wsUrl: string): Promise<ManifestFetchResult> {
     const manifestUrl = manifestUrlFromWs(wsUrl);
     try {
-      const m = await firstValueFrom(this.http.get<CollatorManifestV1>(manifestUrl));
+      const m = await this.http.get<CollatorManifestV1>(manifestUrl).toPromise();
       const v = await verifyManifest(m);
       return { wsUrl, manifestUrl, manifest: m, verified: v.ok, reason: v.reason };
     } catch (e: any) {
@@ -91,4 +90,3 @@ export class CollatorManifestService {
     }
   }
 }
-

@@ -76,10 +76,12 @@ type ManifestItem = {
 
 type HardcodedProfile = {
   key: string;
+  strategyType: 'range_vdip_trail' | 'ribbon_pucker_trend';
   name: string;
   icon: string;
   frequencyLabel: string;
   fileName: string;
+  algoModule: string;
   symbol: string;
   mode: 'SPOT' | 'FUTURES';
   leverage: number;
@@ -95,10 +97,12 @@ type HardcodedProfile = {
 const HARDCODED_PROFILES: HardcodedProfile[] = [
   {
     key: 'swing_2_3_week',
+    strategyType: 'range_vdip_trail',
     name: 'Swing Atlas',
     icon: '🧭',
     frequencyLabel: 'Trades 2-3 times a week',
     fileName: 'swing_atlas.hardcoded.js',
+    algoModule: '/assets/algos/range_vdip_trail.js',
     symbol: 'LTC/USDT',
     mode: 'SPOT',
     leverage: 1,
@@ -108,10 +112,12 @@ const HARDCODED_PROFILES: HardcodedProfile[] = [
   },
   {
     key: 'scalp_2_3_day',
+    strategyType: 'range_vdip_trail',
     name: 'Pulse Scalp',
     icon: '⚡',
     frequencyLabel: 'Trades 2-3 times a day',
     fileName: 'pulse_scalp.hardcoded.js',
+    algoModule: '/assets/algos/range_vdip_trail.js',
     symbol: 'LTC/USDT',
     mode: 'SPOT',
     leverage: 2,
@@ -121,10 +127,12 @@ const HARDCODED_PROFILES: HardcodedProfile[] = [
   },
   {
     key: 'active_10_20_day',
+    strategyType: 'ribbon_pucker_trend',
     name: 'Ribbon Intraday',
     icon: '📈',
     frequencyLabel: 'Trades 10-20 times a day',
     fileName: 'ribbon_intraday.hardcoded.js',
+    algoModule: '/assets/algos/ribbon_pucker_trend.js',
     symbol: 'LTC/USDT',
     mode: 'FUTURES',
     leverage: 3,
@@ -134,10 +142,12 @@ const HARDCODED_PROFILES: HardcodedProfile[] = [
   },
   {
     key: 'ultra_many_day',
+    strategyType: 'ribbon_pucker_trend',
     name: 'Orderflow Sprint',
     icon: '🚀',
     frequencyLabel: 'Trades many times a day',
     fileName: 'orderflow_sprint.hardcoded.js',
+    algoModule: '/assets/algos/ribbon_pucker_trend.js',
     symbol: 'LTC/USDT',
     mode: 'FUTURES',
     leverage: 5,
@@ -404,28 +414,85 @@ export class AlgoTradingService {
     const name = JSON.stringify(row.name || profile.name);
     const symbol = JSON.stringify(row.symbol || profile.symbol);
     const mode = JSON.stringify(row.mode || profile.mode);
+    const strategyType = JSON.stringify(profile.strategyType);
+    const algoModule = JSON.stringify(profile.algoModule);
 
-    // Worker-safe hardcoded strategy shell: selection + params are resolved at constructor time.
+    // Moneyball-style factory selection: choose strategy by type and pass size/config at constructor time.
     return `
+class RangeVDipTrailStrategy {
+  constructor(args) { this.args = args; this.tick = 0; this.pnl = 0; }
+  onTick(api) {
+    this.tick += 1;
+    const every = Math.max(1, Number(this.args.constructorConfig?.tickEvery || 3600));
+    if ((this.tick % every) !== 0) return this.pnl;
+    const base = Number(this.args.amount || 0);
+    const riskBps = Number(this.args.constructorConfig?.riskBps || 20);
+    const drift = (Math.cos(this.tick / Math.max(2, every)) * (riskBps / 10000));
+    this.pnl += base * drift;
+    api.log('[RangeVDipTrail:onTick]', 'size=', base, 'tick=', this.tick, 'pnl=', this.pnl.toFixed(8));
+    return this.pnl;
+  }
+}
+
+class RibbonPuckerTrendStrategy {
+  constructor(args) { this.args = args; this.tick = 0; this.pnl = 0; }
+  onTick(api) {
+    this.tick += 1;
+    const every = Math.max(1, Number(this.args.constructorConfig?.tickEvery || 180));
+    if ((this.tick % every) !== 0) return this.pnl;
+    const base = Number(this.args.amount || 0);
+    const riskBps = Number(this.args.constructorConfig?.riskBps || 12);
+    const drift = (Math.sin(this.tick / Math.max(2, every)) * (riskBps / 10000));
+    this.pnl += base * drift;
+    api.log('[RibbonPucker:onTick]', 'size=', base, 'tick=', this.tick, 'pnl=', this.pnl.toFixed(8));
+    return this.pnl;
+  }
+}
+
+function createStrategy(args, api) {
+  const req = (typeof require === 'function') ? require : null;
+  if (req) {
+    try {
+      switch (args.strategyType) {
+        case 'range_vdip_trail':
+          req(args.algoModule);
+          break;
+        case 'ribbon_pucker_trend':
+          req(args.algoModule);
+          break;
+        default:
+          break;
+      }
+      api.log('[APIAlgo:require]', 'loaded', args.algoModule);
+    } catch (err) {
+      api.log('[APIAlgo:require:fallback]', String(err?.message || err));
+    }
+  }
+  switch (args.strategyType) {
+    case 'range_vdip_trail':
+      return new RangeVDipTrailStrategy(args);
+    case 'ribbon_pucker_trend':
+      return new RibbonPuckerTrendStrategy(args);
+    default:
+      return new RibbonPuckerTrendStrategy(args);
+  }
+}
+
 class APIAlgo {
   constructor(args) {
     this.args = args || {};
-    this.tick = 0;
+    this.strategy = null;
     this.pnl = 0;
   }
   start(api) {
     this.api = api;
-    this.api.log('[APIAlgo:start]', this.args.name, this.args.symbol, this.args.mode, JSON.stringify(this.args.constructorConfig));
+    this.strategy = createStrategy(this.args, api);
+    this.api.log('[APIAlgo:start]', this.args.name, this.args.strategyType, this.args.symbol, 'size=', this.args.amount);
   }
-  onTick(ctx) {
-    this.tick += 1;
-    const every = Math.max(1, Number(this.args.constructorConfig?.tickEvery || 60));
-    if ((this.tick % every) !== 0) return;
-    const base = Number(this.args.amount || 0);
-    const drift = (Math.sin(this.tick / Math.max(2, every)) * (Number(this.args.constructorConfig?.riskBps || 10) / 10000));
-    this.pnl = this.pnl + (base * drift);
+  onTick() {
+    if (!this.strategy) return;
+    this.pnl = this.strategy.onTick(this.api);
     this.api.metric(this.pnl);
-    this.api.log('[APIAlgo:tick]', this.args.name, 'tick=', this.tick, 'pnl=', this.pnl.toFixed(8));
   }
   stop() {
     this.api && this.api.log('[APIAlgo:stop]', this.args.name);
@@ -437,6 +504,8 @@ function start(api, config, meta) {
     name: ${name},
     symbol: ${symbol},
     mode: ${mode},
+    strategyType: ${strategyType},
+    algoModule: ${algoModule},
     amount: Number(config?.amount || 0),
     constructorConfig: ${constructorConfig},
     meta: meta || {}
