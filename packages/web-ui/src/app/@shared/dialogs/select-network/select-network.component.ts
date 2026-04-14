@@ -3,13 +3,20 @@ import { MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/@core/services/loading.service';
-import { ENetwork, RpcService } from 'src/app/@core/services/rpc.service';
+import { RpcService } from 'src/app/@core/services/rpc.service';
 import { WindowsService } from 'src/app/@core/services/windows.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 import { SpotMarketsService } from 'src/app/@core/services/spot-services/spot-markets.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
 
-type NetworkOpt = { value: ENetwork; label: string };
+type NetworkValue = 'BTC' | 'LTC' | 'LTCTEST';
+type NetworkOpt = { value: NetworkValue; label: string };
+
+const NETWORK_OPTIONS: NetworkOpt[] = [
+  { value: 'BTC', label: 'BTC' },
+  { value: 'LTC', label: 'LTC' },
+  { value: 'LTCTEST', label: 'LTCTEST' },
+];
 
 @Component({
   selector: 'select-network-dialog',
@@ -17,8 +24,8 @@ type NetworkOpt = { value: ENetwork; label: string };
   styleUrls: ['./select-network.component.scss'],
 })
 export class SelectNetworkDialog implements OnInit {
-  public network: ENetwork = ENetwork.LTC; // default like old version
-  public options: NetworkOpt[] = [];
+  public network: NetworkValue = 'BTC';
+  public options: NetworkOpt[] = NETWORK_OPTIONS;
 
   constructor(
     private rpcService: RpcService,
@@ -38,18 +45,11 @@ export class SelectNetworkDialog implements OnInit {
   }
 
   ngOnInit(): void {
-    const enumObj = (ENetwork as any) || {};
-    const keys = Object.keys(enumObj).filter((k) => isNaN(Number(k)));
-
-    if (keys.length) {
-      this.options = keys.map((k) => ({
-        value: enumObj[k] as ENetwork,
-        label: k.replace(/_/g, ' '),
-      }));
-    } else {
-      this.options = [{ value: ENetwork.LTC, label: 'LTC' }];
+    this.options = [...NETWORK_OPTIONS];
+    const currentNetwork = this.rpcService.NETWORK as NetworkValue | null;
+    if (currentNetwork && this.options.some((opt) => opt.value === currentNetwork)) {
+      this.network = currentNetwork;
     }
-
     if (!this.options.some((o) => o.value === this.network)) {
       this.network = this.options[0]?.value ?? this.network;
     }
