@@ -66,6 +66,7 @@ ngOnInit(): void {
 
   ngOnDestroy(): void {
     for (const s of this.subs) s.unsubscribe();
+    this.clearApiCredentials();
   }
 
 // state + handlers
@@ -126,6 +127,7 @@ clearWorkerConsole(preserveTail: boolean = false): void {
     const amt = Number(this.allocationForm.value?.amount) || 0;
     if (this.selected) this.svc.runSystem(this.selected.id, { amount: amt });
     this.showAllocate = false;
+    this.clearApiCredentials();
   }
 
   openWithdraw(r: StrategyRow | RunningRow) {
@@ -154,7 +156,10 @@ clearWorkerConsole(preserveTail: boolean = false): void {
     input.click();
   }*/
 
-  closeAllocate() { this.showAllocate = false; }
+  closeAllocate() {
+    this.showAllocate = false;
+    this.clearApiCredentials();
+  }
   closeWithdraw() { this.showWithdraw = false; }
 
 
@@ -196,5 +201,9 @@ clearWorkerConsole(preserveTail: boolean = false): void {
     const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
     return `${h}h ${m}m ${s}s`;
+  }
+
+  private clearApiCredentials() {
+    this.allocationForm.patchValue({ apiKey: '', apiSecret: '' }, { emitEvent: false });
   }
 }

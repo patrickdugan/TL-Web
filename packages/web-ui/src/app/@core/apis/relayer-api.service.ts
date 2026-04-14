@@ -1,8 +1,9 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
-import { Observable } from "rxjs";
+import { from, Observable } from "rxjs";
 import { environment } from "src/environments/environment";
 import { TNETWORK } from "../services/rpc.service";
+import { RelayerWsService } from "../services/relayer-ws.service";
 
 
 @Injectable({
@@ -15,6 +16,7 @@ export class TradeLayerApiService {
 
     constructor(
         private http: HttpClient,
+        private relayerWsService: RelayerWsService,
     ) {}
 
     private get apiURL() {
@@ -30,31 +32,38 @@ export class TradeLayerApiService {
         data?: any;
         error?: any;
     }> {
-        if (!this.apiURL) throw new Error("Api Url not found");
-        const body = { params };
-        return this.http.post<{
-            data?: any;
-            error?: any;
-        }>(this.apiURL + '/rpc/' + method, body);
+        return from(
+            this.relayerWsService.request<{
+                data?: any;
+                error?: any;
+            }>(`/rpc/${method}`, {
+                method: "POST",
+                body: { params },
+            })
+        );
     }
 
     validateAddress(address: string): Observable<{
         data?: any;
         error?: any;
     }>  {
-        return this.http.get<{
-            data?: any;
-            error?: any
-        }>(this.apiURL + '/address/validate/' + address);
+        return from(
+            this.relayerWsService.request<{
+                data?: any;
+                error?: any;
+            }>(`/address/validate/${address}`, { method: "GET" })
+        );
     }
 
     fundTestnetAddress(address: string): Observable<{
         data?: any;
         error?: any;
     }>  {
-        return this.http.get<{
-            data?: any;
-            error?: any
-        }>(this.apiURL + '/address/faucet/' + address);
+        return from(
+            this.relayerWsService.request<{
+                data?: any;
+                error?: any;
+            }>(`/address/faucet/${address}`, { method: "GET" })
+        );
     }
 }

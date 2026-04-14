@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
 import { RpcService, TNETWORK } from './rpc.service';
+import { RelayerWsService } from './relayer-ws.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,7 +93,7 @@ const getPhantomBtc = (net?: TNETWORK | string): PhantomBtc | undefined => {
 
 @Injectable({ providedIn: 'root' })
 export class WalletService {
-  constructor(private rpc: RpcService) {
+  constructor(private rpc: RpcService, private relayerWsService: RelayerWsService) {
     const net = (this.rpc.NETWORK || '').toUpperCase();
   }
 
@@ -421,10 +422,11 @@ export class WalletService {
   // -------------------------------------------------------------------------
 
   async checkIP(): Promise<{ ip: string; isVpn: boolean; countryCode: string }> {
-    const res = await fetch(`${this.baseUrl}/attestation/ip`, {
-      method: "GET",
-      credentials: "include"
-    }).then(r => r.json());
+    this.relayerWsService.setBaseUrl(this.baseUrl);
+    const res = await this.relayerWsService.request<{ ip: string; isVpn: boolean; countryCode: string }>(
+      `/attestation/ip`,
+      { method: "GET" }
+    );
 
     return res;
   }
@@ -446,17 +448,15 @@ export class WalletService {
     m: number,
     pubKeys: string[]
   ): Promise<MultisigRecord> {
-    const url = `${this.baseUrl}/tx/multisig`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    this.relayerWsService.setBaseUrl(this.baseUrl);
+    const response = await this.relayerWsService.request<any>(`/tx/multisig`, {
+      method: "POST",
+      body: {
         m,
         pubKeys,
         network: this.rpc.NETWORK,
-      }),
-    }).then((r) => r.json());
+      },
+    });
 
     if (!response.success) {
       throw new Error(`Failed to compute multisig: ${response.error}`);

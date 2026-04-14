@@ -8,7 +8,6 @@ import { RpcService, ENetwork } from 'src/app/@core/services/rpc.service'
 import { ENDPOINTS } from 'src/environments/endpoints.conf';
 import { SocketService } from 'src/app/@core/services/socket.service';
 import BigNumber from 'bignumber.js';
-import axios from 'axios';
 import { Subject, Subscription } from "rxjs";
 import { filter } from "rxjs/operators";
 import { Observable } from "rxjs";
@@ -236,12 +235,12 @@ private isSpotZeroTrade(): boolean {
 
     private async checkRbf(rawTxOrTxid: string): Promise<boolean> {
         try {
-            const baseUrl = this.relayerUrl;
             // If it looks like a raw tx hex (long), decode it; otherwise fetch by txid
             const txData = rawTxOrTxid.length > 80
-                ? await axios.post(`${baseUrl}/tx/decode`, { rawtx: rawTxOrTxid }).then(r => r.data)
-                : await axios.get(`${baseUrl}/tx/${rawTxOrTxid}?verbose=true`).then(r => r.data);
-            const vins = txData?.vin || [];
+                ? await this.txsService.decode(rawTxOrTxid)
+                : await this.txsService.getTx(rawTxOrTxid);
+            const txPayload = (txData as any)?.data ?? txData;
+            const vins = txPayload?.vin || [];
             return vins.some((vin: any) => vin.sequence < 0xfffffffe);
         } catch (err: any) {
             console.warn('RBF check failed (non-fatal):', err.message);

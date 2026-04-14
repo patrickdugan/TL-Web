@@ -18,6 +18,11 @@ declare const gtag: Function; // Declare gtag globally
 export const routes: Routes = [
   {
     path: '',
+    component: HomePageComponent,
+    /*canActivate: [RPCGuard]*/
+  },
+  {
+    path: 'futures',
     component: FuturesPageComponent,
     /*canActivate: [RPCGuard]*/
   },

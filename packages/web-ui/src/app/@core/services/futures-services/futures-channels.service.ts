@@ -1,11 +1,11 @@
 // src/app/@core/services/futures-services/futures-channels.service.ts
 import { Injectable } from '@angular/core';
-import axios, { AxiosResponse } from 'axios';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { WalletService } from 'src/app/@core/services/wallet.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
 import { RpcService, TNETWORK } from "../rpc.service";
+import { RelayerWsService } from '../relayer-ws.service';
 
 // NOTE: avoid import path issues by typing as any
 type FuturesMarketSvc = any;
@@ -45,7 +45,8 @@ export class FuturesChannelsService {
     private auth: AuthService,
     private walletService: WalletService,
     private futMarkets: FuturesMarketService,
-    private rpcService: RpcService
+    private rpcService: RpcService,
+    private relayerWsService: RelayerWsService
   ) {}
 
   refreshFuturesChannels(): void { this.refreshNow(); }
@@ -136,12 +137,14 @@ export class FuturesChannelsService {
       console.log('[futures-channels] Making request to:', `${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`);
       console.log('[futures-channels] With params:', [addr, collateralPropertyId]);
 
-      const res: AxiosResponse<ChannelBalancesResponse | ChannelBalanceRow[] | any> =
-        await axios.post(`${this.relayerUrl}/rpc/tl_channelBalanceForCommiter`, {
-          params: [addr, collateralPropertyId],
-        });
-
-      const data = res.data;
+      this.relayerWsService.setBaseUrl(this.relayerUrl);
+      const data = await this.relayerWsService.request<any>(
+        `/rpc/tl_channelBalanceForCommiter`,
+        {
+          method: "POST",
+          body: { params: [addr, collateralPropertyId] },
+        }
+      );
       console.log('data res in channel '+data)
       const rawRows: any[] = Array.isArray(data) ? data : (Array.isArray(data?.rows) ? data.rows : []);
       const rows = rawRows.map(row => this.normalizeRow(row, addr!, { collateralPropertyId }));

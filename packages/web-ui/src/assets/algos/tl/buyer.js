@@ -574,10 +574,10 @@ this.relayerUrl = test
 
         // Ensure that each input has the necessary witness data
      
+        let wif = null;
         try{
             // Sign the PSBT transaction using the wallet
-            let wif = await this.dumpprivkeyAsync(this.myInfo.keypair.address)
-            console.log('wif '+wif)
+            wif = await this.dumpprivkeyAsync(this.myInfo.keypair.address)
             let network = "LTC"
             if(this.test==true){
                 network = "LTCTEST"
@@ -585,7 +585,6 @@ this.relayerUrl = test
             //console.log('network')
             //const signedPsbt = await signpsbtAsync(psbtHex,true)
             const signedPsbt = await signPsbtRawTx({wif:wif,network:network,psbtHex:psbtHex}, this.client);
-            wif = ''
             //if (!signedPsbt || !signedPsbt.hex) return new Error('Failed to sign PSBT');
             const timeToCoSign = Date.now()-this.tradeStartTime
             console.log('Cosigned trade in '+timeToCoSign)
@@ -611,6 +610,8 @@ this.relayerUrl = test
             this.socket.emit(`${this.myInfo.socketId}::swap`, { eventName: 'BUYER:STEP6', socketId: this.myInfo.socketId, data: sentTx });
         } catch (error) {
             this.terminateTrade(`Step 5: ${error.message}`);
+        } finally {
+            if (typeof wif === 'string') wif = '';
         }
     }
 }

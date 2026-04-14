@@ -60,6 +60,75 @@ export class MainApiService {
         return this.http.post(this.apiUrl + 'set-api-url', { apiUrl });
     }
 
+  getBitvmProceduralConfig(): Promise<{ data?: any; error?: string }> {
+    return this.http
+      .get<{ data?: any; error?: string }>(this.apiUrl + 'bitvm/procedural-config')
+      .toPromise();
+  }
+
+  getBitvmProceduralSync(): Promise<{ data?: any; error?: string }> {
+    return this.http
+      .get<{ data?: any; error?: string }>(this.apiUrl + 'bitvm/procedural-sync')
+      .toPromise();
+  }
+
+  getBitvmExecutionContext(): Promise<{ data?: any; error?: string }> {
+    return this.http
+      .get<{ data?: any; error?: string }>(this.apiUrl + 'bitvm/execution-context')
+      .toPromise();
+  }
+
+  bitvmGenerateArtifacts(body: {
+    mode?: string;
+    pathName?: string;
+    broadcastFunding?: boolean;
+    includeSettlementValidation?: boolean;
+    forceSettlementValidation?: boolean;
+    provisionIfMissing?: boolean;
+    rpcUrl?: string;
+    rpcUser?: string;
+    rpcPass?: string;
+    sourceWallet?: string;
+    destinationWallet?: string;
+    minConfirmations?: number;
+  }): Promise<{ data?: any; error?: string }> {
+    return this.http
+      .post<{ data?: any; error?: string }>(this.apiUrl + 'bitvm/generate-artifacts', body)
+      .toPromise();
+  }
+
+  bitvmProceduralMint(body: {
+    recipientAddress: string;
+    amount: number | string;
+    depositTxid?: string;
+    expectedExecutionContextId?: string;
+    expectedExecutionContextHash?: string;
+    expectedFundingTxid?: string;
+    expectedSelectedPathId?: string;
+    expectedTemplateId?: string;
+    expectedContractId?: string;
+  }): Promise<{ data?: any; error?: string }> {
+    return this.http
+      .post<{ data?: any; error?: string }>(this.apiUrl + 'bitvm/procedural-mint', body)
+      .toPromise();
+  }
+
+  bitvmProceduralRelease(body: {
+    recipientAddress: string;
+    amount: number | string;
+    redeemTxid?: string;
+    expectedExecutionContextId?: string;
+    expectedExecutionContextHash?: string;
+    expectedFundingTxid?: string;
+    expectedSelectedPathId?: string;
+    expectedTemplateId?: string;
+    expectedContractId?: string;
+  }): Promise<{ data?: any; error?: string }> {
+    return this.http
+      .post<{ data?: any; error?: string }>(this.apiUrl + 'bitvm/procedural-release', body)
+      .toPromise();
+  }
+
   async rpcCall(method: string, params?: any[]): Promise<any> {
     return this.http
       .post<any>(`${this.apiUrl}${method}`, { params })

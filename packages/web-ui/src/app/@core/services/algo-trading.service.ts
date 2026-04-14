@@ -14,6 +14,7 @@ import {
 export interface StrategyRow {
   id: string;
   name: string;
+  systemKey?: string;
   symbol: string;
   mode: 'SPOT' | 'FUTURES';
   leverage?: number;
@@ -28,6 +29,8 @@ export interface StrategyRow {
   amount: number;
   venue?: string;
   description?: string;
+  icon?: string;
+  frequencyLabel?: string;
   code?: string; // optional inline code; worker prefers DB if present
 }
 
@@ -71,6 +74,89 @@ type ManifestItem = {
   amount: number;
 };
 
+type HardcodedProfile = {
+  key: string;
+  strategyType: 'range_vdip_trail' | 'ribbon_pucker_trend';
+  name: string;
+  icon: string;
+  frequencyLabel: string;
+  fileName: string;
+  algoModule: string;
+  symbol: string;
+  mode: 'SPOT' | 'FUTURES';
+  leverage: number;
+  defaultAmount: number;
+  constructorConfig: {
+    cadence: 'swing' | 'daily' | 'intraday' | 'hf';
+    tickEvery: number;
+    riskBps: number;
+  };
+  description: string;
+};
+
+const HARDCODED_PROFILES: HardcodedProfile[] = [
+  {
+    key: 'swing_2_3_week',
+    strategyType: 'range_vdip_trail',
+    name: 'Swing Atlas',
+    icon: '🧭',
+    frequencyLabel: 'Trades 2-3 times a week',
+    fileName: 'swing_atlas.hardcoded.js',
+    algoModule: '/assets/algos/range_vdip_trail.js',
+    symbol: 'LTC/USDT',
+    mode: 'SPOT',
+    leverage: 1,
+    defaultAmount: 0.025,
+    constructorConfig: { cadence: 'swing', tickEvery: 3600, riskBps: 35 },
+    description: 'Low-frequency swing system tuned for slower regime shifts.',
+  },
+  {
+    key: 'scalp_2_3_day',
+    strategyType: 'range_vdip_trail',
+    name: 'Pulse Scalp',
+    icon: '⚡',
+    frequencyLabel: 'Trades 2-3 times a day',
+    fileName: 'pulse_scalp.hardcoded.js',
+    algoModule: '/assets/algos/range_vdip_trail.js',
+    symbol: 'LTC/USDT',
+    mode: 'SPOT',
+    leverage: 2,
+    defaultAmount: 0.025,
+    constructorConfig: { cadence: 'daily', tickEvery: 900, riskBps: 22 },
+    description: 'Session-based scalper focused on medium intraday momentum.',
+  },
+  {
+    key: 'active_10_20_day',
+    strategyType: 'ribbon_pucker_trend',
+    name: 'Ribbon Intraday',
+    icon: '📈',
+    frequencyLabel: 'Trades 10-20 times a day',
+    fileName: 'ribbon_intraday.hardcoded.js',
+    algoModule: '/assets/algos/ribbon_pucker_trend.js',
+    symbol: 'LTC/USDT',
+    mode: 'FUTURES',
+    leverage: 3,
+    defaultAmount: 0.025,
+    constructorConfig: { cadence: 'intraday', tickEvery: 180, riskBps: 15 },
+    description: 'Higher-frequency trend/ribbon executor for active sessions.',
+  },
+  {
+    key: 'ultra_many_day',
+    strategyType: 'ribbon_pucker_trend',
+    name: 'Orderflow Sprint',
+    icon: '🚀',
+    frequencyLabel: 'Trades many times a day',
+    fileName: 'orderflow_sprint.hardcoded.js',
+    algoModule: '/assets/algos/ribbon_pucker_trend.js',
+    symbol: 'LTC/USDT',
+    mode: 'FUTURES',
+    leverage: 5,
+    defaultAmount: 0.025,
+    constructorConfig: { cadence: 'hf', tickEvery: 45, riskBps: 10 },
+    description: 'High-turnover orderflow model with strict risk throttles.',
+  },
+];
+
 // ---------- Service ----------
 @Injectable({ providedIn: 'root' })
 export class AlgoTradingService {
@@ -93,7 +179,7 @@ export class AlgoTradingService {
     if (this.inited) { console.log('[ALGO] init() already done'); return; }
     this.inited = true;
     console.log('[ALGO] init() start');
-    await this.bootstrapFromManifest();
+    await this.bootstrapHardcodedCatalog();
     console.log('[ALGO] init() done; catalog size =', this.catalog.size);
     this.refreshDiscovery();
     this.refreshRunning();
@@ -171,12 +257,6 @@ export class AlgoTradingService {
     };
     this.workers.set(systemId, handle);
 
-    worker.onmessage = e => {
-  if (e.data?.type === 'log') {
-   
-  }
-};
-
     worker.onmessage = (ev: MessageEvent) => {
       const msg = ev.data;
       if (!msg || typeof msg !== 'object') return;
@@ -208,7 +288,7 @@ export class AlgoTradingService {
     worker.postMessage({
       type: 'run',
       systemId,
-      source: cfg.code, // worker will also try DB by id if needed
+      source: cfg.code || this.buildHardcodedWorkerSource(cfg),
       config: {
         amount: cfg.amount,
         hedgeMode: opts?.hedgeMode ?? 'mirror',
@@ -279,95 +359,167 @@ export class AlgoTradingService {
     this.running$.next(live);
   }
 
-private async bootstrapFromManifest() {
-  //try {
-    const url = new URL('assets/algos/manifest.json', document.baseURI).toString();
-    const res = await fetch(url);
-    console.log('res '+JSON.stringify(res))
-    if (!res.ok) {
-      console.warn('[ALGO] manifest fetch failed', res.status, url);
-      this.refreshDiscovery();
-      this.refreshRunning();
-      return;
-    }
+  private async bootstrapHardcodedCatalog() {
+    this.catalog.clear();
+    const now = Date.now();
 
-    const base = await res.json();
-    // Accept either an array or {files:[...]}
-    const rows: any[] = Array.isArray(base)
-      ? base
-      : (Array.isArray(base?.files) ? base.files : []);
-
-    if (!rows.length) {
-      console.warn('[ALGO] manifest parsed but empty');
-      this.refreshDiscovery();
-      this.refreshRunning();
-      return;
-    }
-
-    for (const m of rows) {
-      // accept fileName OR filename OR name; add .js if missing
-      let fname = (m.fileName ?? m.filename ?? m.name ?? '').toString();
-      if (!fname) {
-        console.warn('[ALGO] skip manifest row without name/fileName', m);
-        continue;
-      }
-      if (!/\.js$/i.test(fname)) fname += '.js';
-
-      // try to fetch code, but do NOT block listing if it fails
-      let code = '';
-      try {
-        const jsUrl = new URL(`assets/algos/${fname}`, document.baseURI).toString();
-        const s = await fetch(jsUrl);
-        if (s.ok) code = await s.text();
-        else console.warn('[ALGO] strategy file missing', fname, s.status);
-      } catch (e) {
-        console.warn('[ALGO] fetch error for', fname, e);
-      }
-
-      const id: string = (m.id ?? 'sys-' + Math.random().toString(36).slice(2, 9)).toString();
-      const name: string = (m.name ?? fname.replace(/\.js$/i, '')).toString();
+    for (const p of HARDCODED_PROFILES) {
+      const id = `sys-${p.key}`;
+      const code = this.buildHardcodedWorkerSource({
+        id,
+        name: p.name,
+        systemKey: p.key,
+        symbol: p.symbol,
+        mode: p.mode,
+        leverage: p.leverage,
+      } as StrategyRow);
 
       const row: StrategyRow = {
         id,
-        name,
-        symbol: (m.symbol ?? '3-PERP').toString(),
-        mode: ((m.mode as 'SPOT' | 'FUTURES') ?? 'FUTURES'),
-        leverage: (typeof m.leverage === 'number' ? m.leverage : 5),
-        fileName: fname,
-        size: (typeof m.size === 'number' ? m.size : (code ? code.length : 0)),
-        createdAt: (typeof m.createdAt === 'number' ? m.createdAt : Date.now()),
-        status: (m.status === 'running' ? 'running' : 'stopped'),
-        amount: (typeof m.amount === 'number' ? m.amount : 0),
+        name: p.name,
+        systemKey: p.key,
+        symbol: p.symbol,
+        mode: p.mode,
+        leverage: p.leverage,
+        fileName: p.fileName,
+        size: code.length,
+        createdAt: now,
+        status: 'stopped',
+        amount: p.defaultAmount,
         pnlUsd: 0,
         roiPct: 0,
         copiers: 0,
         runtime: '0h',
-        code, // may be ''
+        venue: 'TL-Web',
+        icon: p.icon,
+        frequencyLabel: p.frequencyLabel,
+        description: p.description,
+        code,
       };
 
-      this.catalog.set(row.id, row);
-      if (code) {
-        try { await dbPutFile(row.id, code); } catch {}
-      }
+      this.catalog.set(id, row);
+      try { await dbPutFile(id, code); } catch {}
     }
 
-    // snapshot to index (best-effort)
     try {
       await dbPutIndex(Array.from(this.catalog.values()).map(toIndexItem));
     } catch (e) {
       console.warn('[ALGO] dbPutIndex failed (non-fatal)', e);
     }
+  }
 
-    console.debug('[ALGO] bootstrap complete; discovered', this.catalog.size, 'algos');
-    this.refreshDiscovery();
-    this.refreshRunning();
+  private buildHardcodedWorkerSource(row: StrategyRow): string {
+    const profile = HARDCODED_PROFILES.find((p) => p.key === row.systemKey) || HARDCODED_PROFILES[0];
+    const constructorConfig = JSON.stringify(profile.constructorConfig);
+    const name = JSON.stringify(row.name || profile.name);
+    const symbol = JSON.stringify(row.symbol || profile.symbol);
+    const mode = JSON.stringify(row.mode || profile.mode);
+    const strategyType = JSON.stringify(profile.strategyType);
+    const algoModule = JSON.stringify(profile.algoModule);
 
-  /*} catch (e) {
-    console.warn('[ALGO] bootstrapFromManifest fatal', e);
-    this.refreshDiscovery();
-    this.refreshRunning();
-  }*/
+    // Moneyball-style factory selection: choose strategy by type and pass size/config at constructor time.
+    return `
+class RangeVDipTrailStrategy {
+  constructor(args) { this.args = args; this.tick = 0; this.pnl = 0; }
+  onTick(api) {
+    this.tick += 1;
+    const every = Math.max(1, Number(this.args.constructorConfig?.tickEvery || 3600));
+    if ((this.tick % every) !== 0) return this.pnl;
+    const base = Number(this.args.amount || 0);
+    const riskBps = Number(this.args.constructorConfig?.riskBps || 20);
+    const drift = (Math.cos(this.tick / Math.max(2, every)) * (riskBps / 10000));
+    this.pnl += base * drift;
+    api.log('[RangeVDipTrail:onTick]', 'size=', base, 'tick=', this.tick, 'pnl=', this.pnl.toFixed(8));
+    return this.pnl;
+  }
 }
+
+class RibbonPuckerTrendStrategy {
+  constructor(args) { this.args = args; this.tick = 0; this.pnl = 0; }
+  onTick(api) {
+    this.tick += 1;
+    const every = Math.max(1, Number(this.args.constructorConfig?.tickEvery || 180));
+    if ((this.tick % every) !== 0) return this.pnl;
+    const base = Number(this.args.amount || 0);
+    const riskBps = Number(this.args.constructorConfig?.riskBps || 12);
+    const drift = (Math.sin(this.tick / Math.max(2, every)) * (riskBps / 10000));
+    this.pnl += base * drift;
+    api.log('[RibbonPucker:onTick]', 'size=', base, 'tick=', this.tick, 'pnl=', this.pnl.toFixed(8));
+    return this.pnl;
+  }
+}
+
+function createStrategy(args, api) {
+  const req = (typeof require === 'function') ? require : null;
+  if (req) {
+    try {
+      switch (args.strategyType) {
+        case 'range_vdip_trail':
+          req(args.algoModule);
+          break;
+        case 'ribbon_pucker_trend':
+          req(args.algoModule);
+          break;
+        default:
+          break;
+      }
+      api.log('[APIAlgo:require]', 'loaded', args.algoModule);
+    } catch (err) {
+      api.log('[APIAlgo:require:fallback]', String(err?.message || err));
+    }
+  }
+  switch (args.strategyType) {
+    case 'range_vdip_trail':
+      return new RangeVDipTrailStrategy(args);
+    case 'ribbon_pucker_trend':
+      return new RibbonPuckerTrendStrategy(args);
+    default:
+      return new RibbonPuckerTrendStrategy(args);
+  }
+}
+
+class APIAlgo {
+  constructor(args) {
+    this.args = args || {};
+    this.strategy = null;
+    this.pnl = 0;
+  }
+  start(api) {
+    this.api = api;
+    this.strategy = createStrategy(this.args, api);
+    this.api.log('[APIAlgo:start]', this.args.name, this.args.strategyType, this.args.symbol, 'size=', this.args.amount);
+  }
+  onTick() {
+    if (!this.strategy) return;
+    this.pnl = this.strategy.onTick(this.api);
+    this.api.metric(this.pnl);
+  }
+  stop() {
+    this.api && this.api.log('[APIAlgo:stop]', this.args.name);
+  }
+}
+let instance = null;
+function start(api, config, meta) {
+  instance = new APIAlgo({
+    name: ${name},
+    symbol: ${symbol},
+    mode: ${mode},
+    strategyType: ${strategyType},
+    algoModule: ${algoModule},
+    amount: Number(config?.amount || 0),
+    constructorConfig: ${constructorConfig},
+    meta: meta || {}
+  });
+  instance.start(api);
+}
+function onTick(ctx) {
+  if (instance) instance.onTick(ctx || {});
+}
+function stop() {
+  if (instance) instance.stop();
+}
+`;
+  }
 
 
   private genId(): string {

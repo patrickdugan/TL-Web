@@ -64,6 +64,8 @@
                         <span> | </span>
                         <span class='span-button' (click)="openDialog('withdraw', element.address, -1)">Send</span>
                         <span> | </span>
+                        <span class='span-button' (click)="openTokenizeDialog(element.address, element.confirmed)">Mint {{ underlyingAssetLabel }}</span>
+                        <span> | </span>
                         <span class='span-button' (click)="showTokens(element.address)">Show Tokens</span>
                     </mat-cell>
                 </ng-container>
@@ -142,9 +144,10 @@
             <span class='span-button' (click)="openDialog('deposit', selectedAddress, element.propertyid)">Receive</span>
             <span> | </span>
             <span class='span-button' (click)="openDialog('withdraw', selectedAddress, element.propertyid)">Send</span>
-            <span> | </span>
-             <span class="span-button" (click)="openDialog('synth', selectedAddress, element.propertyid,element.available)">Mint/Redeem
-            </span>
+            <ng-container *ngIf="isProceduralReceiptRow(element)">
+              <span> | </span>
+              <span class="span-button" (click)="openTokenActionDialog(selectedAddress, element)">Redeem {{ underlyingAssetLabel }}</span>
+            </ng-container>
           </mat-cell>
         </ng-container>
 

@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter } from '@angular/core';
+import { Component, Output, EventEmitter, OnDestroy } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
@@ -9,7 +9,7 @@ import { RpcService } from 'src/app/@core/services/rpc.service';
   styleUrls: ['./sign-tab.component.scss']
 })
 
-export class TxBuilderSignTabComponent {
+export class TxBuilderSignTabComponent implements OnDestroy {
   @Output('loading') loadingEmmiter: EventEmitter<boolean> = new EventEmitter();
   private _nRequired: number = 2;
   private _loading: boolean = false;
@@ -87,6 +87,10 @@ export class TxBuilderSignTabComponent {
     this.privKeys[i] = event.target.value;
   }
 
+  ngOnDestroy(): void {
+    this.clearSensitiveState();
+  }
+
   nKeysChange(keysType: 'required' | 'all', action: 'add' | 'remove') {
     if (keysType === 'required'){
         if (action === 'add') {
@@ -120,6 +124,7 @@ export class TxBuilderSignTabComponent {
 }
 
   async update() {
+    this.privKeys = [];
     this.vins = [];
     const decodeRes = await this.rpcService.rpc('decoderawtransaction', [this.rawTx]);
     if (decodeRes.error || !decodeRes.data?.vin?.length) {
@@ -134,34 +139,44 @@ export class TxBuilderSignTabComponent {
     this.loading = true;
     this.complete = false;
     this.errorsObj = null;
-    if (this.addMultisig) {
-      const amsRes = await this.rpcService.rpc('addmultisigaddress', [this.nRequired, this.pubkeysArray]);
-      if (amsRes.error || !amsRes.data) {
-        this.toastrService.error(amsRes.error || `Unknown Error`, 'Adding Multisig')
+    try {
+      if (this.addMultisig) {
+        const amsRes = await this.rpcService.rpc('addmultisigaddress', [this.nRequired, this.pubkeysArray]);
+        if (amsRes.error || !amsRes.data) {
+          this.toastrService.error(amsRes.error || `Unknown Error`, 'Adding Multisig')
+        }
       }
+      const res = !this.detailed
+        ? await this.rpcService.rpc('signrawtransaction', [this.rawTx])
+        : await this.rpcService.rpc('signrawtransaction',
+          [
+            this.rawTx, this.vins, 
+            this.vins.map((e, i: number) => this.privKeys[i] || this.activeKeyPair?.privkey || '')
+          ]
+        );
+      if (res.error || !res.data) {
+        this.toastrService.error(res.error || 'Unknown Error', 'Signing Error');
+      } else {
+        const { hex, complete, errors } = res.data;
+        this.complete = complete;
+        this.hexOutput = hex;
+        if (errors) this.errorsObj = errors;
+      }
+    } finally {
+      this.clearSensitiveState();
+      this.loading = false;
     }
-    const res = !this.detailed
-      ? await this.rpcService.rpc('signrawtransaction', [this.rawTx])
-      : await this.rpcService.rpc('signrawtransaction',
-        [
-          this.rawTx, this.vins, 
-          this.vins.map((e, i: number) => this.privKeys[i] || this.activeKeyPair?.privkey || '')
-        ]
-      );
-    if (res.error || !res.data) {
-      this.toastrService.error(res.error || 'Unknown Error', 'Signing Error');
-    } else {
-      const { hex, complete, errors } = res.data;
-      this.complete = complete;
-      this.hexOutput = hex;
-      if (errors) this.errorsObj = errors;
-    }
-    this.privKeys = [];
-    this.loading = false;
   }
 
   copy(text: string) {
     navigator.clipboard.writeText(text);
     this.toastrService.info('Address Copied to clipboard', 'Copied')
+  }
+
+  private clearSensitiveState() {
+    for (let i = 0; i < this.privKeys.length; i++) {
+      this.privKeys[i] = '';
+    }
+    this.privKeys = [];
   }
 }
