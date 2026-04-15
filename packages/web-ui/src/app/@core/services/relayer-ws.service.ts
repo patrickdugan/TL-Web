@@ -30,6 +30,13 @@ export class RelayerWsService {
     { resolve: (value: any) => void; reject: (reason?: any) => void; timeout: any }
   >();
 
+  private sanitizePath(path: string) {
+    if (!path) return null;
+    if (!path.startsWith("/")) return null;
+    if (path.includes("..")) return null;
+    return path;
+  }
+
   setBaseUrl(url: string | null) {
     const normalized = url?.trim() || null;
     if (normalized === this.baseUrl) return;
@@ -51,10 +58,14 @@ export class RelayerWsService {
 
     const id = String(this.nextId++);
     const timeoutMs = opts?.timeoutMs ?? 15000;
+    const requestPath = this.sanitizePath(path);
+    if (!requestPath) {
+      throw new Error("Invalid relayer request path");
+    }
     const payload: WsRequest = {
       id,
       method: (opts?.method || (opts?.body ? "POST" : "GET")).toUpperCase(),
-      path: path.startsWith("/") ? path : `/${path}`,
+      path: requestPath,
       query: opts?.query,
       body: opts?.body,
     };

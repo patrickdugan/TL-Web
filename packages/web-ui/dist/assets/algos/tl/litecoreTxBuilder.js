@@ -6,12 +6,13 @@ const BigNumber = require('bignumber.js');
 const {
   signPsbtLocal,
   makeNewAddress,
-  addMultisigAddress,
-  sendRawTransaction,
+  makeMultisig,
+  makeLocalRpc,
   createRawTransaction,
-  createPsbt,
-  decodeRawTransaction,
-  decodePsbt,
+  createPsbtAsync,
+  decodeRawTransactionAsync,
+  decodepsbtAsync,
+  signRawTransaction,
   ensureBitcoin,
 } = require('./util');
 //const { payments, Psbt, Transaction } = require('bitcoinjs-lib');
@@ -60,20 +61,21 @@ const getNetworkConfig = (networkCode) => {
 
 function initializeLocalTxHelpers(network = 'LTCTEST') {
   const btc = ensureBitcoin();
+  const localRpc = makeLocalRpc({ network });
 
   return {
     createPsbtAsync: async (inputs, outputs) =>
-      createPsbt(inputs, outputs, network),
+      createPsbtAsync(inputs, outputs, network),
 
     decodeRawTransactionAsync: async (rawtx) =>
-      decodeRawTransaction(rawtx, network),
+      decodeRawTransactionAsync(rawtx, network),
 
     signrawtransactionwithwalletAsync: async (rawtxHex, wif) =>
      signRawTransaction(rawtxHex, wif, network),
 
 
     decodepsbtAsync: async (psbtBase64) =>
-      decodePsbt(psbtBase64, network),
+      decodepsbtAsync(psbtBase64, network),
 
     createRawTransactionAsync: async (inputs, outputs) =>
       createRawTransaction(inputs, outputs, network),
@@ -84,10 +86,10 @@ function initializeLocalTxHelpers(network = 'LTCTEST') {
     getNewAddressAsync: async () => makeNewAddress(network),
 
     addMultisigAddressAsync: async (pubkeys, m = 2) =>
-      addMultisigAddress(pubkeys, m, network),
+      makeMultisig({ m, pubkeys, network }),
 
     sendrawtransactionAsync: async (rawtx) =>
-      sendRawTransaction(rawtx, network),
+      localRpc.sendrawtransactionAsync(rawtx),
   };
 }
 
@@ -113,7 +115,7 @@ const buildLitecoinTransaction = async (txConfig, client) => {
             relayerUrl= "testnet-api.layerwallet.com"
         }
 
-        const { createRawTransactionAsync } = initializeLocalTxHelpers(client);
+        const { createRawTransactionAsync } = initializeLocalTxHelpers(network);
 
         const buyerAddress = buyerKeyPair.address;
         const sellerAddress = sellerKeyPair.address;
@@ -191,7 +193,7 @@ async function buildPsbtViaRpc(buildPsbtOptions, client, networkCode) {
     createPsbtAsync,
     decodeRawTransactionAsync,
     decodepsbtAsync
-  } = initializeLocalTxHelpers(client);
+  } = initializeLocalTxHelpers(networkCode);
 
   //try {
     const { rawtx, inputs } = buildPsbtOptions;
@@ -395,44 +397,50 @@ const signPsbtRawTx = (signOptions, client) => {
 };*/
 
     const signPsbtRawTx = async (signOptions, client) => {
+        let signingWif = null;
         try {
-            const { wif, network, psbtHex } = signOptions;
-            const { signpsbtAsync } = initializeLocalTxHelpers(client);
+            const { wif, network = 'LTCTEST', psbtHex } = signOptions || {};
+            const { signpsbtAsync } = initializeLocalTxHelpers(network);
+            const { Psbt } = ensureBitcoin();
 
-            // Convert PSBT to Base64 for RPC
-            const psbt = Psbt.fromHex(psbtHex); // Load the PSBT from hex
-            const psbt64 = psbt.toBase64(); // Convert PSBT to Base64 (required for RPC)
-
-            console.log('PSBT in Base64:', psbt64);
-
+            // Prefer explicitly passed WIF; fallback to ephemeral session key.
             const key = getEphemeralKey();
-            if (!key?.wif) throw new Error('No ephemeral key available for signing');
-            // Use RPC to sign the PSBT
-            const signResult = await signpsbtAsync(psbt64,key.wif);
+            signingWif = (typeof wif === 'string' && wif) || key?.wif || null;
+            if (!signingWif) throw new Error('No signing key available for PSBT signing');
 
-            console.log('RPC Sign Result:', signResult);
+            // Local signer accepts base64 PSBT and returns final tx hex.
+            const psbt = Psbt.fromHex(psbtHex);
+            const psbt64 = psbt.toBase64();
+            const signResult = await signpsbtAsync(psbt64, signingWif);
 
-            // Check if the RPC returned a valid result
+            if (typeof signResult === 'string') {
+                return {
+                    data: {
+                        psbtHex,
+                        isFinished: true,
+                        finalHex: signResult,
+                        hex: signResult,
+                    },
+                };
+            }
+
             if (!signResult || !signResult.psbt) {
-                throw new Error('RPC signing failed or returned invalid result');
+                throw new Error('PSBT signing failed or returned invalid result');
             }
 
-            // Convert the returned PSBT back to a Psbt object
             const signedPsbt = Psbt.fromBase64(signResult.psbt);
-            const signedHex = signedPsbt.toHex()
-            // Check if the PSBT is finalized
-            console.log('signed hex '+JSON.stringify(signedHex))
+            const signedHex = signedPsbt.toHex();
             if (signResult.complete) {
-                const finalHex = signedPsbt.extractTransaction().toHex(); // Extract the final transaction
-                console.log('Finalized Transaction Hex:', finalHex);
-                return { data: { psbtHex: signResult.psbt, isFinished: true, hex: finalHex } };
-            } else {
-                console.log('PSBT partially signed, returning for further processing.');
-                return { data: { psbtHex: signedHex, isFinished: false } };
+                const finalHex = signedPsbt.extractTransaction().toHex();
+                return { data: { psbtHex: signResult.psbt, isFinished: true, finalHex, hex: finalHex } };
             }
+
+            return { data: { psbtHex: signedHex, isFinished: false } };
         } catch (error) {
             console.error('Error during RPC PSBT signing:', error.message);
             return { error: error.message };
+        } finally {
+            if (typeof signingWif === 'string') signingWif = '';
         }
     };
 
@@ -514,10 +522,10 @@ const buildFuturesTransaction = async (trade, buyerKeyPair, sellerKeyPair, commi
 const getUTXOFromCommit = async (rawtx, multySigChannelData, client, network) => {
     try {
         // Initialize promisified methods for the client
-        const { decoderawtransactionAsync } = initializeLocalTxHelpers(client);
+        const { decodeRawTransactionAsync } = initializeLocalTxHelpers(network || 'LTCTEST');
 
         // Decode the raw transaction
-        const decodedTx = await decoderawtransactionAsync(rawtx);
+        const decodedTx = await decodeRawTransactionAsync(rawtx);
         if (!decodedTx || !decodedTx.vout) {
             throw new Error('Failed to decode raw transaction');
         }
