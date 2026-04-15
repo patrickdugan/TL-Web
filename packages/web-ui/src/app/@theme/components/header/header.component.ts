@@ -7,6 +7,7 @@ import { ConnectionService } from 'src/app/@core/services/connections.service';
 import { RpcService } from 'src/app/@core/services/rpc.service';
 import { WindowsService } from 'src/app/@core/services/windows.service';
 import { DialogService, DialogTypes } from 'src/app/@core/services/dialogs.service';
+import { MenuService } from 'src/app/@core/services/menu.service';
 
 @Component({
   selector: 'tl-header',
@@ -63,7 +64,8 @@ export class HeaderComponent implements OnInit {
   private _selectedRoute: any = this._mainRoutes[0];
   public balanceLoading: boolean = false;
   constructor(
-   private dialogService: DialogService,
+    private dialogService: DialogService,
+    private menuService: MenuService,
     private router: Router,
     private authService: AuthService,
     private balanceService: BalanceService,
@@ -140,7 +142,7 @@ export class HeaderComponent implements OnInit {
   }
 
   toggleSideBar() {
-    // this.menuService.toggleSideBar();
+    this.menuService.toggleSideBar();
   }
   
   async updateBalance() {
