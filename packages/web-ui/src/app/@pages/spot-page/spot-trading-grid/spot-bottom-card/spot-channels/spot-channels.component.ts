@@ -52,8 +52,8 @@ export class SpotChannelsComponent implements OnInit, OnDestroy {
   working = false;
   error?: string;
   private sub?: Subscription;
-  private address: string;
-  private propertyId: number;
+  private address = '';
+  private propertyId: number | null = null;
   private rows: ChannelBalanceRow[] = [];
 
   constructor(

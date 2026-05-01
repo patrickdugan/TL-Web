@@ -93,8 +93,8 @@ function base64ToHex(b64: string): string {
   providedIn: "root",
 })
 export class TxsService {
-  private baseUrl = "https://api.layerwallet.com";
-  private testUrl = "https://testnet-api.layerwallet.com"
+  private baseUrl = "https://ws.layerwallet.com/relayer";
+  private testUrl = "https://ws.layerwallet.com/relayer"
   private network = this.rpcService.NETWORK
 
   constructor(
@@ -113,6 +113,38 @@ export class TxsService {
   return String(this.balanceService.NETWORK).includes("TEST")
     ? this.testUrl
     : this.baseUrl;
+  }
+
+  private async requestTradeLayer(method: string, params?: any): Promise<any> {
+    const provider = this.walletService.getTradeLayerProvider();
+    if (!provider) {
+      throw new Error("TradeLayer extension not available.");
+    }
+    return provider.request({ method, params });
+  }
+
+  private normalizeTradeLayerPsbtResult(response: any): {
+    psbtHex: string;
+    isValid: boolean;
+    isFinished: boolean;
+    rawTx?: string;
+  } {
+    const result = response?.data ?? response;
+    if (!result) {
+      throw new Error("TradeLayer wallet returned an empty PSBT result.");
+    }
+
+    const psbtHex = result.psbtHex || result.psbt || result.rawTx;
+    if (!psbtHex) {
+      throw new Error("TradeLayer wallet did not return a PSBT or final transaction hex.");
+    }
+
+    return {
+      psbtHex,
+      isValid: result.isValid ?? true,
+      isFinished: result.isFinished ?? !!result.rawTx,
+      rawTx: result.rawTx,
+    };
   }
 
   async getContractInfo(contractId: number) {
@@ -205,7 +237,7 @@ export class TxsService {
      
 
       if(this.balanceService.NETWORK=="LTCTEST"){
-            this.baseUrl = 'https://testnet-api.layerwallet.com'
+            this.baseUrl = 'https://ws.layerwallet.com/relayer'
             console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
       }
       const uri = this.baseUrl+'/tx/buildLTCTradeTx'
@@ -224,7 +256,7 @@ export class TxsService {
 
   async fetchUTXOs(address: string, pubkey:string): Promise<{ data?: string; error?: string }>{
       if(this.balanceService.NETWORK=="LTCTEST"){
-          this.baseUrl = 'https://testnet-api.layerwallet.com'
+          this.baseUrl = 'https://ws.layerwallet.com/relayer'
           console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
       }
       const uri = this.baseUrl+'/address/utxo/'+address 
@@ -311,8 +343,8 @@ export class TxsService {
       // ────────────────────────────────────────────
       //  PHANTOM MODE? → PSBT SIGNING FLOW
       // ────────────────────────────────────────────
-      const provider = this.walletService.provider$.value || this.walletService["pick"]();
-      const isPhantom = provider?.kind === "phantom-btc";
+      const providerKind = this.walletService.getConnectedOrPreferredProviderKind();
+      const isPhantom = providerKind === "phantom-btc";
 
       let finalHex: string;
 
@@ -370,16 +402,25 @@ export class TxsService {
         // ────────────────────────────────────────────
         //  CUSTOM EXTENSION? → existing direct-sign flow
         // ────────────────────────────────────────────
-        const signResponse = await window.myWallet?.sendRequest("signTransaction", {
-          transaction: buildTxConfig,
-          network: this.balanceService.NETWORK,
-        });
+        const unsignedRes = await fetch(`${this.walletService.baseUrl}/tx/buildUnsigned`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            txConfig: buildTxConfig,
+            network: this.balanceService.NETWORK
+          })
+        }).then(r => r.json());
 
-        if (!signResponse || !signResponse.success) {
-          return { error: signResponse?.error || "Failed to sign transaction." };
+        if (!unsignedRes.success) {
+          return { error: unsignedRes.error || "Failed to build unsigned PSBT" };
         }
 
-        finalHex = signResponse.data.rawTx;
+        const customSigned = await this.signPsbt(base64ToHex(unsignedRes.data.psbtBase64), false);
+        if (customSigned.error || !customSigned.data?.finalHex) {
+          return { error: customSigned.error || "Failed to finalize custom PSBT." };
+        }
+
+        finalHex = customSigned.data.finalHex;
       }
 
       console.log("signed tx:", finalHex);
@@ -421,8 +462,8 @@ export class TxsService {
     try {
       //this.loadingService.isLoading = true;
 
-      const provider = this.walletService.provider$.value || this.walletService["pick"]();
-      const isPhantom = provider?.kind === "phantom-btc";
+      const providerKind = this.walletService.getConnectedOrPreferredProviderKind();
+      const isPhantom = providerKind === "phantom-btc";
 
       let finalHex: string;
 
@@ -473,16 +514,25 @@ export class TxsService {
 
       } else {
         // EXTENSION legacy flow
-        const signResponse = await window.myWallet?.sendRequest("signTransaction", {
-          transaction: buildTxConfig,
-          network: this.balanceService.NETWORK,
-        });
+        const unsignedRes = await fetch(`${this.walletService.baseUrl}/tx/buildUnsigned`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            txConfig: buildTxConfig,
+            network: this.balanceService.NETWORK
+          })
+        }).then(r => r.json());
 
-        if (!signResponse || !signResponse.success) {
-          return { error: signResponse?.error || "Failed to sign transaction." };
+        if (!unsignedRes.success) {
+          return { error: unsignedRes.error || "Failed to build unsigned PSBT" };
         }
 
-        finalHex = signResponse.data.rawTx;
+        const customSigned = await this.signPsbt(base64ToHex(unsignedRes.data.psbtBase64), false);
+        if (customSigned.error || !customSigned.data?.finalHex) {
+          return { error: customSigned.error || "Failed to finalize custom PSBT." };
+        }
+
+        finalHex = customSigned.data.finalHex;
       }
 
       // 3) Broadcast
@@ -699,11 +749,11 @@ export class TxsService {
       error?: string;
     }> {
       try {
-        const provider = this.walletService.provider$.value || this.walletService["pick"]?.();
-        const isPhantom = provider?.kind === "phantom-btc";
-        const isCustom = provider?.kind === "custom";
+        const providerKind = this.walletService.getConnectedOrPreferredProviderKind();
+        const isPhantom = providerKind === "phantom-btc";
+        const isCustom = providerKind === "custom";
 
-        if (!provider) {
+        if (!providerKind) {
           return { error: "No wallet provider connected." };
         }
 
@@ -728,7 +778,7 @@ export class TxsService {
 
           console.log("Signing PSBT via Phantom", psbtBase64, "signingIndexes", signingIndexes);
 
-          const res = await provider.signPsbt(psbtBase64!, {
+          const res = await this.walletService.signPsbt(psbtBase64!, {
             autoFinalize: false,
             broadcast: false,
             signingIndexes,
@@ -740,20 +790,17 @@ export class TxsService {
         } else if (isCustom) {
           console.log("Signing PSBT via custom extension", psbtHex);
 
-          const response = await window.myWallet!.sendRequest("signPsbt", {
+          const response = await this.requestTradeLayer("signPsbt", {
             psbtHex,
             network: this.balanceService.NETWORK,
             sellerFlag,
             redeemScript,
           });
+          const normalized = this.normalizeTradeLayerPsbtResult(response);
 
-          if (!response || !response.success) {
-            return { error: response?.error || "Failed to sign PSBT." };
-          }
-
-          signedPsbtHex = response.data.psbtHex;
-          finalHex = response.data?.rawTx;
-          isFinished = response.data?.isFinished ?? !!finalHex;
+          signedPsbtHex = normalized.psbtHex;
+          finalHex = normalized.rawTx;
+          isFinished = normalized.isFinished;
         }
 
         if (!signedPsbtHex) {
@@ -817,13 +864,13 @@ export class TxsService {
       error?: string;
     }> {
       try {
-        if (!window.myWallet || typeof window.myWallet.sendRequest !== "function") {
+        if (!this.walletService.getTradeLayerProvider()) {
           throw new Error("Wallet extension not available for signing PSBT.");
         }
 
         console.log('about to call sign Psbt in tx service '+psbtHex+' '+this.balanceService.NETWORK);
         
-        const response = await window.myWallet.sendRequest("signPsbt", {
+        const response = await this.requestTradeLayer("signPsbt", {
           psbtHex: psbtHex,
           network: this.balanceService.NETWORK,
           sellerFlag: sellerFlag,
@@ -832,16 +879,14 @@ export class TxsService {
         
         console.log('response in sign PSBT '+JSON.stringify(response));
         
-        if (!response || !response.success) {
-          return { error: response?.error || "Failed to sign PSBT." };
-        }
+        const normalized = this.normalizeTradeLayerPsbtResult(response);
 
         return {
           data: {
-            psbtHex: response.data.psbtHex,
-            isValid: response.data.isValid,
-            isFinished: response.data.isFinished,
-            finalHex: response.data.rawTx,
+            psbtHex: normalized.psbtHex,
+            isValid: normalized.isValid,
+            isFinished: normalized.isFinished,
+            finalHex: normalized.rawTx,
           },
         };
       } catch (error: any) {
@@ -852,7 +897,7 @@ export class TxsService {
 
     async decode(rawTx:string): Promise<{ data?: string; error?: string }>{
         if(this.balanceService.NETWORK=="LTCTEST"){
-              this.baseUrl = 'https://testnet-api.layerwallet.com'
+              this.baseUrl = 'https://ws.layerwallet.com/relayer'
               console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
           }
 
@@ -871,7 +916,7 @@ export class TxsService {
 
     async getTx(txid: string): Promise<{ data?: any; error?: string }> {
       if (this.balanceService.NETWORK == "LTCTEST") {
-        this.baseUrl = "https://testnet-api.layerwallet.com";
+        this.baseUrl = "https://ws.layerwallet.com/relayer";
       }
       try {
         this.relayerWsService.setBaseUrl(this.baseUrl);
@@ -887,7 +932,7 @@ export class TxsService {
 
     async sendTx(rawTx: string): Promise<{ data?: string; error?: string }> {
         if(this.balanceService.NETWORK=="LTCTEST"){
-          this.baseUrl = 'https://testnet-api.layerwallet.com'
+          this.baseUrl = 'https://ws.layerwallet.com/relayer'
           console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
         }
       try {
@@ -913,7 +958,7 @@ export class TxsService {
 
     async getChainInfo(): Promise<{ data?: string; error?: string }>{
           if(this.balanceService.NETWORK=="LTCTEST"){
-              this.baseUrl = 'https://testnet-api.layerwallet.com'
+              this.baseUrl = 'https://ws.layerwallet.com/relayer'
               console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
           }
 
@@ -929,7 +974,7 @@ export class TxsService {
 
     async predictColumn(channelAddress: string, myAddress: string, cpAddress: string): Promise<{ data?: string; error?: string }>{
         if(this.balanceService.NETWORK=="LTCTEST"){
-          this.baseUrl = 'https://testnet-api.layerwallet.com'
+          this.baseUrl = 'https://ws.layerwallet.com/relayer'
           console.log('network in txservice '+this.balanceService.NETWORK+' '+this.baseUrl)
         }
         try {
@@ -962,7 +1007,7 @@ export class TxsService {
         ms: number
       ): Promise<{ data?: string; error?: string }> => {
       if(this.balanceService.NETWORK=="LTCTEST"){
-        this.baseUrl = 'https://testnet-api.layerwallet.com'
+        this.baseUrl = 'https://ws.layerwallet.com/relayer'
         console.log('network in txservice '+this.rpcService.NETWORK+' '+this.baseUrl)
       }
         try {

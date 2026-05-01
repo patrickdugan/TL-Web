@@ -5,16 +5,26 @@ declare global {
   interface Window {
     phantom?: {
       bitcoin?: {
+        isPhantom: true;
         request: (args: {
           method: string;
           params?: any;
         }) => Promise<any>;
+        requestAccounts?: () => Promise<any>;
         on?: (ev: string, cb: (...a: any[]) => void) => void;
+        off?: (ev: string, cb: (...a: any[]) => void) => void;
       };
     };
-    myWallet?: {
-      sendRequest: (method: string, params?: any) => Promise<any>;
+    tradelayer?: {
+      providerId: 'tradelayer';
+      isTradeLayer: true;
+      version?: string;
+      request: (args: {
+        method: string;
+        params?: any;
+      }) => Promise<any>;
       on?: (ev: string, cb: (...a: any[]) => void) => void;
+      off?: (ev: string, cb: (...a: any[]) => void) => void;
     };
   }
 }

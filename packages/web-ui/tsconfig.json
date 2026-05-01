@@ -18,6 +18,7 @@
     "experimentalDecorators": true,
     "moduleResolution": "node",
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "importHelpers": true,
     "target": "es2017",
     "module": "es2020",
@@ -30,8 +31,7 @@
     "strictInjectionParameters": false,
     "strictInputAccessModifiers": false,
     "strictTemplates": false,
-    "strictPropertyInitialization": false,
-    "resolveJsonModule": true
+    "strictPropertyInitialization": false
   },
   "include": [
     "src/**/*.ts",

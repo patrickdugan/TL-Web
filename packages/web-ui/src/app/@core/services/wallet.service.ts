@@ -12,9 +12,30 @@ import { RelayerWsService } from './relayer-ws.service';
 type WalletKind = 'phantom-btc' | 'custom';
 
 type PhantomBtc = {
+  isPhantom: true;
   request: (args: { method: string; params?: any }) => Promise<any>;
   requestAccounts?: () => Promise<any>;
   on?: (ev: string, cb: (...a: any[]) => void) => void;
+  off?: (ev: string, cb: (...a: any[]) => void) => void;
+};
+
+export type WalletAccount = {
+  address: string;
+  pubkey?: string;
+};
+
+type TradeLayerRequestArgs = {
+  method: string;
+  params?: any;
+};
+
+type TradeLayerProvider = {
+  providerId: 'tradelayer';
+  isTradeLayer: true;
+  version?: string;
+  request: (args: TradeLayerRequestArgs) => Promise<any>;
+  on?: (ev: string, cb: (...a: any[]) => void) => void;
+  off?: (ev: string, cb: (...a: any[]) => void) => void;
 };
 
 interface MultisigRecord {
@@ -82,9 +103,60 @@ interface WsAuthResult {
 const isLtcNet = (net?: TNETWORK | string) =>
   String(net ?? '').toUpperCase().startsWith('LTC');
 
+const isPhantomBtcProvider = (value: any): value is PhantomBtc =>
+  !!value &&
+  value.isPhantom === true &&
+  typeof value.request === 'function';
+
+const isTradeLayerProvider = (value: any): value is TradeLayerProvider =>
+  !!value &&
+  value.providerId === 'tradelayer' &&
+  value.isTradeLayer === true &&
+  typeof value.request === 'function';
+
+const normalizeWalletAccount = (
+  account: string | { address?: string; pubkey?: string; publicKey?: string } | null | undefined
+): WalletAccount | null => {
+  if (!account) return null;
+  if (typeof account === 'string') {
+    return { address: account };
+  }
+
+  if (!account.address) {
+    return null;
+  }
+
+  return {
+    address: account.address,
+    pubkey: account.pubkey ?? account.publicKey,
+  };
+};
+
+const normalizeWalletAccounts = (accounts: unknown): WalletAccount[] => {
+  if (!Array.isArray(accounts)) {
+    return [];
+  }
+
+  return accounts
+    .map((account) => normalizeWalletAccount(account as WalletAccount | string))
+    .filter((account): account is WalletAccount => !!account);
+};
+
 const getPhantomBtc = (net?: TNETWORK | string): PhantomBtc | undefined => {
   if (isLtcNet(net)) return undefined;
-  return (window as any).phantom?.bitcoin as PhantomBtc | undefined;
+  const candidate = (window as any).phantom?.bitcoin;
+  return isPhantomBtcProvider(candidate) ? candidate : undefined;
+};
+
+const getTradeLayerProvider = (): TradeLayerProvider | undefined => {
+  const candidate = (window as any).tradelayer;
+  return isTradeLayerProvider(candidate) ? candidate : undefined;
+};
+
+const requestTradeLayer = async (method: string, params?: any): Promise<any> => {
+  const provider = getTradeLayerProvider();
+  if (!provider) throw new Error('TradeLayer extension not available');
+  return provider.request({ method, params });
 };
 
 // ---------------------------------------------------------------------------
@@ -127,8 +199,8 @@ export class WalletService {
   get baseUrl(): string {
     const net = (this.rpc.NETWORK || "").toUpperCase();
     return net.includes("TEST")
-      ? "https://testnet-api.layerwallet.com"
-      : "https://api.layerwallet.com";
+      ? "https://ws.layerwallet.com/relayer"
+      : "https://ws.layerwallet.com/relayer";
   }
 
   get wsUrl(): string {
@@ -144,6 +216,24 @@ export class WalletService {
 
   public isWalletAvailable(): boolean {
     return this.available().length > 0;
+  }
+
+  public getPhantomProvider(): PhantomBtc | undefined {
+    return getPhantomBtc(this.rpc.NETWORK);
+  }
+
+  public getTradeLayerProvider(): TradeLayerProvider | undefined {
+    return getTradeLayerProvider();
+  }
+
+  public getPrimaryAddress(
+    accounts: Array<string | { address?: string } | null | undefined> | null | undefined
+  ): string | null {
+    return normalizeWalletAccounts(accounts)[0]?.address ?? null;
+  }
+
+  public getConnectedOrPreferredProviderKind(): WalletKind | null {
+    return (this.provider$.value || this.pick())?.kind ?? null;
   }
 
   get activeWallet(): 'phantom' | 'custom' | null {
@@ -537,61 +627,61 @@ export class WalletService {
     },
 
     on: (ev, cb) => getPhantomBtc()?.on?.(ev, cb),
+    off: (ev, cb) => getPhantomBtc()?.off?.(ev, cb),
   };
 
   private customExt: IWalletProvider = {
     kind: 'custom',
     name: 'TradeLayer Extension',
-    isAvailable: () => !!window.myWallet,
+    isAvailable: () => !!getTradeLayerProvider(),
 
     connect: async () => {
-      try {
-        await window.myWallet!.sendRequest('connect', {});
-      } catch {}
+      await requestTradeLayer('connect', {
+        network: this.customWalletNetwork(),
+      });
     },
 
     getAddresses: async (net) => {
       const appNet = this.rpc.NETWORK || 'BTC';
       const reqNet = net === 'testnet' ? 'LTCTEST' : appNet;
-      const r = await window.myWallet!.sendRequest('requestAccounts', {
+      const r = await requestTradeLayer('requestAccounts', {
         network: reqNet,
       });
-      return (r || []).map((a: any) => a.address);
+      return normalizeWalletAccounts(r).map((account) => account.address);
     },
 
     signMessage: async (_addr, msg) => {
-      return window.myWallet!.sendRequest('signMessage', { message: msg });
+      return requestTradeLayer('signMessage', {
+        message: msg,
+        network: this.rpc.NETWORK,
+      });
     },
 
     signPsbt: async (psbtBase64, opts) => {
       const hex = base64ToHex(psbtBase64);
-      const r = await window.myWallet!.sendRequest('signPSBT', {
-        transaction: hex,
+      const r = await requestTradeLayer('signPsbt', {
+        psbtHex: hex,
         network: this.rpc.NETWORK,
         ...(opts?.signingIndexes ? { signingIndexes: opts.signingIndexes } : {}),
         ...(opts?.sigHash != null ? { sigHash: opts.sigHash } : {}),
       });
       const out =
-        typeof r === 'string' ? r : r?.psbt ?? r?.transaction ?? hex;
+        typeof r === 'string'
+          ? r
+          : r?.psbtHex ?? r?.psbt ?? r?.rawTx ?? r?.transaction ?? hex;
       return isHex(out) ? hexToBase64(out) : out;
     },
 
-    signTransactionHex: async (txHex, network) => {
-      return window.myWallet!.sendRequest('signTransaction', {
-        transaction: txHex,
-        network,
-      });
-    },
-
     addMultisig: async (m, pubkeys, network) => {
-      return window.myWallet!.sendRequest('addMultisig', {
+      return requestTradeLayer('addMultisig', {
         m,
         pubkeys,
         network,
       });
     },
 
-    on: (ev, cb) => window.myWallet?.on?.(ev, cb),
+    on: (ev, cb) => getTradeLayerProvider()?.on?.(ev, cb),
+    off: (ev, cb) => getTradeLayerProvider()?.off?.(ev, cb),
   };
 
   // -------------------------------------------------------------------------
@@ -619,9 +709,13 @@ export class WalletService {
   // -------------------------------------------------------------------------
 
   private _prevProvider: IWalletProvider | null = null;
-  private _onAccountsChanged = (accs: string[]) => {
-    this.addresses$.next(accs || []);
-    this.address$.next(accs?.[0] ?? null);
+  private _onAccountsChanged = (accs: Array<string | { address?: string }>) => {
+    const addresses = (accs || [])
+      .map((account) => (typeof account === 'string' ? account : account?.address))
+      .filter((address): address is string => !!address);
+
+    this.addresses$.next(addresses);
+    this.address$.next(addresses[0] ?? null);
     this.sessionState$.next({
       token: null, address: null, expiresAt: null, wsAuthed: false,
     });
@@ -662,29 +756,24 @@ export class WalletService {
   // -------------------------------------------------------------------------
 
   async requestAccounts(
-    network?: string
-  ): Promise<{ address: string; pubkey?: string }[]> {
-    const isBTC = network === 'BTC' || network === 'BITCOIN';
-    const phantomBtc = getPhantomBtc();
+    network?: string | null
+  ): Promise<WalletAccount[]> {
+    const normalizedNetwork = String(network ?? this.rpc.NETWORK ?? '').toUpperCase();
+    const activeProvider = this.provider$.value || this.pick();
+    const phantomBtc = getPhantomBtc(normalizedNetwork);
+    const usePhantom =
+      activeProvider?.kind === 'phantom-btc' ||
+      (activeProvider == null && (normalizedNetwork === 'BTC' || normalizedNetwork === 'BITCOIN'));
 
-    if (isBTC && phantomBtc?.requestAccounts) {
-      try {
-        const btcAccs = await phantomBtc.requestAccounts();
-        return btcAccs.map((a: any) => ({
-          address: a.address,
-          pubkey: a.publicKey,
-        }));
-      } catch {}
+    if (usePhantom && phantomBtc?.requestAccounts) {
+      return normalizeWalletAccounts(await phantomBtc.requestAccounts());
     }
 
-    const accs = await window.myWallet!.sendRequest('requestAccounts', {
-      network,
+    const accs = await requestTradeLayer('requestAccounts', {
+      network: normalizedNetwork || this.customWalletNetwork(),
     });
 
-    return accs.map((a: any) => ({
-      address: a.address,
-      pubkey: a.pubkey,
-    }));
+    return normalizeWalletAccounts(accs);
   }
 
   async signMessage(
@@ -753,9 +842,13 @@ function hexToBase64(hex: string): string {
 
 declare global {
   interface Window {
-    myWallet?: {
-      sendRequest: (method: string, params?: any) => Promise<any>;
+    tradelayer?: {
+      providerId: 'tradelayer';
+      isTradeLayer: true;
+      version?: string;
+      request: (args: { method: string; params?: any }) => Promise<any>;
       on?: (ev: string, cb: (...a: any[]) => void) => void;
+      off?: (ev: string, cb: (...a: any[]) => void) => void;
     };
   }
 }

@@ -34,8 +34,8 @@ export class FuturesChannelsService {
   private refreshMs = 20000;
   private pollId?: any;
   private isLoading = false;
-  private baseUrl = "https://api.layerwallet.com";
-  private testUrl = "https://testnet-api.layerwallet.com"
+  private baseUrl = "https://ws.layerwallet.com/relayer";
+  private testUrl = "https://ws.layerwallet.com/relayer"
 
   private __rows$ = new BehaviorSubject<ChannelBalanceRow[]>([]);
   private __override: FutOverride | null = null;

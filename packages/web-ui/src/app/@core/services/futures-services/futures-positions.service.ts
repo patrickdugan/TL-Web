@@ -1,5 +1,5 @@
 // PATCHED WEB VERSION - futures-positions.service.ts
-// Changes: Uses relayer API (https://api.layerwallet.com/rpc/tl_getContractPosition)
+// Changes: Uses relayer API (https://ws.layerwallet.com/relayer/rpc/tl_getContractPosition)
 // Removes: Mempool scanning (desktop-only feature)
 // Keeps: Web-specific axios patterns
 
@@ -26,8 +26,8 @@ export class FuturesPositionsService {
     private _openedPosition: IPosition | null = null;
     private _selectedContractId: string | null = null;
     private subs$: Subscription | null = null;
-    private baseUrl = "https://api.layerwallet.com";
-  	private testUrl = "https://testnet-api.layerwallet.com"
+    private baseUrl = "https://ws.layerwallet.com/relayer";
+  	private testUrl = "https://ws.layerwallet.com/relayer"
   	private network = this.rpcService.NETWORK
   	private _pendingPositionDelta: number = 0;
 	private _pendingUpnlDelta: number = 0;

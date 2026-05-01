@@ -14,7 +14,7 @@ export interface SpotTradeRecord {
 export class SpotTradeHistoryService {
   /** Latest rows for UI binding (bind your table directly to this) */
   public rows: SpotTradeRecord[] = [];
-  public baseURL: string = 'https://api.layerwallet.com/rpc/';
+  public baseURL: string = 'https://ws.layerwallet.com/relayer/rpc/';
   /** poll cadence (ms) */
   private refreshMs = 20000;
 

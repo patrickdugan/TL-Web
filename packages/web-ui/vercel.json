@@ -2,34 +2,72 @@
   "version": 2,
   "buildCommand": "npm ci && npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)\\.(js|css|woff2|ttf|png|jpg|jpeg|gif|svg|webp|ico)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/index.html",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; frame-src 'self' https://algo.layerwallet.com; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; worker-src 'self'; connect-src 'self' https://api.layerwallet.com https://testnet-api.layerwallet.com https://ws.layerwallet.com wss://ws.layerwallet.com https://ob.layerwallet.com wss://ob.layerwallet.com https://testnet-ob.layerwallet.com wss://testnet-ob.layerwallet.com https://api.coinbase.com https://www.google-analytics.com https://region1.google-analytics.com http://localhost:1986 http://localhost:3000 ws://127.0.0.1:8787 ws://localhost:* http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; upgrade-insecure-requests"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains; preload"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
       ]
     }
-{ "key": "Content-Security-Policy", "value": "upgrade-insecure-requests" },
-        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" }
   ],
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/index.html" }
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
+    }
   ],
-"redirects": [
+  "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.layerwallet.com" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.layerwallet.com"
+        }
+      ],
       "destination": "https://layerwallet.com/:path*",
       "permanent": true
     }
   ]
-
 }

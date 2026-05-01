@@ -129,8 +129,12 @@ export class RpcService {
 
     set NETWORK(value: TNETWORK) {
       this.apiService.network = value;
-      this.apiService.apiUrl = null;
-      this.apiService.orderbookUrl = null;
+      const endpoint = value ? environment.ENDPOINTS[value] : null;
+      this.apiService.apiUrl = endpoint?.relayerUrl || null;
+      this.apiService.orderbookUrl = endpoint?.orderbookApiUrl || null;
+      if (endpoint?.orderbookApiUrl) {
+        this.socketService.obSocketConnect(endpoint.orderbookApiUrl);
+      }
       this.headerBlock = 0;
       this._NETWORK = value
       this.isNetworkSelected = true; // add this line;

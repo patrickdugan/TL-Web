@@ -11,12 +11,12 @@ export class NewTradeLayerApiService {
 
     // Replace this with your actual API URL
     private get apiUrl() {
-        return "https://api.layerwallet.com";
+        return "https://ws.layerwallet.com/relayer/";
     }
 
     // Generalized RPC call
     rpc(method: string, params: any[] = []): Observable<{ data?: any; error?: any }> {
-        const endpoint = `${this.apiUrl}tl_${method}`; // Prefix with "tl_"
+        const endpoint = `${this.apiUrl}rpc/tl_${method}`; // Prefix with "tl_"
         const body = { params }; // Wrap params in the expected format
 
         return this.http.post<any>(endpoint, body).pipe(

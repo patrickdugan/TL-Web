@@ -31,8 +31,8 @@ export class SpotChannelsService {
   private isLoading = false;
 
   /** relayer endpoints (testnet default) */
-  private baseUrl = 'https://api.layerwallet.com';
-  private testUrl = 'https://testnet-api.layerwallet.com';
+  private baseUrl = 'https://ws.layerwallet.com/relayer';
+  private testUrl = 'https://ws.layerwallet.com/relayer';
 
   /** Store accounts like BalanceService */
   private accounts: { address: string; pubkey: string }[] = [];

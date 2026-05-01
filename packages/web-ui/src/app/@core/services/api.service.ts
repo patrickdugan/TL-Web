@@ -14,8 +14,8 @@ import { RelayerWsService } from "./relayer-ws.service";
 
 export class ApiService {
     private _network: TNETWORK = 'BTC'// null;
-    private _apiUrl: string | null = 'https://api.layerwallet.com'; // Fixed
-    private _orderbookUrl: string | null = 'wss://ws.layerwallet.com';
+    private _apiUrl: string | null = 'https://ws.layerwallet.com/relayer';
+    private _orderbookUrl: string | null = 'wss://ws.layerwallet.com/ws';
 
     constructor(
         private marketApiService: MarketApiService,

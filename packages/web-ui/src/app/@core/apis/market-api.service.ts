@@ -9,7 +9,7 @@ import { map } from 'rxjs/operators';
 
 export class MarketApiService {
     // private NETWORK: TNETWORK = null;
-    private orderbookUrl: string | null = 'wss:ws.layerwallet.com';
+    private orderbookUrl: string | null = 'wss://ws.layerwallet.com/ws';
 
     constructor(
         private http: HttpClient,

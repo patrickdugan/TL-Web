@@ -12,6 +12,7 @@ import { TxsService } from 'src/app/@core/services/txs.service';
 import { ENCODER } from 'src/app/utils/payloads/encoder';
 import { WalletService } from 'src/app/@core/services/wallet.service'
 import { ProceduralRuntimeConfig, ProceduralRuntimeService } from 'src/app/@core/services/procedural-runtime.service';
+import { environment } from 'src/environments/environment';
 
 @Component({
   selector: 'tl-portoflio-page',
@@ -22,7 +23,7 @@ export class PortfolioPageComponent implements OnInit {
   cryptoBalanceColumns: string[] = ['attestation', 'address', 'confirmed', 'unconfirmed', 'actions'];
   tokensBalanceColums: string[] = ['propertyid', 'name', 'available', 'reserved', 'margin', 'channel', 'actions'];
   selectedAddress: string = '';
-  private url = "https://api.layerwallet.com";
+  private url = "https://ws.layerwallet.com/relayer";
   receiptPropertyId: number | null = null;
   proceduralConfig: ProceduralRuntimeConfig | null = null;
 
@@ -78,9 +79,8 @@ export class PortfolioPageComponent implements OnInit {
   }
 
   get relayerRpcBase() {
-    return this.isLtctest
-      ? 'https://testnet-api.layerwallet.com/rpc'
-      : 'https://api.layerwallet.com/rpc';
+    const network = this.balanceService.NETWORK || 'LTC';
+    return `${environment.ENDPOINTS[network]?.relayerUrl || environment.ENDPOINTS.LTC.relayerUrl}/rpc`;
   }
 
   ngOnInit(): void {
@@ -271,9 +271,7 @@ export class PortfolioPageComponent implements OnInit {
          }
         
         const network = this.balanceService.NETWORK; // 'LTC' or 'LTCTEST'
-        if(network=='LTCTEST'){
-          this.url = 'https://testnet-api.layerwallet.com'
-        }
+        this.url = environment.ENDPOINTS[network]?.relayerUrl || environment.ENDPOINTS.LTC.relayerUrl;
         console.log('network in portfolio '+network+' '+this.url)
 
       const payload = { pubkey:_pubkey };

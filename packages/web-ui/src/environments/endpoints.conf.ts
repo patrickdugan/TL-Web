@@ -5,17 +5,20 @@ export type TEndpoint = {
     } 
 };
 
+const ORDERBOOK_URL = "wss://ws.layerwallet.com/ws";
+const RELAYER_URL = "https://ws.layerwallet.com/relayer";
+
 export const ENDPOINTS: TEndpoint = {
     LTC: {
-        orderbookApiUrl: "wss://ws.layerwallet.com:443",
-        relayerUrl: "https://api.layerwallet.com", // Use the masked HTTPS domain for production
+        orderbookApiUrl: ORDERBOOK_URL,
+        relayerUrl: RELAYER_URL,
     },
     BTC: {
-      orderbookApiUrl: 'wss://ws.layerwallet.com:443',
-      relayerUrl:     'https://api.layerwallet.com',
+      orderbookApiUrl: ORDERBOOK_URL,
+      relayerUrl: RELAYER_URL,
     },
     LTCTEST: {
-        orderbookApiUrl: "wss://ws.layerwallet.com:443",
-        relayerUrl: "https://testnet-api.layerwallet.com", // Use the masked HTTPS domain for production
+        orderbookApiUrl: ORDERBOOK_URL,
+        relayerUrl: RELAYER_URL,
     },
 };

@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { Subscription } from 'rxjs';
 import { AuthService } from 'src/app/@core/services/auth.service';
 import { BalanceService } from 'src/app/@core/services/balance.service';
 import { ConnectionService } from 'src/app/@core/services/connections.service';
@@ -8,6 +9,7 @@ import { RpcService } from 'src/app/@core/services/rpc.service';
 import { WindowsService } from 'src/app/@core/services/windows.service';
 import { DialogService, DialogTypes } from 'src/app/@core/services/dialogs.service';
 import { MenuService } from 'src/app/@core/services/menu.service';
+import { WalletService } from 'src/app/@core/services/wallet.service';
 
 @Component({
   selector: 'tl-header',
@@ -15,7 +17,8 @@ import { MenuService } from 'src/app/@core/services/menu.service';
   styleUrls: ['./header.component.scss']
 })
 
-export class HeaderComponent implements OnInit {
+export class HeaderComponent implements OnInit, OnDestroy {
+  private readonly subscriptions = new Subscription();
   private _mainRoutes: {
     id: number;
     name: string;
@@ -67,6 +70,7 @@ export class HeaderComponent implements OnInit {
     private dialogService: DialogService,
     private menuService: MenuService,
     private router: Router,
+    private walletService: WalletService,
     private authService: AuthService,
     private balanceService: BalanceService,
     private connectionService: ConnectionService,
@@ -113,7 +117,18 @@ export class HeaderComponent implements OnInit {
     return this.rpcService.isSynced;
   }
 
-  ngOnInit(): void { }
+  ngOnInit(): void {
+    this.subscriptions.add(
+      this.walletService.address$.subscribe((address) => {
+        this.walletAddress = address;
+        this.balanceVisible = !!address;
+      })
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+  }
 
   navigateTo(route: any) {
     this.selectedRoute = route;
@@ -157,66 +172,41 @@ async connectWallet() {
     console.log("Checking for wallet...");
 //
     // --- Phantom Bitcoin provider (preferred) ---
-    const ph: any = (window as any)?.phantom?.bitcoin;
-    if (!this.isLitecoinNetwork && ph?.isPhantom) {
+    const ph = this.walletService.getPhantomProvider();
+    if (!this.isLitecoinNetwork && ph?.isPhantom && ph.requestAccounts) {
       console.log("Phantom Bitcoin detected.");
 
       // Must be called from a user gesture (your button click) to show the approval modal.
       const accounts = await ph.requestAccounts(); // triggers Phantom approval UI
+      await this.walletService.connectPreferred();
+      const nextAddress = this.walletService.getPrimaryAddress(accounts);
       if (accounts && accounts.length > 0) {
         // accounts: BtcAccount[] per docs: { address, addressType, publicKey, purpose }
-        this.walletAddress = accounts[0].address;
-        this.balanceVisible = true;
+        this.walletAddress = nextAddress;
+        this.balanceVisible = !!nextAddress;
         console.log("Connected Phantom BTC Address:", this.walletAddress);
         this.toastrService.success("Phantom connected successfully!");
-      }
-
-      // Listen for account switches (Phantom BTC supports 'accountsChanged')
-      if (!this.isLitecoinNetwork && typeof ph.on === "function") {
-        ph.on("accountsChanged", (newAccounts: any[]) => {
-          console.log("Phantom accounts changed:", newAccounts);
-          if (Array.isArray(newAccounts) && newAccounts.length > 0) {
-            this.walletAddress = newAccounts[0].address;
-            this.toastrService.info("Phantom account switched.");
-          } else {
-            // If empty array, try to reconnect (per docs suggestion)
-            ph.requestAccounts().catch((e: any) => console.warn("Re-connect failed:", e));
-          }
-        });
       }
 
       return; // Done with Phantom path
     }
 
     // --- Fallback: your existing custom wallet path ---
-    if (typeof (window as any).myWallet !== "undefined") {
+    if (this.walletService.getTradeLayerProvider()) {
       console.log("Fallback wallet detected.");
 
       if (this.isLitecoinNetwork && this.walletAddress && this.walletAddress.startsWith('bc1')) {
         this.walletAddress = null;
       }
 
-      const accounts = await (window as any).myWallet.sendRequest("requestAccounts", {});
+      await this.walletService.connectPreferred();
+      const accounts = await this.walletService.requestAccounts(this.rpcService.NETWORK);
+      const nextAddress = this.walletService.getPrimaryAddress(accounts);
       if (accounts && accounts.length > 0) {
-        this.walletAddress = accounts[0]?.address || accounts[0];
-        this.balanceVisible = true;
+        this.walletAddress = nextAddress;
+        this.balanceVisible = !!nextAddress;
         console.log("Connected Wallet Address:", this.walletAddress);
         this.toastrService.success("Wallet connected successfully!");
-      }
-
-      if (typeof (window as any).myWallet.on === "function") {
-        (window as any).myWallet.on("accountsChanged", (newAccounts: string[]) => {
-          console.log("Accounts changed:", newAccounts);
-          this.walletAddress = newAccounts[0] || null;
-          this.toastrService.info("Account switched.");
-        });
-        // Only keep this if your custom wallet actually emits it. Phantom BTC does not document 'networkChanged'.
-        (window as any).myWallet.on("networkChanged", (network: string) => {
-          console.log("Network changed:", network);
-          this.toastrService.info(`Network changed to ${network}.`);
-        });
-      } else {
-        console.warn("Wallet does not support event listeners.");
       }
     } else {
       console.warn("No wallet extension detected.");

@@ -36,7 +36,7 @@ export class FuturesTradeHistoryService {
   /** interval handle */
   private timerId?: any;
 
-  public baseURL: string = 'https://api.layerwallet.com/rpc/tl_contractTradeHistoryForAddress';
+  public baseURL: string = 'https://ws.layerwallet.com/relayer/rpc/tl_contractTradeHistoryForAddress';
   constructor(
     private api: ApiService,
     private auth: AuthService,

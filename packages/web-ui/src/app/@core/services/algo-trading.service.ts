@@ -1,6 +1,11 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { parseAlgoMetaFromSource, AlgoIndexItem } from '../algo-meta';
+import {
+  AlgoRunnerEvent,
+  AlgoRunnerStartPayload,
+} from '../algo-runner.types';
 import {
   dbGetIndex,
   dbPutIndex,
@@ -9,6 +14,7 @@ import {
   dbManifestDeltaPut,
   dbManifestDeltaAll,
 } from '../algo-db';
+import { AlgoRunnerBridgeService } from './algo-runner-bridge.service';
 
 // ---------- Types ----------
 export interface StrategyRow {
@@ -55,7 +61,8 @@ export interface RunningInstance {
 }
 
 interface WorkerHandle {
-  worker: Worker;
+  transport: 'local' | 'remote';
+  worker?: Worker;
   systemId: string;
   startedAt: number;
   amount: number;
@@ -169,9 +176,10 @@ export class AlgoTradingService {
   // NEW: explicit init gate
   private inited = false;
 
-  constructor() {
+  constructor(private runnerBridge: AlgoRunnerBridgeService) {
     // Do NOT bootstrap in the ctor anymore (hard to observe in prod).
     console.log('[ALGO] service constructed');
+    this.runnerBridge.events$.subscribe((event) => this.handleRunnerEvent(event));
   }
 
   /** Call once from component */
@@ -180,6 +188,13 @@ export class AlgoTradingService {
     this.inited = true;
     console.log('[ALGO] init() start');
     await this.bootstrapHardcodedCatalog();
+    if (this.runnerBridge.isEnabled()) {
+      try {
+        await this.runnerBridge.ensureReady();
+      } catch (error) {
+        console.warn('[ALGO] runner bridge unavailable during init', error);
+      }
+    }
     console.log('[ALGO] init() done; catalog size =', this.catalog.size);
     this.refreshDiscovery();
     this.refreshRunning();
@@ -234,10 +249,27 @@ export class AlgoTradingService {
     });
 
     this.catalog.set(id, item);
+    if (this.runnerBridge.isEnabled()) {
+      try {
+        await this.runnerBridge.importStrategy({
+          id,
+          source,
+          name: item.name,
+          meta: {
+            symbol: item.symbol,
+            mode: item.mode,
+            leverage: item.leverage,
+            venue: item.venue,
+          },
+        });
+      } catch (error) {
+        console.warn('[ALGO] runner import failed; strategy remains local-only', error);
+      }
+    }
     this.refreshDiscovery();
   }
 
-  runSystem(systemId: string, opts?: { amount?: number; counterVenueKey?: string; hedgeMode?: string }) {
+  async runSystem(systemId: string, opts?: { amount?: number; counterVenueKey?: string; hedgeMode?: string }) {
     const cfg = this.catalog.get(systemId);
     if (!cfg) return;
 
@@ -245,9 +277,53 @@ export class AlgoTradingService {
     cfg.amount = opts?.amount ?? cfg.amount ?? 0;
     this.catalog.set(systemId, cfg);
 
+    const startPayload: AlgoRunnerStartPayload = {
+      systemId,
+      source: cfg.code || this.buildHardcodedWorkerSource(cfg),
+      config: {
+        amount: cfg.amount,
+        hedgeMode: opts?.hedgeMode ?? 'mirror',
+        counterVenueKey: opts?.counterVenueKey ?? '',
+      },
+      meta: { name: cfg.name, symbol: cfg.symbol, mode: cfg.mode, leverage: cfg.leverage },
+    };
+
+    if (this.runnerBridge.isEnabled()) {
+      try {
+        const ready = await this.runnerBridge.ensureReady();
+        if (ready) {
+          const result = await this.runnerBridge.startStrategy(startPayload);
+          const handle: WorkerHandle = {
+            transport: 'remote',
+            systemId,
+            startedAt: result.startedAt || Date.now(),
+            amount: cfg.amount,
+            pnlUsd: 0,
+            status: 'running',
+          };
+          this.workers.set(systemId, handle);
+          this.refreshDiscovery();
+          this.refreshRunning();
+          return;
+        }
+      } catch (error) {
+        console.warn('[ALGO] remote runner start failed; falling back to local worker', error);
+      }
+
+      if (!this.canUseLocalExecution()) {
+        cfg.status = 'stopped';
+        this.catalog.set(systemId, cfg);
+        this.logs$.next({ systemId, args: ['[ERROR] Remote algo runner unavailable; local execution is disabled in this environment.'] });
+        this.refreshDiscovery();
+        this.refreshRunning();
+        return;
+      }
+    }
+
     const worker = new Worker(new URL('../algo.worker.ts', import.meta.url), { type: 'module' });
 
     const handle: WorkerHandle = {
+      transport: 'local',
       worker,
       systemId,
       startedAt: Date.now(),
@@ -287,21 +363,14 @@ export class AlgoTradingService {
 
     worker.postMessage({
       type: 'run',
-      systemId,
-      source: cfg.code || this.buildHardcodedWorkerSource(cfg),
-      config: {
-        amount: cfg.amount,
-        hedgeMode: opts?.hedgeMode ?? 'mirror',
-        counterVenueKey: opts?.counterVenueKey ?? '',
-      },
-      meta: { name: cfg.name, symbol: cfg.symbol, mode: cfg.mode, leverage: cfg.leverage },
+      ...startPayload,
     });
 
     this.refreshDiscovery();
     this.refreshRunning();
   }
 
-  stopSystem(systemId: string) {
+  async stopSystem(systemId: string) {
     const h = this.workers.get(systemId);
     if (!h) {
       const cfg = this.catalog.get(systemId);
@@ -313,7 +382,18 @@ export class AlgoTradingService {
       this.refreshRunning();
       return;
     }
-    h.worker.postMessage({ type: 'stop', systemId });
+
+    if (h.transport === 'remote') {
+      try {
+        await this.runnerBridge.stopStrategy(systemId);
+      } catch (error) {
+        console.warn('[ALGO] remote runner stop failed', error);
+      }
+      this.internalStop(systemId);
+      return;
+    }
+
+    h.worker?.postMessage({ type: 'stop', systemId });
     this.internalStop(systemId);
   }
 
@@ -321,7 +401,7 @@ export class AlgoTradingService {
   private internalStop(systemId: string) {
     const h = this.workers.get(systemId);
     if (h) {
-      try { h.worker.terminate(); } catch {}
+      try { h.worker?.terminate(); } catch {}
       this.workers.delete(systemId);
     }
     const cfg = this.catalog.get(systemId);
@@ -551,5 +631,37 @@ function stop() {
     const ms = Date.now() - h.startedAt;
     const hours = Math.floor(ms / (1000 * 60 * 60));
     return `${hours}h`;
+  }
+
+  private canUseLocalExecution(): boolean {
+    return environment.algoRunner?.allowLocalExecution !== false;
+  }
+
+  private handleRunnerEvent(event: AlgoRunnerEvent): void {
+    switch (event.type) {
+      case 'log':
+        this.logs$.next({ systemId: event.systemId, args: event.args as any[] });
+        break;
+      case 'metric': {
+        const handle = this.workers.get(event.systemId);
+        if (handle) {
+          handle.pnlUsd = event.pnl;
+          this.workers.set(event.systemId, handle);
+          this.refreshRunning();
+          this.refreshDiscovery();
+        }
+        break;
+      }
+      case 'order':
+        this.logs$.next({ systemId: event.systemId, args: [`[ORDER] ${JSON.stringify(event.order)}`] });
+        break;
+      case 'error':
+        this.logs$.next({ systemId: event.systemId, args: [`[ERROR] ${event.error}`] });
+        this.internalStop(event.systemId);
+        break;
+      case 'stopped':
+        this.internalStop(event.systemId);
+        break;
+    }
   }
 }

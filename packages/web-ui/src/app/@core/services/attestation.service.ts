@@ -71,8 +71,8 @@ export class AttestationService {
         console.log('Checking attestation for address: ' + address);
 
         const url = this.rpcService.NETWORK === "LTCTEST"
-            ? 'https://testnet-api.layerwallet.com'
-            : 'https://api.layerwallet.com';
+            ? 'https://ws.layerwallet.com/relayer'
+            : 'https://ws.layerwallet.com/relayer';
 
         try {
             const payload = { address, id: 0 };

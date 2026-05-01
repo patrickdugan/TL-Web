@@ -63,8 +63,8 @@ export class SynthMintRedeemDialogComponent {
 
   get relayerRpcBase() {
     return this.balanceService.NETWORK === 'LTCTEST'
-      ? 'https://testnet-api.layerwallet.com/rpc'
-      : 'https://api.layerwallet.com/rpc';
+      ? 'https://ws.layerwallet.com/relayer/rpc'
+      : 'https://ws.layerwallet.com/relayer/rpc';
   }
 
   get isProceduralFlow() {

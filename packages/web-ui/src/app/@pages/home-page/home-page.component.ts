@@ -3,6 +3,7 @@ import { Subscription } from 'rxjs';
 import { ConnectionService } from 'src/app/@core/services/connections.service';
 import { ToastrService } from 'ngx-toastr';
 import { AlgoTradingService, StrategyRow } from 'src/app/@core/services/algo-trading.service';
+import { WalletService } from 'src/app/@core/services/wallet.service';
 
 interface LaunchAlgoButton {
   icon: string;
@@ -23,7 +24,8 @@ export class HomePageComponent implements OnInit, OnDestroy {
   constructor(
     private connectionService: ConnectionService,
     private toastrService: ToastrService,
-    private algoTradingService: AlgoTradingService
+    private algoTradingService: AlgoTradingService,
+    private walletService: WalletService
   ) {}
 
   public walletAddress: string | null = null;
@@ -59,6 +61,10 @@ export class HomePageComponent implements OnInit, OnDestroy {
     this.algoTradingService.fetchDiscovery();
     this.algoTradingService.fetchRunning();
     this.subs.push(
+      this.walletService.address$.subscribe((address) => {
+        this.walletAddress = address;
+        this.balanceVisible = !!address;
+      }),
       this.algoTradingService.discovery$.subscribe((discovery) => this.bindStrategiesToButtons(discovery)),
       this.algoTradingService.running$.subscribe((running) => {
         this.runningAlgoCount = running.length;
@@ -80,21 +86,18 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
   async connectWallet() {
     try {
-      // Check if the browser wallet is available
-      if ((window as any).ethereum) {
-        // Request accounts from the wallet
-        const accounts = await (window as any).ethereum.request({
-          method: 'eth_requestAccounts',
-        });
-
-        // Use the first account as the connected wallet address
-        this.walletAddress = accounts[0];
-        this.balanceVisible = true;
-
-        this.toastrService.success('Wallet connected successfully!');
-      } else {
+      if (!this.walletService.getPhantomProvider() && !this.walletService.getTradeLayerProvider()) {
         this.toastrService.error('No wallet detected. Please install a browser wallet extension.');
+        return;
       }
+
+      await this.walletService.connectPreferred();
+      const accounts = await this.walletService.requestAccounts(this.walletService.network);
+      const nextAddress = this.walletService.getPrimaryAddress(accounts);
+
+      this.walletAddress = nextAddress;
+      this.balanceVisible = !!nextAddress;
+      this.toastrService.success('Wallet connected successfully!');
     } catch (error) {
       console.error('Wallet connection error:', error);
       this.toastrService.error('Failed to connect wallet.');
@@ -124,22 +127,6 @@ export class HomePageComponent implements OnInit, OnDestroy {
     for (const button of this.launchButtons) {
       const match = discovery.find((row) => row.name === button.strategyName);
       button.strategyId = match?.id;
-    }
-  }
-
-  setupWalletListeners() {
-    const wallet = (window as any).myWallet;
-
-    if (wallet) {
-      wallet.on('accountsChanged', (accounts: string[]) => {
-        console.log('Accounts changed:', accounts);
-        this.walletAddress = accounts[0] || null;
-        this.balanceVisible = !!accounts[0];
-      });
-
-      wallet.on('networkChanged', (network: string) => {
-        console.log('Network changed:', network);
-      });
     }
   }
 

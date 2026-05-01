@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { WalletService } from './wallet.service';
 import { RpcService, TNETWORK } from "./rpc.service";
 import { RelayerWsService } from './relayer-ws.service';
+import { environment } from 'src/environments/environment';
 
 const minBlocksForBalanceConf: number = 1;
 const emptyBalanceObj = {
@@ -21,7 +22,7 @@ const emptyBalanceObj = {
 })
 
 export class BalanceService {
-  private url = "https://api.layerwallet.com";
+  private url = environment.ENDPOINTS.LTC.relayerUrl;
   
   private accounts: { address: string; pubkey: string }[] = [];
   private _NETWORK: string = "LTC"; // Use a different backing field
@@ -78,12 +79,8 @@ export class BalanceService {
 
  async updateBalances() {
       console.log('network detected in balances '+this._NETWORK)
-     if(this._NETWORK=="LTCTEST"){
-      this.url = 'https://testnet-api.layerwallet.com'
-      console.log('network in portfolio '+this._NETWORK+' '+this.url)
-    }else{
-      this.url = 'https://api.layerwallet.com'
-    }
+    this.url = environment.ENDPOINTS[this._NETWORK]?.relayerUrl || environment.ENDPOINTS.LTC.relayerUrl;
+    console.log('network in portfolio '+this._NETWORK+' '+this.url)
    //
     try {
         const accounts = await this.walletService.requestAccounts(this._NETWORK);

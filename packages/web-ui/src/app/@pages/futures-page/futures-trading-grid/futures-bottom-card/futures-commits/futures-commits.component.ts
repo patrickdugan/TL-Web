@@ -44,8 +44,8 @@ export class FuturesChannelsComponent implements OnInit, OnDestroy {
   error?: string;
   rows: ChannelBalanceRow[] = [];
   private sub?: Subscription;
-  private address: string;
-  private propertyId: number;
+  private address = '';
+  private propertyId: number | null = null;
 
   constructor(
     private futSvc: FuturesChannelsService,
