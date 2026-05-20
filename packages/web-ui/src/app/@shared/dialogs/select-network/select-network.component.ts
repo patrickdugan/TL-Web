@@ -26,6 +26,7 @@ const NETWORK_OPTIONS: NetworkOpt[] = [
 export class SelectNetworkDialog implements OnInit {
   public network: NetworkValue = 'BTC';
   public options: NetworkOpt[] = NETWORK_OPTIONS;
+  public isFirefox = false;
 
   constructor(
     private rpcService: RpcService,
@@ -45,6 +46,7 @@ export class SelectNetworkDialog implements OnInit {
   }
 
   ngOnInit(): void {
+    this.isFirefox = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
     this.options = [...NETWORK_OPTIONS];
     const currentNetwork = this.rpcService.NETWORK as NetworkValue | null;
     if (currentNetwork && this.options.some((opt) => opt.value === currentNetwork)) {

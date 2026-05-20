@@ -77,20 +77,6 @@
     border-radius: 4px;
 }
 
-.firefox-only {
-    display: none;
-}
-
-/* Show native select in Firefox, hide mat-select to avoid overlay bugs */
-@supports (-moz-appearance: none) {
-    .firefox-only {
-        display: block;
-    }
-    .mat-select-field {
-        display: none;
-    }
-}
-
 .native-select:focus {
     outline: 2px solid var(--lightBlue);
     outline-offset: 1px;

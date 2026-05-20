@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { NavigationEnd } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { Subscription } from 'rxjs';
 import { AuthService } from 'src/app/@core/services/auth.service';
@@ -27,9 +28,15 @@ export class HeaderComponent implements OnInit, OnDestroy {
     needFullSynced?: boolean;
   }[] = [
     {
+       id: 1,
+       name: 'Home',
+       link: '/',
+       needAuthToShow: false,
+    },
+    {
        id: 4,
        name: 'Futures Trading',
-       link: '',
+       link: '/futures',
        needAuthToShow: false,
     },
     {
@@ -118,12 +125,32 @@ export class HeaderComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.syncSelectedRoute(this.router.url || '/');
     this.subscriptions.add(
       this.walletService.address$.subscribe((address) => {
         this.walletAddress = address;
         this.balanceVisible = !!address;
       })
     );
+
+    this.subscriptions.add(
+      this.router.events.subscribe((event) => {
+        if (!(event instanceof NavigationEnd)) return;
+        this.syncSelectedRoute(event.urlAfterRedirects || '/');
+      })
+    );
+  }
+
+  private syncSelectedRoute(url: string): void {
+    const currentUrl = String(url || '/').split('?')[0].split('#')[0];
+    const match = this.mainRoutes.find((route) => {
+      const link = route.link || '';
+      const routeUrl =
+        link === '' || link === '/' ? '/' :
+        link.startsWith('/') ? link : `/${link}`;
+      return routeUrl === currentUrl;
+    });
+    this.selectedRoute = match || this.mainRoutes[0];
   }
 
   ngOnDestroy(): void {

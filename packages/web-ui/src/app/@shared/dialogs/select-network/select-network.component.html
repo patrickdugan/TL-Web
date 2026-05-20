@@ -3,7 +3,7 @@
 
   <div class="field">
     <label class="field-label">Network</label>
-    <mat-form-field appearance="fill" class="field-control mat-select-field">
+    <mat-form-field *ngIf="!isFirefox" appearance="fill" class="field-control mat-select-field">
       <mat-label>Network</mat-label>
       <mat-select [(ngModel)]="network">
         <mat-option *ngFor="let opt of options" [value]="opt.value">
@@ -11,7 +11,7 @@
         </mat-option>
       </mat-select>
     </mat-form-field>
-    <select class="native-select firefox-only" [(ngModel)]="network">
+    <select *ngIf="isFirefox" class="native-select" [(ngModel)]="network">
       <option *ngFor="let opt of options" [value]="opt.value">
         {{ opt.label }}
       </option>
