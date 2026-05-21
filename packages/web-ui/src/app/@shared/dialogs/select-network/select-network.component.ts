@@ -40,9 +40,7 @@ export class SelectNetworkDialog implements OnInit {
     private futures: FuturesMarketService,
     private spot: SpotMarketsService
   ) {
-    // enable click-off close
     this.dialogRef.disableClose = false;
-    this.dialogRef.backdropClick().subscribe(() => this.cancel());
   }
 
   ngOnInit(): void {
