@@ -1,6 +1,8 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { map } from 'rxjs/operators';
+import { KeysApiService } from "./keys-api.service";
+import { environment } from "src/environments/environment";
 // import { TNETWORK } from "../services/rpc.service";
 
 @Injectable({
@@ -9,11 +11,18 @@ import { map } from 'rxjs/operators';
 
 export class MarketApiService {
     // private NETWORK: TNETWORK = null;
-    private orderbookUrl: string | null = 'wss://ws.layerwallet.com/ws';
+    private orderbookUrl: string | null = environment.ENDPOINTS.BTC.orderbookApiUrl;
 
     constructor(
         private http: HttpClient,
+        private keysApiService: KeysApiService,
     ) {}
+
+    private get endpointBase() {
+        const network = this.keysApiService.NETWORK || 'BTC';
+        const endpoint = environment.ENDPOINTS[network] || environment.ENDPOINTS.BTC;
+        return endpoint.relayerUrl.replace(/\/relayer$/, '');
+    }
 
     private get apiUrl() {
         console.log('loading markets '+this.orderbookUrl + '/markets/')
@@ -32,7 +41,7 @@ export class MarketApiService {
 
     getSpotMarkets(network: string) {
         console.log('spot markets '+this.apiUrl + 'spot')
-        const spotURL = `https://ws.layerwallet.com/markets/spot/${network}`;
+        const spotURL = `${this.endpointBase}/markets/spot/${network}`;
         const markets =  this.http.get(spotURL)
         console.log('returning spot markets '+JSON.stringify(markets))
         const mapped = markets.pipe(map((res: any) => res.data));
@@ -43,7 +52,7 @@ export class MarketApiService {
     getFuturesMarkets(network: string) {    
         console.log('futures markets '+this.apiUrl + 'futures')
        
-        const futuresURL = `https://ws.layerwallet.com/markets/futures/${network}`;            
+        const futuresURL = `${this.endpointBase}/markets/futures/${network}`;            
         return this.http.get(futuresURL)
             .pipe(map((res: any) => res.data));
     }

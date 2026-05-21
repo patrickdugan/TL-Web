@@ -1,6 +1,8 @@
 import { Component, Input, ViewChild } from '@angular/core';
 import { ConnectionService } from 'src/app/@core/services/connections.service';
 import { SocketService } from 'src/app/@core/services/socket.service';
+import { RpcService } from 'src/app/@core/services/rpc.service';
+import { environment } from 'src/environments/environment';
 
 @Component({
   selector: 'tl-disconnected-line',
@@ -11,6 +13,7 @@ export class DisconnectedLineComponent {
   constructor(
       private connectionService: ConnectionService,
       private socketService: SocketService,
+      private rpcService: RpcService,
   ) { }
 
   get isOnlineConnected() {
@@ -22,6 +25,8 @@ export class DisconnectedLineComponent {
   }
 
   mainSocketReconenct() {
-    this.socketService.obSocketConnect('https://ws.layerwallet.com/443');
+    const network = this.rpcService.NETWORK || 'BTC';
+    const endpoint = environment.ENDPOINTS[network] || environment.ENDPOINTS.BTC;
+    this.socketService.obSocketConnect(endpoint.orderbookApiUrl);
   }
 }

@@ -2,16 +2,22 @@ import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
+import { KeysApiService } from "./keys-api.service";
+import { environment } from "src/environments/environment";
 
 @Injectable({
     providedIn: 'root',
 })
 export class NewTradeLayerApiService {
-    constructor(private http: HttpClient) {}
+    constructor(
+        private http: HttpClient,
+        private keysApiService: KeysApiService,
+    ) {}
 
-    // Replace this with your actual API URL
     private get apiUrl() {
-        return "https://ws.layerwallet.com/relayer/";
+        const network = this.keysApiService.NETWORK || 'BTC';
+        const endpoint = environment.ENDPOINTS[network] || environment.ENDPOINTS.BTC;
+        return `${endpoint.relayerUrl}/`;
     }
 
     // Generalized RPC call

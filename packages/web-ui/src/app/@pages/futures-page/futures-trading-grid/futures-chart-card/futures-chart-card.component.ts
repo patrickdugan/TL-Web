@@ -1,6 +1,3 @@
-// PATCHED WEB VERSION - futures-chart-card.component.ts
-// Adds: Coinbase API integration, timeframe selector, real candle data
-
 import {
   AfterViewInit,
   Component,
@@ -19,6 +16,12 @@ import {
 
 import { FuturesOrderbookService } from 'src/app/@core/services/futures-services/futures-orderbook.service';
 import { FuturesMarketService } from 'src/app/@core/services/futures-services/futures-markets.service';
+import {
+  createTradingViewWidget,
+  loadTradingViewScript,
+  resolveTradingViewSymbol,
+  tradingViewInterval,
+} from 'src/app/@core/utils/tradingview-chart.util';
 
 export interface ICandle {
   time: any;
@@ -58,42 +61,48 @@ export const chartOptions: DeepPartial<ChartOptions> = {
 export class FuturesChartCardComponent implements AfterViewInit, OnDestroy {
   @ViewChild('chart', { static: true }) chartElement!: ElementRef;
 
+  chartMode: 'advanced' | 'fallback' = 'advanced';
+  chartStatus = 'TradingView Advanced';
+  advancedSymbol = '';
+
   private chart?: IChartApi;
   private candleStickSeries?: ISeriesApi<'Candlestick'>;
+  private tradingViewWidget: any = null;
 
   private bars: ICandle[] = [];
   private lastBar: ICandle | null = null;
-
-  private candleIntervalSec = 60; // default 1m
+  private candleIntervalSec = 60;
   private maxBars = 600;
-
-  get timeframeSec(): number {
-    return this.candleIntervalSec;
-  }
-
   private quotePoll: any = null;
   private pollMs = 150;
+  private marketWatchPoll: any = null;
+  private activeMarketKey = '';
 
   constructor(
     private futuresOrderbookService: FuturesOrderbookService,
     private futuresMarketService: FuturesMarketService
   ) {}
 
+  get timeframeSec(): number {
+    return this.candleIntervalSec;
+  }
+
+  get chartContainer(): HTMLElement {
+    return this.chartElement.nativeElement;
+  }
+
   ngAfterViewInit(): void {
-    setTimeout(async () => {
-      this.createChart();
-      this.forceResize();
-      await this.loadFuturesHistory();
-      this.startQuotePolling();
+    setTimeout(() => {
+      this.renderPreferredChart();
+      this.startMarketWatcher();
     }, 0);
   }
 
   ngOnDestroy(): void {
-    if (this.quotePoll) {
-      clearInterval(this.quotePoll);
-      this.quotePoll = null;
-    }
+    this.stopMarketWatcher();
+    this.stopQuotePolling();
     this.destroyChart();
+    this.destroyAdvancedChart();
   }
 
   @HostListener('window:resize')
@@ -103,140 +112,56 @@ export class FuturesChartCardComponent implements AfterViewInit, OnDestroy {
 
   setTimeframe(sec: number) {
     const next = Number(sec);
-    if (!Number.isFinite(next) || next <= 0) return;
-
-    // No-op if unchanged
-    if (this.candleIntervalSec === next) return;
-
+    if (!Number.isFinite(next) || next <= 0 || this.candleIntervalSec === next) return;
     this.candleIntervalSec = next;
-
-    // Reset candle state cleanly
-    this.bars = [];
-    this.lastBar = null;
-
-    this.candleStickSeries?.setData([]);
-
-    // Reload history with new timeframe
-    this.loadFuturesHistory();
-
-    // Optional: refit view
-    this.chart?.timeScale().fitContent();
+    this.renderPreferredChart();
   }
 
-  private secsToGranularity(secs: number): string {
-    const map: Record<number, string> = {
-      5: 'ONE_MINUTE',      // sub-minute falls back to 1m data
-      60: 'ONE_MINUTE',
-      300: 'FIVE_MINUTE',
-      900: 'FIFTEEN_MINUTE',
-      1800: 'THIRTY_MINUTE',
-      3600: 'ONE_HOUR',
-      7200: 'TWO_HOUR',
-      21600: 'SIX_HOUR',
-      86400: 'ONE_DAY',
-    };
-    return map[secs] || 'ONE_MINUTE';
+  reloadAdvancedChart() {
+    this.renderPreferredChart();
   }
 
-  private async loadHistory(symbol: string, intervalSec: number) {
-    if (!this.candleStickSeries) return;
+  private async renderPreferredChart() {
+    this.stopQuotePolling();
+    this.destroyChart();
+    this.destroyAdvancedChart();
 
-    try {
-      const cbSymbol = this.normalizeSymbolForCoinbase(symbol);
+    this.activeMarketKey = this.getMarketKey();
+    const tvSymbol = resolveTradingViewSymbol(this.getChartSymbol());
 
-      const now = Math.floor(Date.now() / 1000);
-      const lookbackBars = this.maxBars;
-      const start = now - lookbackBars * intervalSec;
-
-      const granularity = this.secsToGranularity(intervalSec);
-      const url =
-        `https://api.coinbase.com/api/v3/brokerage/market/products/${cbSymbol}/candles` +
-        `?start=${start}&end=${now}&granularity=${granularity}`;
-
-      const res = await fetch(url);
-      if (!res.ok) return;
-
-      const data = await res.json();
-      const raw = data?.candles;
-      if (!Array.isArray(raw)) return;
-
-      const candles: ICandle[] = raw
-        .map((c: any) => ({
-          time: Number(c.start),
-          low: Number(c.low),
-          high: Number(c.high),
-          open: Number(c.open),
-          close: Number(c.close),
-          volume: Number(c.volume ?? 0),
-        }))
-        .sort((a, b) => a.time - b.time)
-        .slice(-this.maxBars);
-
-      if (!candles.length) return;
-
-      this.bars = candles;
-      this.lastBar = candles[candles.length - 1];
-
-      this.candleStickSeries.setData(this.bars as any);
-
-      this.chart?.timeScale().fitContent();
-    } catch (err) {
-      console.warn('History load failed:', err);
-    }
-  }
-
-  private forceResize() {
-    if (!this.chart || !this.chartContainer) return;
-
-    const w = this.chartContainer.offsetWidth;
-    const h = this.chartContainer.offsetHeight;
-
-    if (w > 0 && h > 0) {
-      this.chart.resize(w, h, true);
-      this.chart.timeScale().fitContent();
-    }
-  }
-
-  get chartContainer(): HTMLElement {
-    return this.chartElement.nativeElement;
-  }
-
-  private normalizeSymbolForCoinbase(symbol: string): string | null {
-    if (!symbol) return null;
-
-    // 1) Trim testnet prefix
-    if (symbol.startsWith('t')) {
-      symbol = symbol.slice(1);
+    if (tvSymbol) {
+      try {
+        this.chartMode = 'advanced';
+        this.chartStatus = 'TradingView Advanced';
+        this.advancedSymbol = tvSymbol;
+        await loadTradingViewScript();
+        this.tradingViewWidget = createTradingViewWidget(
+          this.chartContainer,
+          tvSymbol,
+          tradingViewInterval(this.candleIntervalSec)
+        );
+        return;
+      } catch (err) {
+        console.warn('TradingView Advanced chart failed; using lightweight fallback:', err);
+      }
     }
 
-    // 2) Futures perps → underlying spot
-    // BTC/USDT, BTC-PERP, etc → BTC-USD
-    symbol = symbol
-      .replace('/USDT', '-USD')
-      .replace('/USD', '-USD')
-      .replace('USDT', 'USD')
-      .replace('_PERP', '')
-      .replace('-PERP', '');
-
-    // Coinbase expects DASH
-    symbol = symbol.replace('/', '-');
-
-    return symbol;
+    await this.startFallbackChart(tvSymbol ? 'Advanced unavailable' : 'Unsupported public symbol');
   }
 
-  private async loadFuturesHistory() {
-    const rawSymbol = this.futuresMarketService?.selectedMarket?.contractName;
-    const cbSymbol = this.normalizeSymbolForCoinbase(rawSymbol);
-    if (!cbSymbol) return;
-
-    await this.loadHistory(cbSymbol, this.candleIntervalSec);
+  private async startFallbackChart(reason: string) {
+    this.chartMode = 'fallback';
+    this.chartStatus = `Fallback: ${reason}`;
+    this.advancedSymbol = '';
+    this.createChart();
+    this.forceResize();
+    await this.loadFuturesHistory();
+    this.startQuotePolling();
   }
 
   private createChart() {
     this.destroyChart();
-
-    if (!this.chartContainer) return;
-
+    this.chartContainer.innerHTML = '';
     this.chart = createChart(this.chartContainer, chartOptions);
     this.candleStickSeries = this.chart.addCandlestickSeries();
     this.candleStickSeries.setData([]);
@@ -252,29 +177,83 @@ export class FuturesChartCardComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  private destroyAdvancedChart() {
+    this.tradingViewWidget = null;
+    if (this.chartElement?.nativeElement) {
+      this.chartElement.nativeElement.innerHTML = '';
+    }
+  }
+
+  private forceResize() {
+    if (!this.chart || !this.chartContainer) return;
+
+    const w = this.chartContainer.offsetWidth;
+    const h = this.chartContainer.offsetHeight;
+
+    if (w > 0 && h > 0) {
+      this.chart.resize(w, h, true);
+      this.chart.timeScale().fitContent();
+    }
+  }
+
+  private async loadFuturesHistory() {
+    const cbSymbol = this.normalizeSymbolForCoinbase(this.getChartSymbol());
+    if (!cbSymbol) return;
+    await this.loadHistory(cbSymbol, this.candleIntervalSec);
+  }
+
   private startQuotePolling() {
     if (this.quotePoll) return;
 
     this.quotePoll = setInterval(() => {
-      const { bid, ask } = this.getBestBidAsk(
-        this.futuresOrderbookService as any
-      );
-
+      const { bid, ask } = this.getBestBidAsk(this.futuresOrderbookService as any);
       const mid =
         bid !== undefined && ask !== undefined
           ? (bid + ask) / 2
           : bid ?? ask ?? null;
 
       if (mid == null) return;
-
       this.upsertBarFromMid(mid, Date.now());
     }, this.pollMs);
   }
 
+  private stopQuotePolling() {
+    if (!this.quotePoll) return;
+    clearInterval(this.quotePoll);
+    this.quotePoll = null;
+  }
+
+  private startMarketWatcher() {
+    if (this.marketWatchPoll) return;
+    this.marketWatchPoll = setInterval(() => {
+      const nextMarketKey = this.getMarketKey();
+      if (nextMarketKey && nextMarketKey !== this.activeMarketKey) {
+        this.renderPreferredChart();
+      }
+    }, 500);
+  }
+
+  private stopMarketWatcher() {
+    if (!this.marketWatchPoll) return;
+    clearInterval(this.marketWatchPoll);
+    this.marketWatchPoll = null;
+  }
+
+  private getMarketKey(): string {
+    const market = this.futuresMarketService?.selectedMarket as any;
+    return [market?.contract_id, market?.contractName, market?.pairString]
+      .filter(value => value !== undefined && value !== null && value !== '')
+      .join('|');
+  }
+
+  private getChartSymbol(): string | null {
+    const market = this.futuresMarketService?.selectedMarket as any;
+    return market?.contractName || market?.pairString || null;
+  }
+
   private upsertBarFromMid(mid: number, tsMs: number) {
     const tSec = Math.floor(tsMs / 1000);
-    const bucket =
-      Math.floor(tSec / this.candleIntervalSec) * this.candleIntervalSec;
+    const bucket = Math.floor(tSec / this.candleIntervalSec) * this.candleIntervalSec;
 
     if (!this.lastBar || this.lastBar.time !== bucket) {
       const bar: ICandle = {
@@ -288,7 +267,6 @@ export class FuturesChartCardComponent implements AfterViewInit, OnDestroy {
 
       this.lastBar = bar;
       this.bars.push(bar);
-
       if (this.bars.length > this.maxBars) this.bars.shift();
 
       this.candleStickSeries?.setData(this.bars as any);
@@ -336,24 +314,86 @@ export class FuturesChartCardComponent implements AfterViewInit, OnDestroy {
     return {};
   }
 
-  private extractTopPrice(
-    arr: any[],
-    side: 'bid' | 'ask'
-  ): number | undefined {
+  private secsToGranularity(secs: number): string {
+    const map: Record<number, string> = {
+      5: 'ONE_MINUTE',
+      60: 'ONE_MINUTE',
+      300: 'FIVE_MINUTE',
+      900: 'FIFTEEN_MINUTE',
+      1800: 'THIRTY_MINUTE',
+      3600: 'ONE_HOUR',
+      7200: 'TWO_HOUR',
+      21600: 'SIX_HOUR',
+      86400: 'ONE_DAY',
+    };
+    return map[secs] || 'ONE_MINUTE';
+  }
+
+  private normalizeSymbolForCoinbase(symbol?: string | null): string | null {
+    if (!symbol) return null;
+    let value = symbol.toUpperCase();
+    if (value.startsWith('T') && ['TBTC', 'TLTC', 'TETH', 'TDOGE'].some(prefix => value.startsWith(prefix))) {
+      value = value.slice(1);
+    }
+    value = value
+      .replace('/USDT', '-USD')
+      .replace('/USD', '-USD')
+      .replace('USDT', 'USD')
+      .replace('_PERP', '')
+      .replace('-PERP', '')
+      .replace('/', '-');
+    return value;
+  }
+
+  private async loadHistory(symbol: string, intervalSec: number) {
+    if (!this.candleStickSeries) return;
+
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const start = now - this.maxBars * intervalSec;
+      const granularity = this.secsToGranularity(intervalSec);
+      const url =
+        `https://api.coinbase.com/api/v3/brokerage/market/products/${symbol}/candles` +
+        `?start=${start}&end=${now}&granularity=${granularity}`;
+
+      const res = await fetch(url);
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const raw = data?.candles;
+      if (!Array.isArray(raw)) return;
+
+      const candles: ICandle[] = raw
+        .map((c: any) => ({
+          time: Number(c.start),
+          low: Number(c.low),
+          high: Number(c.high),
+          open: Number(c.open),
+          close: Number(c.close),
+          volume: Number(c.volume ?? 0),
+        }))
+        .sort((a, b) => a.time - b.time)
+        .slice(-this.maxBars);
+
+      if (!candles.length) return;
+
+      this.bars = candles;
+      this.lastBar = candles[candles.length - 1];
+      this.candleStickSeries.setData(this.bars as any);
+      this.chart?.timeScale().fitContent();
+    } catch (err) {
+      console.warn('Fallback history load failed:', err);
+    }
+  }
+
+  private extractTopPrice(arr: any[], side: 'bid' | 'ask'): number | undefined {
     if (!Array.isArray(arr) || !arr.length) return undefined;
 
     let best: number | undefined;
     for (const it of arr) {
-      const px = Array.isArray(it)
-        ? Number(it[0])
-        : Number(it?.price ?? it?.p);
+      const px = Array.isArray(it) ? Number(it[0]) : Number(it?.price ?? it?.p);
       if (!Number.isFinite(px)) continue;
-      best =
-        best == null
-          ? px
-          : side === 'bid'
-          ? Math.max(best, px)
-          : Math.min(best, px);
+      best = best == null ? px : side === 'bid' ? Math.max(best, px) : Math.min(best, px);
     }
     return best;
   }

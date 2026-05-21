@@ -6,6 +6,7 @@ import { TradeLayerApiService } from "../apis/relayer-api.service";
 import { TNETWORK } from "./rpc.service";
 import { NewTradeLayerApiService } from "../apis/tl-api.service";
 import { RelayerWsService } from "./relayer-ws.service";
+import { environment } from "src/environments/environment";
 
 
 @Injectable({
@@ -14,8 +15,8 @@ import { RelayerWsService } from "./relayer-ws.service";
 
 export class ApiService {
     private _network: TNETWORK = 'BTC'// null;
-    private _apiUrl: string | null = 'https://ws.layerwallet.com/relayer';
-    private _orderbookUrl: string | null = 'wss://ws.layerwallet.com/ws';
+    private _apiUrl: string | null = environment.ENDPOINTS.BTC.relayerUrl;
+    private _orderbookUrl: string | null = environment.ENDPOINTS.BTC.orderbookApiUrl;
 
     constructor(
         private marketApiService: MarketApiService,

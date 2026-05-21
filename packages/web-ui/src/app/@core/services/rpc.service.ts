@@ -5,12 +5,15 @@ import { SocketService } from "./socket.service";
 import { DialogService } from "./dialogs.service";
 import { LoadingService } from "./loading.service";
 import { BehaviorSubject } from "rxjs";
-import { IUTXO } from 'src/app/@core/services/txs.service';
-import { environment } from 'src/environments/environment';
+import { IUTXO } from "src/app/@core/services/txs.service";
+import { environment } from "src/environments/environment";
 
-
-export type TNETWORK = 'BTC' | 'LTC' | 'LTCTEST' | null;
-export enum ENetwork  { BTC = 'BTC', LTC = 'LTC', LTCTEST = 'LTCTEST' }
+export type TNETWORK = "BTC" | "LTC" | "LTCTEST" | null;
+export enum ENetwork {
+  BTC = "BTC",
+  LTC = "LTC",
+  LTCTEST = "LTCTEST",
+}
 
 export interface IBlockSubsObj {
   type: "API" | "LOCAL";
@@ -19,25 +22,25 @@ export interface IBlockSubsObj {
 }
 
 export interface IBuildLTCITTxConfig {
-    buyerKeyPair: {
-        address: string;
-        pubkey?: string;
-    };
-    sellerKeyPair: {
-        address: string;
-        pubkey?: string;
-    };
-    amount: number;
-    payload: string;
-    commitUTXOs: IUTXO[];
-    network?: TNETWORK;
+  buyerKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  sellerKeyPair: {
+    address: string;
+    pubkey?: string;
+  };
+  amount: number;
+  payload: string;
+  commitUTXOs: IUTXO[];
+  network?: TNETWORK;
 }
 
 export interface ISignPsbtConfig {
-    psbtHex: string;
-    redeem: string;
-    network?: string;
-    wif?: string; // Add this
+  psbtHex: string;
+  redeem: string;
+  network?: string;
+  wif?: string;
 }
 
 export interface ISignTxConfig {
@@ -63,165 +66,136 @@ export interface IBuildTxConfig {
 }
 
 @Injectable({
-    providedIn: 'root',
+  providedIn: "root",
 })
-
 export class RpcService {
   private _NETWORK: TNETWORK = null;
-  private _stoppedByTerminated: boolean = false;
+  private _stoppedByTerminated = false;
 
-  isCoreStarted: boolean = false;
-  isAbleToRpc: boolean = false;
+  isCoreStarted = false;
+  isAbleToRpc = false;
+  isTLStarted = false;
+  latestTlBlock = 0;
 
-  isTLStarted: boolean = false;
-  latestTlBlock: number = 0;
+  lastBlock = 0;
+  headerBlock = 0;
+  networkBlocks = 0;
+  isNetworkSelected = true;
 
-  lastBlock: number = 0;
-  headerBlock: number = 0;
-  networkBlocks: number = 0;
-  isNetworkSelected: boolean = true;
-
-  blockSubs$: BehaviorSubject<IBlockSubsObj> = new BehaviorSubject({
+  blockSubs$ = new BehaviorSubject<IBlockSubsObj>({
     type: this.isApiMode ? "API" : "LOCAL",
     block: this.isApiMode ? this.networkBlocks : this.lastBlock,
     header: this.headerBlock,
   });
 
-    constructor(
-      private apiService: ApiService,
-      private socketService: SocketService,
-      private dialogService: DialogService,
-      private toastrService: ToastrService,
-      private loadingService: LoadingService,
-    ) {
-      console.log('[RpcService] instance id', Math.random());
-    }
+  constructor(
+    private apiService: ApiService,
+    private socketService: SocketService,
+    private dialogService: DialogService,
+    private toastrService: ToastrService,
+    private loadingService: LoadingService,
+  ) {
+    console.log("[RpcService] instance id", Math.random());
+  }
 
-    onInit() {
-      const ep = environment.ENDPOINTS.BTC;
+  private applyNetworkEndpoints(network: TNETWORK): void {
+    const key = (network || "BTC") as keyof typeof environment.ENDPOINTS;
+    const endpoint = environment.ENDPOINTS[key];
+    if (!endpoint) return;
+    this.apiService.network = network;
+    this.apiService.apiUrl = endpoint.relayerUrl;
+    this.apiService.orderbookUrl = endpoint.orderbookApiUrl;
+  }
 
-  // ✅ set URLs on ApiService (that's where they live)
-  this.apiService.apiUrl       = ep.relayerUrl;
-  this.apiService.orderbookUrl = ep.orderbookApiUrl;
+  onInit() {
+    const network = this.NETWORK || "BTC";
+    this.applyNetworkEndpoints(network);
+    this.socketService.obSocketConnect(
+      environment.ENDPOINTS[network]?.orderbookApiUrl || environment.ENDPOINTS.BTC.orderbookApiUrl,
+    );
+    this.isNetworkSelected = true;
+    this.checkNetworkInfo();
+    setInterval(() => this.checkNetworkInfo(), 8000);
+  }
 
-  // ✅ OB socket connect (this method exists)
-  this.socketService.obSocketConnect(ep.orderbookApiUrl);
+  get isSynced() {
+    return true;
+  }
 
-  // ❌ this.socketService.wsConnect(...)  ← remove (you don’t have that method)
-  // If you later add a relayer WS, call the correct method name here.
+  get NETWORK() {
+    return this._NETWORK;
+  }
 
-  // ✅ set network + mark selected
-  this.NETWORK = 'BTC';
-  this.isNetworkSelected = true;
+  set NETWORK(value: TNETWORK) {
+    const next = value || "BTC";
+    this.applyNetworkEndpoints(next);
+    this.headerBlock = 0;
+    this._NETWORK = next;
+    this.isNetworkSelected = true;
+  }
 
-  // pull header / network info after URLs are set
-  this.checkNetworkInfo();
-      setInterval(() => this.checkNetworkInfo(), 8000);
-    }
+  get socket() {
+    return;
+  }
 
-    get isSynced() {
-      return true //this.headerBlock && this.lastBlock + 1 >= this.headerBlock /*&& this.latestTlBlock + 1 >= this.headerBlock;*/
-    }
+  get mainApi() {
+    return this.apiService.mainApi;
+  }
 
-    get NETWORK() {
-      return this._NETWORK;
-    }
+  get tlApi() {
+    return this.apiService.tlApi;
+  }
 
-    set NETWORK(value: TNETWORK) {
-      this.apiService.network = value;
-      const endpoint = value ? environment.ENDPOINTS[value] : null;
-      this.apiService.apiUrl = endpoint?.relayerUrl || null;
-      this.apiService.orderbookUrl = endpoint?.orderbookApiUrl || null;
-      if (endpoint?.orderbookApiUrl) {
-        this.socketService.obSocketConnect(endpoint.orderbookApiUrl);
+  get isApiMode() {
+    return true;
+  }
+
+  async startWalletNode(
+    path: string,
+    network: ENetwork,
+    flags: { reindex: boolean; startclean: boolean },
+  ) {
+    return;
+  }
+
+  async createNewNode(params: { username: string; password: string; port: number; path: string }) {
+    return;
+  }
+
+  async checkNetworkInfo() {
+    if (!this.NETWORK) return;
+    if (!this.apiService.apiUrl) return;
+    try {
+      const infoRes = await this.tlApi.rpc("getblockchaininfo").toPromise();
+      if (infoRes.error || !infoRes.data) throw new Error(infoRes.error);
+      if (infoRes.data.blocks && infoRes.data.blocks !== this.networkBlocks) {
+        this.networkBlocks = infoRes.data.blocks;
+        const blockSubsObj: IBlockSubsObj = {
+          type: "API",
+          block: infoRes.data.blocks,
+          header: infoRes.data.headers,
+        };
+        this.blockSubs$.next(blockSubsObj);
+        console.log(`New Network Block: ${this.networkBlocks}`);
       }
-      this.headerBlock = 0;
-      this._NETWORK = value
-      this.isNetworkSelected = true; // add this line;
-    }
-
-    get socket() {
-      return //this.socketService.socket;
-    }
-
-    get mainApi() {
-      return this.apiService.mainApi;
-    }
-
-    get tlApi() {
-      return this.apiService.tlApi;
-    }
-  
-    get isApiMode() {
-      return true;
-      // return !this.isCoreStarted || !this.isSynced || !this.lastBlock;
-    }
-
-    async startWalletNode(
-      path: string,
-      network: ENetwork,
-      flags: { reindex: boolean, startclean: boolean },
-    ) {
-      return
-      /*this.NETWORK = network;
-      if (this.NETWORK !== network) throw new Error("Please first Change the Network");
-      return await this.mainApi
-        .startWalletNode(path, network, flags)
-        .toPromise()
-        .then(res => {
-          if (res.data) {
-            this.isCoreStarted = true;
-            this.dialogService.closeAllDialogs();
-          }
-          return res;
-        });*/
-    }
-
-    async createNewNode(params: { username: string, password: string, port: number, path: string }) {
-      return//await this.mainApi.createNewConfFile(params).toPromise();
-    }
-
-    async checkNetworkInfo() {
-      if (!this.NETWORK) return;
-      if (!this.apiService.apiUrl) return;
-      try {
-          const infoRes = await this.tlApi.rpc('getblockchaininfo').toPromise();
-          if (infoRes.error || !infoRes.data) throw new Error(infoRes.error);
-          if (infoRes.data.blocks && infoRes.data.blocks !== this.networkBlocks) {
-            this.networkBlocks = infoRes.data.blocks;
-            const blockSubsObj: IBlockSubsObj = { type: "API", block: infoRes.data.blocks, header: infoRes.data.headers };
-            this.blockSubs$.next(blockSubsObj);
-            console.log(`New Network Block: ${this.networkBlocks}`);
-          }
-      } catch(err: any) {
-          this.toastrService.error(err.message || err || 'Undefined Error', 'API Server Disconnected');
-          this.apiService.apiUrl = null;
-          throw(err);
-      }
-    }
-
-    async terminateNode() {
-      return /*await this.mainApi.stopWalletNode().toPromise()
-        .then(res => {
-          this.clearRpcConnection();
-          this._stoppedByTerminated = true;
-          return res;
-        })
-        .catch(err => {
-          this.toastrService.error('Error with stopping Node', err?.message || err);
-        });*/
-    }
-
-    private clearRpcConnection() {
-      this.isAbleToRpc = false;
-      this.isCoreStarted = false;
-      this.lastBlock = 0;
-    }
-
-    rpc(method: string, params?: any[]) {
-      //return this.mainApi.rpcCall(method, params).toPromise();;
-       return this.tlApi.rpc(method, params).toPromise()//this.isApiMode
-         //? 
-         //: this.mainApi.rpcCall(method, params).toPromise();
+    } catch (err: any) {
+      this.toastrService.error(err.message || err || "Undefined Error", "API Server Disconnected");
+      this.apiService.apiUrl = null;
+      throw err;
     }
   }
+
+  async terminateNode() {
+    return;
+  }
+
+  private clearRpcConnection() {
+    this.isAbleToRpc = false;
+    this.isCoreStarted = false;
+    this.lastBlock = 0;
+  }
+
+  rpc(method: string, params?: any[]) {
+    return this.tlApi.rpc(method, params).toPromise();
+  }
+}

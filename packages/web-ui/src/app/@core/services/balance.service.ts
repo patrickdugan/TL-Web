@@ -25,6 +25,7 @@ export class BalanceService {
   private url = environment.ENDPOINTS.LTC.relayerUrl;
   
   private accounts: { address: string; pubkey: string }[] = [];
+  private syncedWatchOnly = new Set<string>();
   private _NETWORK: string = "LTC"; // Use a different backing field
   private _allBalancesObj: {
     [key: string]: {
@@ -87,10 +88,12 @@ export class BalanceService {
         console.log("Accounts with pubkeys:", accounts);
 
         // Store accounts for synchronous access
-      this.accounts = accounts.map((account) => ({
+        this.accounts = accounts.map((account) => ({
         address: account.address,
         pubkey: account.pubkey || '',
       }));
+
+        await this.syncWatchOnlyAccounts(accounts);
 
 
 
@@ -192,6 +195,37 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
     }
   }
 
+  private async syncWatchOnlyAccounts(accounts: { address: string; pubkey?: string }[]) {
+    const batch = accounts
+      .map((account) => ({
+        address: String(account?.address || '').trim(),
+        pubkey: String(account?.pubkey || '').trim(),
+      }))
+      .filter((account) => account.address && account.pubkey)
+      .filter((account) => !this.syncedWatchOnly.has(`${account.address}:${account.pubkey}`));
+
+    if (!batch.length) {
+      return;
+    }
+
+    try {
+      this.relayerWsService.setBaseUrl(this.url);
+      const res = await this.relayerWsService.request<{ imported?: number; skipped?: number; results?: any[] }>(
+        '/address/sync-watchonly',
+        {
+          method: 'POST',
+          body: { accounts: batch },
+          timeoutMs: 30000,
+        }
+      );
+
+      batch.forEach((account) => this.syncedWatchOnly.add(`${account.address}:${account.pubkey}`));
+      console.log(`[balance] synced watch-only accounts: imported=${res?.imported ?? 0} skipped=${res?.skipped ?? 0}`);
+    } catch (error: any) {
+      console.warn('[balance] failed to sync watch-only accounts:', error?.message || error);
+    }
+  }
+
   getTokenNameById(propertyId: number): string {
   // Iterate through all addresses and find the token name by propertyId
   for (const address in this._allBalancesObj) {
@@ -208,5 +242,6 @@ private async updateCoinBalanceForAddressFromWallet(address: string, pubkey?: st
 
   private restartBalance() {
     this._allBalancesObj = {};
+    this.syncedWatchOnly.clear();
   }
 }
