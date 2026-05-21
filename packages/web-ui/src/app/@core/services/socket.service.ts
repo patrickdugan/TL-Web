@@ -1,5 +1,4 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import { ToastrService } from 'ngx-toastr';
 import { Subject } from 'rxjs';
 import { ESounds, SoundsService } from "./sound.service";
 import { LoadingService } from "./loading.service";
@@ -19,7 +18,6 @@ export class SocketService implements OnDestroy {
   private destroyed = false;
 
   constructor(
-    private toasterService: ToastrService,
     private soundsService: SoundsService,
     private loadingService: LoadingService
   ) {}
@@ -57,17 +55,11 @@ export class SocketService implements OnDestroy {
 
     this.ws.onclose = (event) => {
       this.wsConnected = false;
-      if (!this.destroyed) {
-        this.toasterService.error('Socket Disconnected', 'Socket');
-      }
       console.error('OB WebSocket disconnected:', event.reason);
     };
 
     this.ws.onerror = (err) => {
       this.wsConnected = false;
-      if (!this.destroyed) {
-        this.toasterService.error('Socket Connection Error', 'Socket');
-      }
       console.error('OB WebSocket connection error:', err);
     };
 

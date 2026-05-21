@@ -43,6 +43,19 @@ body {
   pointer-events: auto;
 }
 
+/* Keep connected overlays like mat-select above the dialog they open from. */
+.cdk-overlay-container > .cdk-overlay-connected-position-bounding-box {
+  z-index: 2001 !important;
+}
+
+.cdk-overlay-pane.network-select-panel {
+  z-index: 2001 !important;
+}
+
+.network-select-panel .mat-select-panel {
+  z-index: 2001 !important;
+}
+
 .drawer-container {
   background-color: var(--background);
   height: 100%;

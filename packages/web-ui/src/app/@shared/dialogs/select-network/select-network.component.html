@@ -1,22 +1,14 @@
 <div class="dialog-body">
   <h2>Select Network</h2>
 
-  <div class="field">
-    <label class="field-label">Network</label>
-    <mat-form-field *ngIf="!isFirefox" appearance="fill" class="field-control mat-select-field">
-      <mat-label>Network</mat-label>
-      <mat-select [(ngModel)]="network">
-        <mat-option *ngFor="let opt of options" [value]="opt.value">
-          {{ opt.label }}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-    <select *ngIf="isFirefox" class="native-select" [(ngModel)]="network">
-      <option *ngFor="let opt of options" [value]="opt.value">
+  <mat-form-field appearance="fill" style="width:100%; margin-top:12px;">
+    <mat-label>Network</mat-label>
+    <mat-select [(ngModel)]="network" panelClass="network-select-panel">
+      <mat-option *ngFor="let opt of options" [value]="opt.value">
         {{ opt.label }}
-      </option>
-    </select>
-  </div>
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
 
   <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px;">
     <button mat-button type="button" (click)="cancel()">Cancel</button>
