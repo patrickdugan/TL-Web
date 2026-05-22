@@ -158,11 +158,15 @@ export class RelayerWsService {
       return `${trimmed}/ws`;
     }
     if (trimmed.startsWith("https://")) {
-      return `${trimmed.replace(/^https:\/\//, "wss://")}/ws`;
+      return `${this.trimRelayerPath(trimmed.replace(/^https:\/\//, "wss://"))}/ws`;
     }
     if (trimmed.startsWith("http://")) {
-      return `${trimmed.replace(/^http:\/\//, "ws://")}/ws`;
+      return `${this.trimRelayerPath(trimmed.replace(/^http:\/\//, "ws://"))}/ws`;
     }
-    return `wss://${trimmed}/ws`;
+    return `${this.trimRelayerPath(`wss://${trimmed}`)}/ws`;
+  }
+
+  private trimRelayerPath(url: string): string {
+    return url.replace(/\/relayer\/?$/, "");
   }
 }
