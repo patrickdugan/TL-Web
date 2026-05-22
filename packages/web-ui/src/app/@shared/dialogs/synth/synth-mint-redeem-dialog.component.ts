@@ -147,7 +147,7 @@ export class SynthMintRedeemDialogComponent {
     }
 
     const propertiesRes: any = await this.http
-      .post(`${this.relayerRpcBase}/tl_listProperties`, {})
+      .post(`${this.relayerRpcBase}/tl_listproperties`, {})
       .toPromise();
     const properties = Array.isArray(propertiesRes?.data)
       ? propertiesRes.data

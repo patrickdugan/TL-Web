@@ -181,7 +181,7 @@ export class PortfolioPageComponent implements OnInit {
 
     try {
       const properties: any = await this.http
-        .post(`${this.relayerRpcBase}/tl_listProperties`, {})
+        .post(`${this.relayerRpcBase}/tl_listproperties`, {})
         .toPromise();
       const propertyList = Array.isArray(properties?.data) ? properties.data : Array.isArray(properties) ? properties : [];
       const receiptTicker = String(this.proceduralConfig?.receiptTicker || '').toUpperCase();
