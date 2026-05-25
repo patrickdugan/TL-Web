@@ -2,6 +2,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
+import { environment } from 'src/environments/environment';
 import { RpcService, TNETWORK } from './rpc.service';
 import { RelayerWsService } from './relayer-ws.service';
 
@@ -246,6 +247,7 @@ export class WalletService {
 
   // In-memory + persistent cache for multisig
   private multisigCache = new Map<string, MultisigRecord>();
+  private syncedWatchOnly = new Set<string>();
 
   // -------------------------------------------------------------------------
   // Session Auth (REST + WebSocket)
@@ -563,6 +565,51 @@ export class WalletService {
     return this.signPsbt(psbtBase64, { autoFinalize: true, broadcast: false });
   }
 
+  private relayerUrlForNetwork(network?: string | null): string | null {
+    const key = String(network ?? this.rpc.NETWORK ?? '').toUpperCase();
+    if (!key) return null;
+    if (key.includes('TEST')) return environment.ENDPOINTS.LTCTEST.relayerUrl;
+    if (key === 'BTC') return environment.ENDPOINTS.BTC.relayerUrl;
+    return environment.ENDPOINTS.LTC.relayerUrl;
+  }
+
+  private async syncWatchOnlyAccounts(accounts: WalletAccount[], network?: string | null) {
+    const relayerUrl = this.relayerUrlForNetwork(network);
+    if (!relayerUrl) return;
+
+    const batch = (accounts || [])
+      .map((account) => ({
+        address: String(account?.address || '').trim(),
+        pubkey: String(account?.pubkey || '').trim(),
+      }))
+      .filter((account) => account.address && account.pubkey)
+      .filter((account) => !this.syncedWatchOnly.has(`${account.address}:${account.pubkey}`));
+
+    if (!batch.length) return;
+
+    try {
+      this.relayerWsService.setBaseUrl(relayerUrl);
+      const res = await this.relayerWsService.request<{ imported?: number; skipped?: number }>(
+        '/address/sync-watchonly',
+        {
+          method: 'POST',
+          body: { accounts: batch },
+          timeoutMs: 30000,
+        }
+      );
+
+      batch.forEach((account) => this.syncedWatchOnly.add(`${account.address}:${account.pubkey}`));
+      console.log('[wallet] synced watch-only accounts', {
+        network,
+        imported: res?.imported ?? 0,
+        skipped: res?.skipped ?? 0,
+        count: batch.length,
+      });
+    } catch (error: any) {
+      console.warn('[wallet] failed to sync watch-only accounts', error?.message || error);
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Providers (lightweight)
   // -------------------------------------------------------------------------
@@ -736,7 +783,8 @@ export class WalletService {
 
     this.provider$.next(p);
 
-    const addrs = await p.getAddresses(net);
+    const accounts = await this.requestAccounts(this.rpc.NETWORK);
+    const addrs = accounts.map((account) => account.address).filter((address): address is string => !!address);
     this.addresses$.next(addrs);
     this.address$.next(addrs[0] ?? null);
 
@@ -766,14 +814,18 @@ export class WalletService {
       (activeProvider == null && (normalizedNetwork === 'BTC' || normalizedNetwork === 'BITCOIN'));
 
     if (usePhantom && phantomBtc?.requestAccounts) {
-      return normalizeWalletAccounts(await phantomBtc.requestAccounts());
+      const accounts = normalizeWalletAccounts(await phantomBtc.requestAccounts());
+      await this.syncWatchOnlyAccounts(accounts, normalizedNetwork);
+      return accounts;
     }
 
     const accs = await requestTradeLayer('requestAccounts', {
       network: normalizedNetwork || this.customWalletNetwork(),
     });
 
-    return normalizeWalletAccounts(accs);
+    const accounts = normalizeWalletAccounts(accs);
+    await this.syncWatchOnlyAccounts(accounts, normalizedNetwork);
+    return accounts;
   }
 
   async signMessage(

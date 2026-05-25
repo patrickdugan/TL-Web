@@ -28,10 +28,16 @@ export class TradeLayerApiService {
         this.apiUrl = value;
     }
 
+    private bindRelayerBaseUrl() {
+        if (!this.apiURL) throw new Error("Api Url not found");
+        this.relayerWsService.setBaseUrl(this.apiURL);
+    }
+
     rpc(method: string, params?: any[]): Observable<{
         data?: any;
         error?: any;
     }> {
+        this.bindRelayerBaseUrl();
         return from(
             this.relayerWsService.request<{
                 data?: any;
@@ -47,6 +53,7 @@ export class TradeLayerApiService {
         data?: any;
         error?: any;
     }>  {
+        this.bindRelayerBaseUrl();
         return from(
             this.relayerWsService.request<{
                 data?: any;
@@ -59,6 +66,7 @@ export class TradeLayerApiService {
         data?: any;
         error?: any;
     }>  {
+        this.bindRelayerBaseUrl();
         return from(
             this.relayerWsService.request<{
                 data?: any;
