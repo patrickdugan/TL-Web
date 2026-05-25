@@ -116,11 +116,10 @@ export class TxsService {
   }
 
   private async requestTradeLayer(method: string, params?: any): Promise<any> {
-    const provider = this.walletService.getTradeLayerProvider();
-    if (!provider) {
+    if (!this.walletService.hasTradeLayerWallet()) {
       throw new Error("TradeLayer extension not available.");
     }
-    return provider.request({ method, params });
+    return this.walletService.requestTradeLayer(method, params);
   }
 
   private normalizeTradeLayerPsbtResult(response: any): {
@@ -864,7 +863,7 @@ export class TxsService {
       error?: string;
     }> {
       try {
-        if (!this.walletService.getTradeLayerProvider()) {
+        if (!this.walletService.hasTradeLayerWallet()) {
           throw new Error("Wallet extension not available for signing PSBT.");
         }
 

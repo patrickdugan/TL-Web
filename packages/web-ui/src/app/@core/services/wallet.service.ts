@@ -178,7 +178,7 @@ const getLegacyTradeLayerProvider = (): LegacyTradeLayerProvider | undefined => 
 const hasTradeLayerWallet = (): boolean =>
   !!getTradeLayerProvider() || !!getLegacyTradeLayerProvider();
 
-const requestLegacyTradeLayerRaw = (method: string, params?: any): Promise<any> => {
+const requestLegacyTradeLayerMessage = (method: string, params?: any): Promise<any> => {
   const legacyProvider = getLegacyTradeLayerProvider();
   if (!legacyProvider) {
     return Promise.reject(new Error('TradeLayer extension not available'));
@@ -217,6 +217,23 @@ const requestLegacyTradeLayerRaw = (method: string, params?: any): Promise<any> 
   });
 };
 
+const requestLegacyTradeLayer = async (method: string, params?: any): Promise<any> => {
+  const legacyProvider = getLegacyTradeLayerProvider();
+  if (!legacyProvider) {
+    throw new Error('TradeLayer extension not available');
+  }
+
+  if (typeof legacyProvider.sendRequest === 'function') {
+    return legacyProvider.sendRequest(method, params || {});
+  }
+
+  if (method === 'requestAccounts' && typeof legacyProvider.requestAccounts === 'function') {
+    return legacyProvider.requestAccounts();
+  }
+
+  return requestLegacyTradeLayerMessage(method, params);
+};
+
 const requestTradeLayer = async (method: string, params?: any): Promise<any> => {
   const provider = getTradeLayerProvider();
   if (provider) {
@@ -226,7 +243,7 @@ const requestTradeLayer = async (method: string, params?: any): Promise<any> => 
       if (!isUnknownMethodError(error)) throw error;
     }
   }
-  return requestLegacyTradeLayerRaw(method, params);
+  return requestLegacyTradeLayer(method, params);
 };
 
 const requestTradeLayerConnect = async (network: string): Promise<any> => {
@@ -284,7 +301,7 @@ const requestTradeLayerAccounts = async (network: string): Promise<any> => {
 
   if (legacyProvider?.sendRequest) {
     try {
-      return await requestLegacyTradeLayerRaw('requestAccounts', {
+      return await requestLegacyTradeLayer('requestAccounts', {
         network: normalizedNetwork,
       });
     } catch (error) {
@@ -391,6 +408,10 @@ export class WalletService {
 
   public hasTradeLayerWallet(): boolean {
     return hasTradeLayerWallet();
+  }
+
+  public requestTradeLayer(method: string, params?: any): Promise<any> {
+    return requestTradeLayer(method, params);
   }
 
   public getPrimaryAddress(
@@ -872,12 +893,20 @@ export class WalletService {
 
     signPsbt: async (psbtBase64, opts) => {
       const hex = base64ToHex(psbtBase64);
-      const r = await requestTradeLayer('signPsbt', {
+      const params = {
         psbtHex: hex,
+        transaction: hex,
         network: this.rpc.NETWORK,
         ...(opts?.signingIndexes ? { signingIndexes: opts.signingIndexes } : {}),
         ...(opts?.sigHash != null ? { sigHash: opts.sigHash } : {}),
-      });
+      };
+      let r: any;
+      try {
+        r = await requestTradeLayer('signPsbt', params);
+      } catch (error) {
+        if (!isUnknownMethodError(error)) throw error;
+        r = await requestTradeLayer('signPSBT', params);
+      }
       const out =
         typeof r === 'string'
           ? r
@@ -1039,6 +1068,18 @@ export class WalletService {
     const p = this.provider$.value || this.pick();
     if (!p) throw new Error('Wallet not connected');
     return p.signPsbt(psbtBase64, opts);
+  }
+
+  async signPSBT(
+    psbtBase64: string,
+    opts?: {
+      autoFinalize?: boolean;
+      broadcast?: boolean;
+      signingIndexes?: number[];
+      sigHash?: number;
+    }
+  ): Promise<string> {
+    return this.signPsbt(psbtBase64, opts);
   }
 
   async signTransaction(
