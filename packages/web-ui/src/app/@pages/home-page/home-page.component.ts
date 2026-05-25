@@ -86,7 +86,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
   async connectWallet() {
     try {
-      if (!this.walletService.getPhantomProvider() && !this.walletService.getTradeLayerProvider()) {
+      if (!this.walletService.getPhantomProvider() && !this.walletService.hasTradeLayerWallet()) {
         this.toastrService.error('No wallet detected. Please install a browser wallet extension.');
         return;
       }

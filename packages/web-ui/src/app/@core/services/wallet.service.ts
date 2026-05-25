@@ -260,7 +260,7 @@ const requestTradeLayerAccounts = async (network: string): Promise<any> => {
       return await provider.requestAccountsForNetwork(normalizedNetwork);
     } catch (error) {
       lastError = error;
-      if (!isUnknownMethodError(error)) throw error;
+      if (!isRecoverableProviderError(error)) throw error;
     }
   }
 
@@ -269,7 +269,7 @@ const requestTradeLayerAccounts = async (network: string): Promise<any> => {
       return await provider.requestAccounts(normalizedNetwork);
     } catch (error) {
       lastError = error;
-      if (!isUnknownMethodError(error)) throw error;
+      if (!isRecoverableProviderError(error)) throw error;
     }
   }
 
@@ -278,7 +278,7 @@ const requestTradeLayerAccounts = async (network: string): Promise<any> => {
       return await provider.request({ method: 'requestAccounts', params: { network: normalizedNetwork } });
     } catch (error) {
       lastError = error;
-      if (!isUnknownMethodError(error)) throw error;
+      if (!isRecoverableProviderError(error)) throw error;
     }
   }
 
@@ -289,7 +289,7 @@ const requestTradeLayerAccounts = async (network: string): Promise<any> => {
       });
     } catch (error) {
       lastError = error;
-      if (!isUnknownMethodError(error)) throw error;
+      if (!isRecoverableProviderError(error)) throw error;
     }
   }
 
@@ -307,6 +307,14 @@ const isUnknownMethodError = (error: any): boolean => {
     message.includes('method not found') ||
     message.includes('unsupported provider method') ||
     message.includes('invalid tradelayer provider request')
+  );
+};
+
+const isRecoverableProviderError = (error: any): boolean => {
+  const message = String(error?.message || error || '').toLowerCase();
+  return (
+    isUnknownMethodError(error) ||
+    message.includes('origin') && message.includes('not approved')
   );
 };
 
