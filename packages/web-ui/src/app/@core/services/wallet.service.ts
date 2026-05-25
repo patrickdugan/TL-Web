@@ -35,6 +35,9 @@ type TradeLayerProvider = {
   isTradeLayer: true;
   version?: string;
   request: (args: TradeLayerRequestArgs) => Promise<any>;
+  connect?: (network?: string) => Promise<any>;
+  requestAccounts?: (network?: string) => Promise<any>;
+  requestAccountsForNetwork?: (network?: string) => Promise<any>;
   on?: (ev: string, cb: (...a: any[]) => void) => void;
   off?: (ev: string, cb: (...a: any[]) => void) => void;
 };
@@ -158,6 +161,31 @@ const requestTradeLayer = async (method: string, params?: any): Promise<any> => 
   const provider = getTradeLayerProvider();
   if (!provider) throw new Error('TradeLayer extension not available');
   return provider.request({ method, params });
+};
+
+const requestTradeLayerConnect = async (network: string): Promise<any> => {
+  const provider = getTradeLayerProvider();
+  if (!provider) throw new Error('TradeLayer extension not available');
+
+  if (typeof provider.connect === 'function') {
+    return provider.connect(network);
+  }
+
+  return provider.request({ method: 'connect', params: { network } });
+};
+
+const requestTradeLayerAccounts = async (network: string): Promise<any> => {
+  const provider = getTradeLayerProvider();
+  if (!provider) throw new Error('TradeLayer extension not available');
+
+  if (typeof provider.requestAccountsForNetwork === 'function') {
+    return provider.requestAccountsForNetwork(network);
+  }
+  if (typeof provider.requestAccounts === 'function') {
+    return provider.requestAccounts(network);
+  }
+
+  return provider.request({ method: 'requestAccounts', params: { network } });
 };
 
 const isUnknownMethodError = (error: any): boolean => {
@@ -688,32 +716,13 @@ export class WalletService {
     isAvailable: () => !!getTradeLayerProvider(),
 
     connect: async () => {
-      return requestTradeLayer('connect', {
-        network: this.customWalletNetwork(),
-      });
+      return requestTradeLayerConnect(this.customWalletNetwork());
     },
 
     getAddresses: async (net) => {
       const appNet = this.rpc.NETWORK || 'BTC';
       const reqNet = net === 'testnet' ? 'LTCTEST' : appNet;
-      let r: any;
-      try {
-        r = await requestTradeLayer('requestAccounts', {
-          network: reqNet,
-        });
-      } catch (error: any) {
-        if (!isUnknownMethodError(error)) throw error;
-        try {
-          r = await requestTradeLayer('getAccounts', {
-            network: reqNet,
-          });
-        } catch (legacyError: any) {
-          if (!isUnknownMethodError(legacyError)) throw legacyError;
-          r = await requestTradeLayer('getAddresses', {
-            network: reqNet,
-          });
-        }
-      }
+      const r = await requestTradeLayerAccounts(reqNet);
       return normalizeWalletAccounts(r).map((account) => account.address);
     },
 
@@ -846,6 +855,9 @@ export class WalletService {
     if (cachedAddresses.length) {
       return cachedAddresses.map((address) => ({ address }));
     }
+    if (!this.provider$.value) {
+      return [];
+    }
     const activeProvider = this.provider$.value || this.pick();
     const phantomBtc = getPhantomBtc(normalizedNetwork);
     const usePhantom =
@@ -858,39 +870,8 @@ export class WalletService {
       return accounts;
     }
 
-    let accs: any;
     const walletNetwork = normalizedNetwork || this.customWalletNetwork();
-    try {
-      accs = await requestTradeLayer('requestAccounts', {
-        network: walletNetwork,
-      });
-    } catch (error: any) {
-      if (!isUnknownMethodError(error)) {
-        throw error;
-      }
-      console.warn('[wallet] requestAccounts unavailable; trying legacy wallet methods');
-      try {
-        accs = await requestTradeLayer('getAccounts', {
-          network: walletNetwork,
-        });
-      } catch (legacyError: any) {
-        if (!isUnknownMethodError(legacyError)) {
-          throw legacyError;
-        }
-        try {
-          accs = await requestTradeLayer('getAddresses', {
-            network: walletNetwork,
-          });
-        } catch (altLegacyError: any) {
-          if (!isUnknownMethodError(altLegacyError)) {
-            throw altLegacyError;
-          }
-          accs = await requestTradeLayer('btc_getAddresses', {
-            network: walletNetwork,
-          });
-        }
-      }
-    }
+    const accs = await requestTradeLayerAccounts(walletNetwork);
 
     const accounts = normalizeWalletAccounts(accs);
     await this.syncWatchOnlyAccounts(accounts, normalizedNetwork);
