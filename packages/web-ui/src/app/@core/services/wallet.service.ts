@@ -841,6 +841,10 @@ export class WalletService {
     isAvailable: () => hasTradeLayerWallet(),
 
     connect: async () => {
+      if (getTradeLayerProvider()) {
+        return requestTradeLayerConnect(this.customWalletNetwork());
+      }
+
       return requestTradeLayerAccounts(this.customWalletNetwork());
     },
 
