@@ -688,7 +688,7 @@ export class WalletService {
     isAvailable: () => !!getTradeLayerProvider(),
 
     connect: async () => {
-      await requestTradeLayer('connect', {
+      return requestTradeLayer('connect', {
         network: this.customWalletNetwork(),
       });
     },
@@ -799,8 +799,10 @@ export class WalletService {
     }
 
     const net = this.providerNet();
+    let connectedAccounts: WalletAccount[] = [];
     try {
-      await p.connect?.(net);
+      const connectResult = await p.connect?.(net);
+      connectedAccounts = normalizeWalletAccounts(connectResult);
     } catch (error: any) {
       if (!isUnknownMethodError(error)) {
         throw error;
@@ -810,10 +812,16 @@ export class WalletService {
 
     this.provider$.next(p);
 
-    const accounts = await this.requestAccounts(this.rpc.NETWORK);
+    const accounts = connectedAccounts.length
+      ? connectedAccounts
+      : await this.requestAccounts(this.rpc.NETWORK);
     const addrs = accounts.map((account) => account.address).filter((address): address is string => !!address);
     this.addresses$.next(addrs);
     this.address$.next(addrs[0] ?? null);
+
+    if (accounts.length) {
+      await this.syncWatchOnlyAccounts(accounts, this.rpc.NETWORK);
+    }
 
     p.on?.('accountsChanged', this._onAccountsChanged);
     p.on?.('networkChanged', this._onNetworkChanged);
@@ -834,6 +842,10 @@ export class WalletService {
     network?: string | null
   ): Promise<WalletAccount[]> {
     const normalizedNetwork = String(network ?? this.rpc.NETWORK ?? '').toUpperCase();
+    const cachedAddresses = this.addresses$.value || [];
+    if (cachedAddresses.length) {
+      return cachedAddresses.map((address) => ({ address }));
+    }
     const activeProvider = this.provider$.value || this.pick();
     const phantomBtc = getPhantomBtc(normalizedNetwork);
     const usePhantom =
