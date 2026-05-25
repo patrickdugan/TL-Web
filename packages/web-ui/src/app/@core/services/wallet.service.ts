@@ -179,11 +179,6 @@ const hasTradeLayerWallet = (): boolean =>
   !!getTradeLayerProvider() || !!getLegacyTradeLayerProvider();
 
 const requestLegacyTradeLayerMessage = (method: string, params?: any): Promise<any> => {
-  const legacyProvider = getLegacyTradeLayerProvider();
-  if (!legacyProvider) {
-    return Promise.reject(new Error('TradeLayer extension not available'));
-  }
-
   const id = `tl-web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   return new Promise((resolve, reject) => {
@@ -220,7 +215,7 @@ const requestLegacyTradeLayerMessage = (method: string, params?: any): Promise<a
 const requestLegacyTradeLayer = async (method: string, params?: any): Promise<any> => {
   const legacyProvider = getLegacyTradeLayerProvider();
   if (!legacyProvider) {
-    throw new Error('TradeLayer extension not available');
+    return requestLegacyTradeLayerMessage(method, params);
   }
 
   if (typeof legacyProvider.sendRequest === 'function') {
@@ -312,6 +307,15 @@ const requestTradeLayerAccounts = async (network: string): Promise<any> => {
 
   if (legacyProvider?.requestAccounts) {
     return legacyProvider.requestAccounts();
+  }
+
+  try {
+    return await requestLegacyTradeLayerMessage('requestAccounts', {
+      network: normalizedNetwork,
+    });
+  } catch (error) {
+    lastError = error;
+    if (!isRecoverableProviderError(error)) throw error;
   }
 
   throw lastError || new Error('TradeLayer extension not available');
