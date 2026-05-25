@@ -160,6 +160,11 @@ const requestTradeLayer = async (method: string, params?: any): Promise<any> => 
   return provider.request({ method, params });
 };
 
+const isUnknownMethodError = (error: any): boolean => {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('unknown method') || message.includes('method not found');
+};
+
 // ---------------------------------------------------------------------------
 // WalletService
 // ---------------------------------------------------------------------------
@@ -691,9 +696,24 @@ export class WalletService {
     getAddresses: async (net) => {
       const appNet = this.rpc.NETWORK || 'BTC';
       const reqNet = net === 'testnet' ? 'LTCTEST' : appNet;
-      const r = await requestTradeLayer('requestAccounts', {
-        network: reqNet,
-      });
+      let r: any;
+      try {
+        r = await requestTradeLayer('requestAccounts', {
+          network: reqNet,
+        });
+      } catch (error: any) {
+        if (!isUnknownMethodError(error)) throw error;
+        try {
+          r = await requestTradeLayer('getAccounts', {
+            network: reqNet,
+          });
+        } catch (legacyError: any) {
+          if (!isUnknownMethodError(legacyError)) throw legacyError;
+          r = await requestTradeLayer('getAddresses', {
+            network: reqNet,
+          });
+        }
+      }
       return normalizeWalletAccounts(r).map((account) => account.address);
     },
 
@@ -779,7 +799,14 @@ export class WalletService {
     }
 
     const net = this.providerNet();
-    await p.connect?.(net);
+    try {
+      await p.connect?.(net);
+    } catch (error: any) {
+      if (!isUnknownMethodError(error)) {
+        throw error;
+      }
+      console.warn('[wallet] provider connect method unavailable; continuing with account request fallback');
+    }
 
     this.provider$.next(p);
 
@@ -819,9 +846,39 @@ export class WalletService {
       return accounts;
     }
 
-    const accs = await requestTradeLayer('requestAccounts', {
-      network: normalizedNetwork || this.customWalletNetwork(),
-    });
+    let accs: any;
+    const walletNetwork = normalizedNetwork || this.customWalletNetwork();
+    try {
+      accs = await requestTradeLayer('requestAccounts', {
+        network: walletNetwork,
+      });
+    } catch (error: any) {
+      if (!isUnknownMethodError(error)) {
+        throw error;
+      }
+      console.warn('[wallet] requestAccounts unavailable; trying legacy wallet methods');
+      try {
+        accs = await requestTradeLayer('getAccounts', {
+          network: walletNetwork,
+        });
+      } catch (legacyError: any) {
+        if (!isUnknownMethodError(legacyError)) {
+          throw legacyError;
+        }
+        try {
+          accs = await requestTradeLayer('getAddresses', {
+            network: walletNetwork,
+          });
+        } catch (altLegacyError: any) {
+          if (!isUnknownMethodError(altLegacyError)) {
+            throw altLegacyError;
+          }
+          accs = await requestTradeLayer('btc_getAddresses', {
+            network: walletNetwork,
+          });
+        }
+      }
+    }
 
     const accounts = normalizeWalletAccounts(accs);
     await this.syncWatchOnlyAccounts(accounts, normalizedNetwork);
