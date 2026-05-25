@@ -42,6 +42,13 @@ type TradeLayerProvider = {
   off?: (ev: string, cb: (...a: any[]) => void) => void;
 };
 
+type LegacyTradeLayerProvider = {
+  requestAccounts?: () => Promise<any>;
+  sendRequest?: (method: string, params?: any) => Promise<any>;
+  on?: (ev: string, cb: (...a: any[]) => void) => void;
+  off?: (ev: string, cb: (...a: any[]) => void) => void;
+};
+
 interface MultisigRecord {
   m: number;
   pubKeys: string[];
@@ -55,7 +62,7 @@ interface IWalletProvider {
   name: string;
   isAvailable(): boolean;
 
-  connect?(network: 'mainnet' | 'testnet'): Promise<void>;
+  connect?(network: 'mainnet' | 'testnet'): Promise<any>;
   getAddresses(network: 'mainnet' | 'testnet'): Promise<string[]>;
 
   signMessage(
@@ -157,10 +164,69 @@ const getTradeLayerProvider = (): TradeLayerProvider | undefined => {
   return isTradeLayerProvider(candidate) ? candidate : undefined;
 };
 
+const getLegacyTradeLayerProvider = (): LegacyTradeLayerProvider | undefined => {
+  const candidate = (window as any).myWallet;
+  if (
+    candidate &&
+    (typeof candidate.sendRequest === 'function' || typeof candidate.requestAccounts === 'function')
+  ) {
+    return candidate;
+  }
+  return undefined;
+};
+
+const hasTradeLayerWallet = (): boolean =>
+  !!getTradeLayerProvider() || !!getLegacyTradeLayerProvider();
+
+const requestLegacyTradeLayerRaw = (method: string, params?: any): Promise<any> => {
+  const legacyProvider = getLegacyTradeLayerProvider();
+  if (!legacyProvider) {
+    return Promise.reject(new Error('TradeLayer extension not available'));
+  }
+
+  const id = `tl-web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error(`TradeLayer extension request timeout: ${method}`));
+    }, 30000);
+
+    const handler = (event: MessageEvent) => {
+      if (event.source !== window) return;
+      const message = event.data;
+      if (!message || message.type !== 'response') return;
+
+      const data = message.data || {};
+      const payload = data.payload || {};
+      if (payload.id !== id && data.id !== id) return;
+
+      clearTimeout(timeout);
+      window.removeEventListener('message', handler);
+
+      if (data.success === false || data.error) {
+        reject(new Error(data.error || 'TradeLayer extension request failed'));
+        return;
+      }
+
+      resolve(data.result ?? payload.result ?? data.data ?? data);
+    };
+
+    window.addEventListener('message', handler);
+    window.postMessage({ type: 'request', data: { id, method, params: params || {} } }, '*');
+  });
+};
+
 const requestTradeLayer = async (method: string, params?: any): Promise<any> => {
   const provider = getTradeLayerProvider();
-  if (!provider) throw new Error('TradeLayer extension not available');
-  return provider.request({ method, params });
+  if (provider) {
+    try {
+      return await provider.request({ method, params });
+    } catch (error) {
+      if (!isUnknownMethodError(error)) throw error;
+    }
+  }
+  return requestLegacyTradeLayerRaw(method, params);
 };
 
 const requestTradeLayerConnect = async (network: string): Promise<any> => {
@@ -175,22 +241,73 @@ const requestTradeLayerConnect = async (network: string): Promise<any> => {
 };
 
 const requestTradeLayerAccounts = async (network: string): Promise<any> => {
+  const normalizedNetwork = String(network || '').toUpperCase() || 'LTC';
   const provider = getTradeLayerProvider();
-  if (!provider) throw new Error('TradeLayer extension not available');
+  const legacyProvider = getLegacyTradeLayerProvider();
+  let lastError: any = null;
 
-  if (typeof provider.requestAccountsForNetwork === 'function') {
-    return provider.requestAccountsForNetwork(network);
-  }
-  if (typeof provider.requestAccounts === 'function') {
-    return provider.requestAccounts(network);
+  console.log('[wallet] requesting TradeLayer accounts', {
+    network: normalizedNetwork,
+    hasTradelayer: !!provider,
+    hasLegacyMyWallet: !!legacyProvider,
+    tradelayerHasRequestAccounts: typeof provider?.requestAccounts === 'function',
+    tradelayerHasRequestAccountsForNetwork: typeof provider?.requestAccountsForNetwork === 'function',
+    legacyHasSendRequest: typeof legacyProvider?.sendRequest === 'function',
+  });
+
+  if (provider && typeof provider.requestAccountsForNetwork === 'function') {
+    try {
+      return await provider.requestAccountsForNetwork(normalizedNetwork);
+    } catch (error) {
+      lastError = error;
+      if (!isUnknownMethodError(error)) throw error;
+    }
   }
 
-  return provider.request({ method: 'requestAccounts', params: { network } });
+  if (provider && typeof provider.requestAccounts === 'function') {
+    try {
+      return await provider.requestAccounts(normalizedNetwork);
+    } catch (error) {
+      lastError = error;
+      if (!isUnknownMethodError(error)) throw error;
+    }
+  }
+
+  if (provider) {
+    try {
+      return await provider.request({ method: 'requestAccounts', params: { network: normalizedNetwork } });
+    } catch (error) {
+      lastError = error;
+      if (!isUnknownMethodError(error)) throw error;
+    }
+  }
+
+  if (legacyProvider?.sendRequest) {
+    try {
+      return await requestLegacyTradeLayerRaw('requestAccounts', {
+        network: normalizedNetwork,
+      });
+    } catch (error) {
+      lastError = error;
+      if (!isUnknownMethodError(error)) throw error;
+    }
+  }
+
+  if (legacyProvider?.requestAccounts) {
+    return legacyProvider.requestAccounts();
+  }
+
+  throw lastError || new Error('TradeLayer extension not available');
 };
 
 const isUnknownMethodError = (error: any): boolean => {
   const message = String(error?.message || error || '').toLowerCase();
-  return message.includes('unknown method') || message.includes('method not found');
+  return (
+    message.includes('unknown method') ||
+    message.includes('method not found') ||
+    message.includes('unsupported provider method') ||
+    message.includes('invalid tradelayer provider request')
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -258,6 +375,14 @@ export class WalletService {
 
   public getTradeLayerProvider(): TradeLayerProvider | undefined {
     return getTradeLayerProvider();
+  }
+
+  public getLegacyTradeLayerProvider(): LegacyTradeLayerProvider | undefined {
+    return getLegacyTradeLayerProvider();
+  }
+
+  public hasTradeLayerWallet(): boolean {
+    return hasTradeLayerWallet();
   }
 
   public getPrimaryAddress(
@@ -713,10 +838,10 @@ export class WalletService {
   private customExt: IWalletProvider = {
     kind: 'custom',
     name: 'TradeLayer Extension',
-    isAvailable: () => !!getTradeLayerProvider(),
+    isAvailable: () => hasTradeLayerWallet(),
 
     connect: async () => {
-      return requestTradeLayerConnect(this.customWalletNetwork());
+      return requestTradeLayerAccounts(this.customWalletNetwork());
     },
 
     getAddresses: async (net) => {
@@ -756,8 +881,8 @@ export class WalletService {
       });
     },
 
-    on: (ev, cb) => getTradeLayerProvider()?.on?.(ev, cb),
-    off: (ev, cb) => getTradeLayerProvider()?.off?.(ev, cb),
+    on: (ev, cb) => (getTradeLayerProvider() || getLegacyTradeLayerProvider())?.on?.(ev, cb),
+    off: (ev, cb) => (getTradeLayerProvider() || getLegacyTradeLayerProvider())?.off?.(ev, cb),
   };
 
   // -------------------------------------------------------------------------
@@ -949,6 +1074,15 @@ declare global {
       isTradeLayer: true;
       version?: string;
       request: (args: { method: string; params?: any }) => Promise<any>;
+      connect?: (network?: string) => Promise<any>;
+      requestAccounts?: (network?: string) => Promise<any>;
+      requestAccountsForNetwork?: (network?: string) => Promise<any>;
+      on?: (ev: string, cb: (...a: any[]) => void) => void;
+      off?: (ev: string, cb: (...a: any[]) => void) => void;
+    };
+    myWallet?: {
+      requestAccounts?: () => Promise<any>;
+      sendRequest?: (method: string, params?: any) => Promise<any>;
       on?: (ev: string, cb: (...a: any[]) => void) => void;
       off?: (ev: string, cb: (...a: any[]) => void) => void;
     };

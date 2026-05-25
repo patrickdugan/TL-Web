@@ -219,7 +219,7 @@ async connectWallet() {
     }
 
     // --- Fallback: your existing custom wallet path ---
-    if (this.walletService.getTradeLayerProvider()) {
+    if (this.walletService.hasTradeLayerWallet()) {
       console.log("Fallback wallet detected.");
 
       if (this.isLitecoinNetwork && this.walletAddress && this.walletAddress.startsWith('bc1')) {

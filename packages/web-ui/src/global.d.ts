@@ -23,6 +23,15 @@ declare global {
         method: string;
         params?: any;
       }) => Promise<any>;
+      connect?: (network?: string) => Promise<any>;
+      requestAccounts?: (network?: string) => Promise<any>;
+      requestAccountsForNetwork?: (network?: string) => Promise<any>;
+      on?: (ev: string, cb: (...a: any[]) => void) => void;
+      off?: (ev: string, cb: (...a: any[]) => void) => void;
+    };
+    myWallet?: {
+      requestAccounts?: () => Promise<any>;
+      sendRequest?: (method: string, params?: any) => Promise<any>;
       on?: (ev: string, cb: (...a: any[]) => void) => void;
       off?: (ev: string, cb: (...a: any[]) => void) => void;
     };
