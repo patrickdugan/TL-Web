@@ -874,9 +874,10 @@ export class WalletService {
     isAvailable: () => hasTradeLayerWallet(),
 
     connect: async () => {
-      // The Chrome Web Store extension does not support a separate `connect`
-      // method. Its user gesture is `requestAccounts`, which also returns the
-      // address for the selected LTC/LTCTEST network.
+      if (getTradeLayerProvider()) {
+        return requestTradeLayerConnect(this.customWalletNetwork());
+      }
+
       return requestTradeLayerAccounts(this.customWalletNetwork());
     },
 
@@ -1023,6 +1024,9 @@ export class WalletService {
     const cachedAddresses = this.addresses$.value || [];
     if (cachedAddresses.length) {
       return cachedAddresses.map((address) => ({ address }));
+    }
+    if (!this.provider$.value) {
+      return [];
     }
     const activeProvider = this.provider$.value || this.pick();
     const phantomBtc = getPhantomBtc(normalizedNetwork);
