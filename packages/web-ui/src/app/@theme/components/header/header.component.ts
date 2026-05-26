@@ -205,7 +205,6 @@ async connectWallet() {
 
       // Must be called from a user gesture (your button click) to show the approval modal.
       const accounts = await ph.requestAccounts(); // triggers Phantom approval UI
-      await this.walletService.connectPreferred();
       const nextAddress = this.walletService.getPrimaryAddress(accounts);
       if (accounts && accounts.length > 0) {
         // accounts: BtcAccount[] per docs: { address, addressType, publicKey, purpose }
@@ -227,9 +226,8 @@ async connectWallet() {
       }
 
       await this.walletService.connectPreferred();
-      const accounts = await this.walletService.requestAccounts(this.rpcService.NETWORK);
-      const nextAddress = this.walletService.getPrimaryAddress(accounts);
-      if (accounts && accounts.length > 0) {
+      const nextAddress = this.walletService.address$.value;
+      if (nextAddress) {
         this.walletAddress = nextAddress;
         this.balanceVisible = !!nextAddress;
         console.log("Connected Wallet Address:", this.walletAddress);
