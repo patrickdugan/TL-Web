@@ -439,7 +439,6 @@ export class WalletService {
   // In-memory + persistent cache for multisig
   private multisigCache = new Map<string, MultisigRecord>();
   private syncedWatchOnly = new Set<string>();
-  private connectedAccountsCache: WalletAccount[] = [];
 
   // -------------------------------------------------------------------------
   // Session Auth (REST + WebSocket)
@@ -959,11 +958,9 @@ export class WalletService {
     const addresses = (accs || [])
       .map((account) => (typeof account === 'string' ? account : account?.address))
       .filter((address): address is string => !!address);
-    const accounts = addresses.map((address) => ({ address }));
 
     this.addresses$.next(addresses);
     this.address$.next(addresses[0] ?? null);
-    this.connectedAccountsCache = accounts;
     this.sessionState$.next({
       token: null, address: null, expiresAt: null, wsAuthed: false,
     });
@@ -1000,7 +997,6 @@ export class WalletService {
       ? connectedAccounts
       : await this.requestAccounts(this.rpc.NETWORK);
     const addrs = accounts.map((account) => account.address).filter((address): address is string => !!address);
-    this.connectedAccountsCache = accounts;
     this.addresses$.next(addrs);
     this.address$.next(addrs[0] ?? null);
 
@@ -1027,10 +1023,6 @@ export class WalletService {
     network?: string | null
   ): Promise<WalletAccount[]> {
     const normalizedNetwork = String(network ?? this.rpc.NETWORK ?? '').toUpperCase();
-    if (this.connectedAccountsCache.length) {
-      return this.connectedAccountsCache;
-    }
-
     const cachedAddresses = this.addresses$.value || [];
     if (cachedAddresses.length) {
       return cachedAddresses.map((address) => ({ address }));

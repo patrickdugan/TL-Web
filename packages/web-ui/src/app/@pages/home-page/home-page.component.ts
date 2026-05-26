@@ -92,7 +92,8 @@ export class HomePageComponent implements OnInit, OnDestroy {
       }
 
       await this.walletService.connectPreferred();
-      const nextAddress = this.walletService.address$.value;
+      const accounts = await this.walletService.requestAccounts(this.walletService.network);
+      const nextAddress = this.walletService.getPrimaryAddress(accounts);
 
       this.walletAddress = nextAddress;
       this.balanceVisible = !!nextAddress;
