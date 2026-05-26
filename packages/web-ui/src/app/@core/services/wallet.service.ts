@@ -874,10 +874,9 @@ export class WalletService {
     isAvailable: () => hasTradeLayerWallet(),
 
     connect: async () => {
-      if (getTradeLayerProvider()) {
-        return requestTradeLayerConnect(this.customWalletNetwork());
-      }
-
+      // The published TradeLayer provider exposes `requestAccounts` as the
+      // user-gesture connect step. Some versions reject a separate `connect`
+      // method with "Unknown method".
       return requestTradeLayerAccounts(this.customWalletNetwork());
     },
 
