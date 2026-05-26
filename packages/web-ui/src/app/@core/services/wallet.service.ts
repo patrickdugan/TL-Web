@@ -978,14 +978,17 @@ export class WalletService {
 
     const net = this.providerNet();
     let connectedAccounts: WalletAccount[] = [];
-    try {
-      const connectResult = await p.connect?.(net);
-      connectedAccounts = normalizeWalletAccounts(connectResult);
-    } catch (error: any) {
-      if (!isUnknownMethodError(error)) {
-        throw error;
+
+    if (p.kind === 'phantom-btc') {
+      try {
+        const connectResult = await p.connect?.(net);
+        connectedAccounts = normalizeWalletAccounts(connectResult);
+      } catch (error: any) {
+        if (!isUnknownMethodError(error)) {
+          throw error;
+        }
+        console.warn('[wallet] provider connect method unavailable; continuing with account request fallback');
       }
-      console.warn('[wallet] provider connect method unavailable; continuing with account request fallback');
     }
 
     this.provider$.next(p);
