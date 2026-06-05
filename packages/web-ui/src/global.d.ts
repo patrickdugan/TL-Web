@@ -5,33 +5,25 @@ declare global {
   interface Window {
     phantom?: {
       bitcoin?: {
-        isPhantom: true;
         request: (args: {
           method: string;
           params?: any;
         }) => Promise<any>;
-        requestAccounts?: () => Promise<any>;
         on?: (ev: string, cb: (...a: any[]) => void) => void;
-        off?: (ev: string, cb: (...a: any[]) => void) => void;
       };
     };
-    tradelayer?: {
-      providerId: 'tradelayer';
-      isTradeLayer: true;
-      version?: string;
-      request: (args: {
-        method: string;
-        params?: any;
-      }) => Promise<any>;
-      connect?: (network?: string) => Promise<any>;
-      requestAccounts?: (network?: string) => Promise<any>;
-      requestAccountsForNetwork?: (network?: string) => Promise<any>;
+    myWallet?: {
+      sendRequest: (method: string, params?: any) => Promise<any>;
       on?: (ev: string, cb: (...a: any[]) => void) => void;
       off?: (ev: string, cb: (...a: any[]) => void) => void;
     };
-    myWallet?: {
-      requestAccounts?: () => Promise<any>;
-      sendRequest?: (method: string, params?: any) => Promise<any>;
+    tradelayer?: {
+      providerId?: string;
+      isTradeLayer?: boolean;
+      request: (args: { method: string; params?: any }) => Promise<any>;
+      connect?: (network?: string) => Promise<any>;
+      requestAccounts?: (network?: string) => Promise<any>;
+      requestAccountsForNetwork?: (network?: string) => Promise<any>;
       on?: (ev: string, cb: (...a: any[]) => void) => void;
       off?: (ev: string, cb: (...a: any[]) => void) => void;
     };

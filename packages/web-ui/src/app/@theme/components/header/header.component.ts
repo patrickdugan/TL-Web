@@ -199,22 +199,33 @@ async connectWallet() {
     console.log("Checking for wallet...");
 //
     // --- Phantom Bitcoin provider (preferred) ---
-    const ph = this.walletService.getPhantomProvider();
-    if (!this.isLitecoinNetwork && ph?.isPhantom && ph.requestAccounts) {
+    const ph: any = (window as any)?.phantom?.bitcoin;
+    if (!this.isLitecoinNetwork && ph?.isPhantom) {
       console.log("Phantom Bitcoin detected.");
 
       // Must be called from a user gesture (your button click) to show the approval modal.
       const accounts = await ph.requestAccounts(); // triggers Phantom approval UI
-      const nextAddress = this.walletService.getPrimaryAddress(accounts);
       if (accounts && accounts.length > 0) {
         // accounts: BtcAccount[] per docs: { address, addressType, publicKey, purpose }
-        this.walletAddress = nextAddress;
-        this.balanceVisible = !!nextAddress;
+        this.walletAddress = accounts[0].address;
+        this.balanceVisible = true;
         console.log("Connected Phantom BTC Address:", this.walletAddress);
-        this.toastrService.success("Phantom connected successfully!");
       }
 
-      return; // Done with Phantom path
+      // Listen for account switches (Phantom BTC supports 'accountsChanged')
+      if (!this.isLitecoinNetwork && typeof ph.on === "function") {
+        ph.on("accountsChanged", (newAccounts: any[]) => {
+          console.log("Phantom accounts changed:", newAccounts);
+          if (Array.isArray(newAccounts) && newAccounts.length > 0) {
+            this.walletAddress = newAccounts[0].address;
+          } else {
+            // If empty array, try to reconnect (per docs suggestion)
+            ph.requestAccounts().catch((e: any) => console.warn("Re-connect failed:", e));
+          }
+        });
+      }
+
+    return; // Done with Phantom path
     }
 
     // --- Fallback: your existing custom wallet path ---
@@ -229,17 +240,15 @@ async connectWallet() {
       const nextAddress = this.walletService.address$.value;
       if (nextAddress) {
         this.walletAddress = nextAddress;
-        this.balanceVisible = !!nextAddress;
+        this.balanceVisible = true;
         console.log("Connected Wallet Address:", this.walletAddress);
-        this.toastrService.success("Wallet connected successfully!");
       }
+
     } else {
       console.warn("No wallet extension detected.");
-      this.toastrService.error("Wallet extension not detected.");
     }
   } catch (error: any) {
     console.error("Wallet connection error:", error);
-    this.toastrService.error("Failed to connect wallet.");
   }
 }
 

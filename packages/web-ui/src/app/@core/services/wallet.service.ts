@@ -2,7 +2,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
-import { environment } from 'src/environments/environment';
 import { RpcService, TNETWORK } from './rpc.service';
 import { RelayerWsService } from './relayer-ws.service';
 
@@ -13,28 +12,15 @@ import { RelayerWsService } from './relayer-ws.service';
 type WalletKind = 'phantom-btc' | 'custom';
 
 type PhantomBtc = {
-  isPhantom: true;
   request: (args: { method: string; params?: any }) => Promise<any>;
   requestAccounts?: () => Promise<any>;
   on?: (ev: string, cb: (...a: any[]) => void) => void;
-  off?: (ev: string, cb: (...a: any[]) => void) => void;
-};
-
-export type WalletAccount = {
-  address: string;
-  pubkey?: string;
-};
-
-type TradeLayerRequestArgs = {
-  method: string;
-  params?: any;
 };
 
 type TradeLayerProvider = {
-  providerId: 'tradelayer';
-  isTradeLayer: true;
-  version?: string;
-  request: (args: TradeLayerRequestArgs) => Promise<any>;
+  providerId?: string;
+  isTradeLayer?: boolean;
+  request: (args: { method: string; params?: any }) => Promise<any>;
   connect?: (network?: string) => Promise<any>;
   requestAccounts?: (network?: string) => Promise<any>;
   requestAccountsForNetwork?: (network?: string) => Promise<any>;
@@ -42,11 +28,9 @@ type TradeLayerProvider = {
   off?: (ev: string, cb: (...a: any[]) => void) => void;
 };
 
-type LegacyTradeLayerProvider = {
-  requestAccounts?: () => Promise<any>;
-  sendRequest?: (method: string, params?: any) => Promise<any>;
-  on?: (ev: string, cb: (...a: any[]) => void) => void;
-  off?: (ev: string, cb: (...a: any[]) => void) => void;
+export type WalletAccount = {
+  address: string;
+  pubkey?: string;
 };
 
 interface MultisigRecord {
@@ -62,7 +46,7 @@ interface IWalletProvider {
   name: string;
   isAvailable(): boolean;
 
-  connect?(network: 'mainnet' | 'testnet'): Promise<any>;
+  connect?(network: 'mainnet' | 'testnet'): Promise<void>;
   getAddresses(network: 'mainnet' | 'testnet'): Promise<string[]>;
 
   signMessage(
@@ -114,61 +98,17 @@ interface WsAuthResult {
 const isLtcNet = (net?: TNETWORK | string) =>
   String(net ?? '').toUpperCase().startsWith('LTC');
 
-const isPhantomBtcProvider = (value: any): value is PhantomBtc =>
-  !!value &&
-  value.isPhantom === true &&
-  typeof value.request === 'function';
-
-const isTradeLayerProvider = (value: any): value is TradeLayerProvider =>
-  !!value &&
-  value.providerId === 'tradelayer' &&
-  value.isTradeLayer === true &&
-  typeof value.request === 'function';
-
-const normalizeWalletAccount = (
-  account: string | { address?: string; pubkey?: string; publicKey?: string } | null | undefined
-): WalletAccount | null => {
-  if (!account) return null;
-  if (typeof account === 'string') {
-    return { address: account };
-  }
-
-  if (!account.address) {
-    return null;
-  }
-
-  return {
-    address: account.address,
-    pubkey: account.pubkey ?? account.publicKey,
-  };
-};
-
-const normalizeWalletAccounts = (accounts: unknown): WalletAccount[] => {
-  if (!Array.isArray(accounts)) {
-    return [];
-  }
-
-  return accounts
-    .map((account) => normalizeWalletAccount(account as WalletAccount | string))
-    .filter((account): account is WalletAccount => !!account);
-};
-
 const getPhantomBtc = (net?: TNETWORK | string): PhantomBtc | undefined => {
   if (isLtcNet(net)) return undefined;
-  const candidate = (window as any).phantom?.bitcoin;
-  return isPhantomBtcProvider(candidate) ? candidate : undefined;
+  return (window as any).phantom?.bitcoin as PhantomBtc | undefined;
 };
 
 const getTradeLayerProvider = (): TradeLayerProvider | undefined => {
-  const candidate = (window as any).tradelayer;
-  return isTradeLayerProvider(candidate) ? candidate : undefined;
-};
-
-const getLegacyTradeLayerProvider = (): LegacyTradeLayerProvider | undefined => {
-  const candidate = (window as any).myWallet;
+  const candidate = (window as any).tradelayer as TradeLayerProvider | undefined;
   if (
     candidate &&
-    (typeof candidate.sendRequest === 'function' || typeof candidate.requestAccounts === 'function')
+    typeof candidate.request === 'function' &&
+    (candidate.isTradeLayer === true || candidate.providerId === 'tradelayer')
   ) {
     return candidate;
   }
@@ -176,167 +116,37 @@ const getLegacyTradeLayerProvider = (): LegacyTradeLayerProvider | undefined => 
 };
 
 const hasTradeLayerWallet = (): boolean =>
-  !!getTradeLayerProvider() || !!getLegacyTradeLayerProvider();
-
-const requestLegacyTradeLayerMessage = (method: string, params?: any): Promise<any> => {
-  const id = `tl-web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      window.removeEventListener('message', handler);
-      reject(new Error(`TradeLayer extension request timeout: ${method}`));
-    }, 30000);
-
-    const handler = (event: MessageEvent) => {
-      if (event.source !== window) return;
-      const message = event.data;
-      if (!message || message.type !== 'response') return;
-
-      const data = message.data || {};
-      const payload = data.payload || {};
-      if (payload.id !== id && data.id !== id) return;
-
-      clearTimeout(timeout);
-      window.removeEventListener('message', handler);
-
-      if (data.success === false || data.error) {
-        reject(new Error(data.error || 'TradeLayer extension request failed'));
-        return;
-      }
-
-      resolve(data.result ?? payload.result ?? data.data ?? data);
-    };
-
-    window.addEventListener('message', handler);
-    window.postMessage({ type: 'request', data: { id, method, params: params || {} } }, '*');
-  });
-};
-
-const requestLegacyTradeLayer = async (method: string, params?: any): Promise<any> => {
-  const legacyProvider = getLegacyTradeLayerProvider();
-  if (!legacyProvider) {
-    return requestLegacyTradeLayerMessage(method, params);
-  }
-
-  if (typeof legacyProvider.sendRequest === 'function') {
-    return legacyProvider.sendRequest(method, params || {});
-  }
-
-  if (method === 'requestAccounts' && typeof legacyProvider.requestAccounts === 'function') {
-    return legacyProvider.requestAccounts();
-  }
-
-  return requestLegacyTradeLayerMessage(method, params);
-};
+  !!getTradeLayerProvider() || !!(window as any).myWallet;
 
 const requestTradeLayer = async (method: string, params?: any): Promise<any> => {
   const provider = getTradeLayerProvider();
   if (provider) {
-    try {
-      return await provider.request({ method, params });
-    } catch (error) {
-      if (!isUnknownMethodError(error)) throw error;
+    if (method === 'requestAccounts') {
+      if (typeof provider.requestAccountsForNetwork === 'function') {
+        return provider.requestAccountsForNetwork(params?.network);
+      }
+      if (typeof provider.requestAccounts === 'function') {
+        return provider.requestAccounts(params?.network);
+      }
     }
-  }
-  return requestLegacyTradeLayer(method, params);
-};
 
-const requestTradeLayerConnect = async (network: string): Promise<any> => {
-  const provider = getTradeLayerProvider();
-  if (!provider) throw new Error('TradeLayer extension not available');
-
-  if (typeof provider.connect === 'function') {
-    return provider.connect(network);
-  }
-
-  return provider.request({ method: 'connect', params: { network } });
-};
-
-const requestTradeLayerAccounts = async (network: string): Promise<any> => {
-  const normalizedNetwork = String(network || '').toUpperCase() || 'LTC';
-  const provider = getTradeLayerProvider();
-  const legacyProvider = getLegacyTradeLayerProvider();
-  let lastError: any = null;
-
-  console.log('[wallet] requesting TradeLayer accounts', {
-    network: normalizedNetwork,
-    hasTradelayer: !!provider,
-    hasLegacyMyWallet: !!legacyProvider,
-    tradelayerHasRequestAccounts: typeof provider?.requestAccounts === 'function',
-    tradelayerHasRequestAccountsForNetwork: typeof provider?.requestAccountsForNetwork === 'function',
-    legacyHasSendRequest: typeof legacyProvider?.sendRequest === 'function',
-  });
-
-  if (provider && typeof provider.requestAccountsForNetwork === 'function') {
-    try {
-      return await provider.requestAccountsForNetwork(normalizedNetwork);
-    } catch (error) {
-      lastError = error;
-      if (!isRecoverableProviderError(error)) throw error;
+    if (method === 'connect' && typeof provider.connect === 'function') {
+      return provider.connect(params?.network);
     }
+
+    return provider.request({ method, params });
   }
 
-  if (provider && typeof provider.requestAccounts === 'function') {
-    try {
-      return await provider.requestAccounts(normalizedNetwork);
-    } catch (error) {
-      lastError = error;
-      if (!isRecoverableProviderError(error)) throw error;
-    }
+  const legacy = (window as any).myWallet;
+  if (legacy?.sendRequest) {
+    return legacy.sendRequest(method, params || {});
   }
 
-  if (provider) {
-    try {
-      return await provider.request({ method: 'requestAccounts', params: { network: normalizedNetwork } });
-    } catch (error) {
-      lastError = error;
-      if (!isRecoverableProviderError(error)) throw error;
-    }
+  if (method === 'requestAccounts' && legacy?.requestAccounts) {
+    return legacy.requestAccounts();
   }
 
-  if (legacyProvider?.sendRequest) {
-    try {
-      return await requestLegacyTradeLayer('requestAccounts', {
-        network: normalizedNetwork,
-      });
-    } catch (error) {
-      lastError = error;
-      if (!isRecoverableProviderError(error)) throw error;
-    }
-  }
-
-  if (legacyProvider?.requestAccounts) {
-    return legacyProvider.requestAccounts();
-  }
-
-  try {
-    return await requestLegacyTradeLayerMessage('requestAccounts', {
-      network: normalizedNetwork,
-    });
-  } catch (error) {
-    lastError = error;
-    if (!isRecoverableProviderError(error)) throw error;
-  }
-
-  throw lastError || new Error('TradeLayer extension not available');
-};
-
-const isUnknownMethodError = (error: any): boolean => {
-  const message = String(error?.message || error || '').toLowerCase();
-  return (
-    message.includes('unknown method') ||
-    message.includes('method not found') ||
-    message.includes('unsupported provider method') ||
-    message.includes('invalid tradelayer provider request')
-  );
-};
-
-const isRecoverableProviderError = (error: any): boolean => {
-  const message = String(error?.message || error || '').toLowerCase();
-  return (
-    isUnknownMethodError(error) ||
-    message.includes('origin') && message.includes('not approved')
-  );
+  throw new Error('TradeLayer wallet not available');
 };
 
 // ---------------------------------------------------------------------------
@@ -379,8 +189,8 @@ export class WalletService {
   get baseUrl(): string {
     const net = (this.rpc.NETWORK || "").toUpperCase();
     return net.includes("TEST")
-      ? "https://ws.layerwallet.com/relayer"
-      : "https://ws.layerwallet.com/relayer";
+      ? "https://testnet-api.layerwallet.com"
+      : "https://api.layerwallet.com";
   }
 
   get wsUrl(): string {
@@ -398,20 +208,12 @@ export class WalletService {
     return this.available().length > 0;
   }
 
-  public getPhantomProvider(): PhantomBtc | undefined {
-    return getPhantomBtc(this.rpc.NETWORK);
-  }
-
-  public getTradeLayerProvider(): TradeLayerProvider | undefined {
-    return getTradeLayerProvider();
-  }
-
-  public getLegacyTradeLayerProvider(): LegacyTradeLayerProvider | undefined {
-    return getLegacyTradeLayerProvider();
-  }
-
   public hasTradeLayerWallet(): boolean {
     return hasTradeLayerWallet();
+  }
+
+  public getPhantomProvider(): PhantomBtc | undefined {
+    return getPhantomBtc(this.rpc.NETWORK);
   }
 
   public requestTradeLayer(method: string, params?: any): Promise<any> {
@@ -421,7 +223,12 @@ export class WalletService {
   public getPrimaryAddress(
     accounts: Array<string | { address?: string } | null | undefined> | null | undefined
   ): string | null {
-    return normalizeWalletAccounts(accounts)[0]?.address ?? null;
+    if (!Array.isArray(accounts)) return null;
+    for (const account of accounts) {
+      if (typeof account === 'string') return account;
+      if (account?.address) return account.address;
+    }
+    return null;
   }
 
   public getConnectedOrPreferredProviderKind(): WalletKind | null {
@@ -438,7 +245,7 @@ export class WalletService {
 
   // In-memory + persistent cache for multisig
   private multisigCache = new Map<string, MultisigRecord>();
-  private syncedWatchOnly = new Set<string>();
+  private connectedAccountsCache: { address: string; pubkey?: string }[] = [];
 
   // -------------------------------------------------------------------------
   // Session Auth (REST + WebSocket)
@@ -756,51 +563,6 @@ export class WalletService {
     return this.signPsbt(psbtBase64, { autoFinalize: true, broadcast: false });
   }
 
-  private relayerUrlForNetwork(network?: string | null): string | null {
-    const key = String(network ?? this.rpc.NETWORK ?? '').toUpperCase();
-    if (!key) return null;
-    if (key.includes('TEST')) return environment.ENDPOINTS.LTCTEST.relayerUrl;
-    if (key === 'BTC') return environment.ENDPOINTS.BTC.relayerUrl;
-    return environment.ENDPOINTS.LTC.relayerUrl;
-  }
-
-  private async syncWatchOnlyAccounts(accounts: WalletAccount[], network?: string | null) {
-    const relayerUrl = this.relayerUrlForNetwork(network);
-    if (!relayerUrl) return;
-
-    const batch = (accounts || [])
-      .map((account) => ({
-        address: String(account?.address || '').trim(),
-        pubkey: String(account?.pubkey || '').trim(),
-      }))
-      .filter((account) => account.address && account.pubkey)
-      .filter((account) => !this.syncedWatchOnly.has(`${account.address}:${account.pubkey}`));
-
-    if (!batch.length) return;
-
-    try {
-      this.relayerWsService.setBaseUrl(relayerUrl);
-      const res = await this.relayerWsService.request<{ imported?: number; skipped?: number }>(
-        '/address/sync-watchonly',
-        {
-          method: 'POST',
-          body: { accounts: batch },
-          timeoutMs: 30000,
-        }
-      );
-
-      batch.forEach((account) => this.syncedWatchOnly.add(`${account.address}:${account.pubkey}`));
-      console.log('[wallet] synced watch-only accounts', {
-        network,
-        imported: res?.imported ?? 0,
-        skipped: res?.skipped ?? 0,
-        count: batch.length,
-      });
-    } catch (error: any) {
-      console.warn('[wallet] failed to sync watch-only accounts', error?.message || error);
-    }
-  }
-
   // -------------------------------------------------------------------------
   // Providers (lightweight)
   // -------------------------------------------------------------------------
@@ -865,7 +627,6 @@ export class WalletService {
     },
 
     on: (ev, cb) => getPhantomBtc()?.on?.(ev, cb),
-    off: (ev, cb) => getPhantomBtc()?.off?.(ev, cb),
   };
 
   private customExt: IWalletProvider = {
@@ -874,47 +635,42 @@ export class WalletService {
     isAvailable: () => hasTradeLayerWallet(),
 
     connect: async () => {
-      // The published TradeLayer provider exposes `requestAccounts` as the
-      // user-gesture connect step. Some versions reject a separate `connect`
-      // method with "Unknown method".
-      return requestTradeLayerAccounts(this.customWalletNetwork());
+      return requestTradeLayer('connect', {
+        network: this.customWalletNetwork(),
+      });
     },
 
     getAddresses: async (net) => {
       const appNet = this.rpc.NETWORK || 'BTC';
       const reqNet = net === 'testnet' ? 'LTCTEST' : appNet;
-      const r = await requestTradeLayerAccounts(reqNet);
-      return normalizeWalletAccounts(r).map((account) => account.address);
+      const r = await requestTradeLayer('requestAccounts', {
+        network: reqNet,
+      });
+      return (r || []).map((a: any) => a.address);
     },
 
     signMessage: async (_addr, msg) => {
-      return requestTradeLayer('signMessage', {
-        message: msg,
-        network: this.rpc.NETWORK,
-      });
+      return requestTradeLayer('signMessage', { message: msg, network: this.rpc.NETWORK });
     },
 
     signPsbt: async (psbtBase64, opts) => {
       const hex = base64ToHex(psbtBase64);
-      const params = {
-        psbtHex: hex,
+      const r = await requestTradeLayer('signPSBT', {
         transaction: hex,
         network: this.rpc.NETWORK,
         ...(opts?.signingIndexes ? { signingIndexes: opts.signingIndexes } : {}),
         ...(opts?.sigHash != null ? { sigHash: opts.sigHash } : {}),
-      };
-      let r: any;
-      try {
-        r = await requestTradeLayer('signPsbt', params);
-      } catch (error) {
-        if (!isUnknownMethodError(error)) throw error;
-        r = await requestTradeLayer('signPSBT', params);
-      }
+      });
       const out =
-        typeof r === 'string'
-          ? r
-          : r?.psbtHex ?? r?.psbt ?? r?.rawTx ?? r?.transaction ?? hex;
+        typeof r === 'string' ? r : r?.psbt ?? r?.transaction ?? hex;
       return isHex(out) ? hexToBase64(out) : out;
+    },
+
+    signTransactionHex: async (txHex, network) => {
+      return requestTradeLayer('signTransaction', {
+        transaction: txHex,
+        network,
+      });
     },
 
     addMultisig: async (m, pubkeys, network) => {
@@ -925,8 +681,8 @@ export class WalletService {
       });
     },
 
-    on: (ev, cb) => (getTradeLayerProvider() || getLegacyTradeLayerProvider())?.on?.(ev, cb),
-    off: (ev, cb) => (getTradeLayerProvider() || getLegacyTradeLayerProvider())?.off?.(ev, cb),
+    on: (ev, cb) => (getTradeLayerProvider() || (window as any).myWallet)?.on?.(ev, cb),
+    off: (ev, cb) => (getTradeLayerProvider() || (window as any).myWallet)?.off?.(ev, cb),
   };
 
   // -------------------------------------------------------------------------
@@ -954,13 +710,10 @@ export class WalletService {
   // -------------------------------------------------------------------------
 
   private _prevProvider: IWalletProvider | null = null;
-  private _onAccountsChanged = (accs: Array<string | { address?: string }>) => {
-    const addresses = (accs || [])
-      .map((account) => (typeof account === 'string' ? account : account?.address))
-      .filter((address): address is string => !!address);
-
-    this.addresses$.next(addresses);
-    this.address$.next(addresses[0] ?? null);
+  private _onAccountsChanged = (accs: string[]) => {
+    this.addresses$.next(accs || []);
+    this.address$.next(accs?.[0] ?? null);
+    this.connectedAccountsCache = (accs || []).map((address) => ({ address }));
     this.sessionState$.next({
       token: null, address: null, expiresAt: null, wsAuthed: false,
     });
@@ -977,32 +730,40 @@ export class WalletService {
     }
 
     const net = this.providerNet();
-    let connectedAccounts: WalletAccount[] = [];
+    let connectedAccounts: { address: string; pubkey?: string }[] = [];
 
-    if (p.kind === 'phantom-btc') {
+    if (p.kind === 'custom') {
       try {
         const connectResult = await p.connect?.(net);
-        connectedAccounts = normalizeWalletAccounts(connectResult);
-      } catch (error: any) {
-        if (!isUnknownMethodError(error)) {
-          throw error;
-        }
-        console.warn('[wallet] provider connect method unavailable; continuing with account request fallback');
+        connectedAccounts = Array.isArray(connectResult)
+          ? connectResult
+              .map((account: any) => {
+                if (!account) return null;
+                if (typeof account === 'string') return { address: account };
+                if (!account.address) return null;
+                return {
+                  address: account.address,
+                  pubkey: account.pubkey ?? account.publicKey,
+                };
+              })
+              .filter((account: any): account is { address: string; pubkey?: string } => !!account)
+          : [];
+      } catch {
+        console.warn('[wallet] custom connect method unavailable; continuing with account request fallback');
       }
+    } else {
+      await p.connect?.(net);
     }
 
     this.provider$.next(p);
 
     const accounts = connectedAccounts.length
       ? connectedAccounts
-      : await this.requestAccounts(this.rpc.NETWORK);
+      : await this.requestAccounts(String(this.rpc.NETWORK ?? ''));
+    this.connectedAccountsCache = accounts;
     const addrs = accounts.map((account) => account.address).filter((address): address is string => !!address);
     this.addresses$.next(addrs);
     this.address$.next(addrs[0] ?? null);
-
-    if (accounts.length) {
-      await this.syncWatchOnlyAccounts(accounts, this.rpc.NETWORK);
-    }
 
     p.on?.('accountsChanged', this._onAccountsChanged);
     p.on?.('networkChanged', this._onNetworkChanged);
@@ -1022,32 +783,31 @@ export class WalletService {
   async requestAccounts(
     network?: string | null
   ): Promise<WalletAccount[]> {
-    const normalizedNetwork = String(network ?? this.rpc.NETWORK ?? '').toUpperCase();
-    const cachedAddresses = this.addresses$.value || [];
-    if (cachedAddresses.length) {
-      return cachedAddresses.map((address) => ({ address }));
-    }
-    if (!this.provider$.value) {
-      return [];
-    }
-    const activeProvider = this.provider$.value || this.pick();
-    const phantomBtc = getPhantomBtc(normalizedNetwork);
-    const usePhantom =
-      activeProvider?.kind === 'phantom-btc' ||
-      (activeProvider == null && (normalizedNetwork === 'BTC' || normalizedNetwork === 'BITCOIN'));
+    const isBTC = network === 'BTC' || network === 'BITCOIN';
+    const phantomBtc = getPhantomBtc();
 
-    if (usePhantom && phantomBtc?.requestAccounts) {
-      const accounts = normalizeWalletAccounts(await phantomBtc.requestAccounts());
-      await this.syncWatchOnlyAccounts(accounts, normalizedNetwork);
-      return accounts;
+    if (this.connectedAccountsCache.length) {
+      return this.connectedAccountsCache;
     }
 
-    const walletNetwork = normalizedNetwork || this.customWalletNetwork();
-    const accs = await requestTradeLayerAccounts(walletNetwork);
+    if (isBTC && phantomBtc?.requestAccounts) {
+      try {
+        const btcAccs = await phantomBtc.requestAccounts();
+        return btcAccs.map((a: any) => ({
+          address: a.address,
+          pubkey: a.publicKey,
+        }));
+      } catch {}
+    }
 
-    const accounts = normalizeWalletAccounts(accs);
-    await this.syncWatchOnlyAccounts(accounts, normalizedNetwork);
-    return accounts;
+    const accs = await requestTradeLayer('requestAccounts', {
+      network,
+    });
+
+    return accs.map((a: any) => ({
+      address: a.address,
+      pubkey: a.pubkey,
+    }));
   }
 
   async signMessage(
@@ -1074,18 +834,6 @@ export class WalletService {
     const p = this.provider$.value || this.pick();
     if (!p) throw new Error('Wallet not connected');
     return p.signPsbt(psbtBase64, opts);
-  }
-
-  async signPSBT(
-    psbtBase64: string,
-    opts?: {
-      autoFinalize?: boolean;
-      broadcast?: boolean;
-      signingIndexes?: number[];
-      sigHash?: number;
-    }
-  ): Promise<string> {
-    return this.signPsbt(psbtBase64, opts);
   }
 
   async signTransaction(
@@ -1129,9 +877,8 @@ function hexToBase64(hex: string): string {
 declare global {
   interface Window {
     tradelayer?: {
-      providerId: 'tradelayer';
-      isTradeLayer: true;
-      version?: string;
+      providerId?: string;
+      isTradeLayer?: boolean;
       request: (args: { method: string; params?: any }) => Promise<any>;
       connect?: (network?: string) => Promise<any>;
       requestAccounts?: (network?: string) => Promise<any>;
@@ -1140,8 +887,7 @@ declare global {
       off?: (ev: string, cb: (...a: any[]) => void) => void;
     };
     myWallet?: {
-      requestAccounts?: () => Promise<any>;
-      sendRequest?: (method: string, params?: any) => Promise<any>;
+      sendRequest: (method: string, params?: any) => Promise<any>;
       on?: (ev: string, cb: (...a: any[]) => void) => void;
       off?: (ev: string, cb: (...a: any[]) => void) => void;
     };
