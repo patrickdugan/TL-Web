@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TradeLayer Provider Harness</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      background: #101525;
+      color: #edf3ff;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      margin: 0;
+      padding: 24px;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 18px;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    button, select {
+      background: #1f6feb;
+      border: 1px solid #58a6ff;
+      color: #fff;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+
+    select {
+      background: #172033;
+    }
+
+    button.secondary {
+      background: #263245;
+      border-color: #526178;
+    }
+
+    pre {
+      background: #05070d;
+      border: 1px solid #2f3a4f;
+      border-radius: 4px;
+      min-height: 520px;
+      overflow: auto;
+      padding: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+  <script type="module" src="./window.js"></script>
+</head>
+<body>
+  <main>
+    <h1>TradeLayer Provider Harness</h1>
+    <div class="row">
+      <select id="network">
+        <option value="BTC">BTC</option>
+        <option value="LTC">LTC</option>
+        <option value="LTCTEST" selected>LTCTEST</option>
+      </select>
+      <button id="inspect">Inspect Providers</button>
+      <button id="phantom">Phantom requestAccounts</button>
+      <button id="tl-request">tradelayer.request</button>
+      <button id="tl-network">tradelayer.requestAccountsForNetwork</button>
+      <button id="tl-send">tradelayer.sendRequest</button>
+      <button id="mw-send">myWallet.sendRequest</button>
+      <button id="mw-accounts">myWallet.requestAccounts</button>
+      <button id="run-all">Run All</button>
+      <button id="clear" class="secondary">Clear</button>
+    </div>
+    <pre id="log"></pre>
+  </main>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const networkEl = document.getElementById('network');
+
+    const safeKeys = (value) => {
+      try {
+        return value ? Object.keys(value) : null;
+      } catch (error) {
+        return `keys failed: ${error.message}`;
+      }
+    };
+
+    const serialize = (value) => JSON.stringify(value, (_key, item) => {
+      if (typeof item === 'function') return '[function]';
+      if (item instanceof Error) {
+        return { name: item.name, message: item.message, stack: item.stack };
+      }
+      return item;
+    }, 2);
+
+    const log = (label, value) => {
+      const time = new Date().toISOString();
+      logEl.textContent += `\n[${time}] ${label}\n${serialize(value)}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    const withTimeout = (label, promise, timeoutMs = 15000) => {
+      let timeoutId;
+      const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      });
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+    };
+
+    const network = () => networkEl.value;
+
+    const inspectProviders = () => {
+      log('provider snapshot', {
+        href: location.href,
+        origin: location.origin,
+        phantom: !!window.phantom,
+        phantomKeys: safeKeys(window.phantom),
+        phantomBitcoin: !!window.phantom?.bitcoin,
+        phantomBitcoinKeys: safeKeys(window.phantom?.bitcoin),
+        phantomBitcoinRequestAccounts: typeof window.phantom?.bitcoin?.requestAccounts,
+        tradelayer: !!window.tradelayer,
+        tradelayerKeys: safeKeys(window.tradelayer),
+        tradelayerRequest: typeof window.tradelayer?.request,
+        tradelayerSendRequest: typeof window.tradelayer?.sendRequest,
+        tradelayerRequestAccounts: typeof window.tradelayer?.requestAccounts,
+        tradelayerRequestAccountsForNetwork: typeof window.tradelayer?.requestAccountsForNetwork,
+        myWallet: !!window.myWallet,
+        myWalletKeys: safeKeys(window.myWallet),
+        myWalletSendRequest: typeof window.myWallet?.sendRequest,
+        myWalletRequestAccounts: typeof window.myWallet?.requestAccounts,
+      });
+    };
+
+    const runCase = async (label, fn) => {
+      inspectProviders();
+      try {
+        log(`${label} start`, { network: network() });
+        const result = await withTimeout(label, fn());
+        log(`${label} success`, result);
+        return result;
+      } catch (error) {
+        log(`${label} error`, error);
+        throw error;
+      }
+    };
+
+    const handlers = {
+      inspect: inspectProviders,
+      phantom: () => runCase('phantom.requestAccounts', () => window.phantom.bitcoin.requestAccounts()),
+      'tl-request': () => runCase('tradelayer.request(requestAccounts)', () =>
+        window.tradelayer.request({ method: 'requestAccounts', params: { network: network() } })
+      ),
+      'tl-network': () => runCase('tradelayer.requestAccountsForNetwork', () =>
+        window.tradelayer.requestAccountsForNetwork(network())
+      ),
+      'tl-send': () => runCase('tradelayer.sendRequest(requestAccounts)', () =>
+        window.tradelayer.sendRequest('requestAccounts', { network: network() })
+      ),
+      'mw-send': () => runCase('myWallet.sendRequest(requestAccounts)', () =>
+        window.myWallet.sendRequest('requestAccounts', { network: network() })
+      ),
+      'mw-accounts': () => runCase('myWallet.requestAccounts', () =>
+        window.myWallet.requestAccounts(network())
+      ),
+      clear: () => { logEl.textContent = ''; },
+    };
+
+    document.getElementById('run-all').addEventListener('click', async () => {
+      for (const id of ['phantom', 'tl-request', 'tl-network', 'tl-send', 'mw-send', 'mw-accounts']) {
+        try {
+          await handlers[id]();
+        } catch (_error) {
+          // Continue so one failed path does not hide the next provider shape.
+        }
+      }
+    });
+
+    Object.entries(handlers).forEach(([id, handler]) => {
+      document.getElementById(id)?.addEventListener('click', () => handler());
+    });
+
+    window.addEventListener('message', (event) => {
+      if (event.source !== window) return;
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type || data.channel) {
+        log('window message', data);
+      }
+    });
+
+    setTimeout(inspectProviders, 500);
+  </script>
+</body>
+</html>
