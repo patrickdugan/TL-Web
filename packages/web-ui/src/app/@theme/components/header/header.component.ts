@@ -207,8 +207,11 @@ async connectWallet() {
       const accounts = await ph.requestAccounts(); // triggers Phantom approval UI
       if (accounts && accounts.length > 0) {
         // accounts: BtcAccount[] per docs: { address, addressType, publicKey, purpose }
-        this.walletAddress = accounts[0].address;
+        const nextAddress = accounts[0].address;
+        this.walletAddress = nextAddress;
         this.balanceVisible = true;
+        this.walletService.addresses$.next([nextAddress]);
+        this.walletService.address$.next(nextAddress);
         console.log("Connected Phantom BTC Address:", this.walletAddress);
       }
 
@@ -217,7 +220,10 @@ async connectWallet() {
         ph.on("accountsChanged", (newAccounts: any[]) => {
           console.log("Phantom accounts changed:", newAccounts);
           if (Array.isArray(newAccounts) && newAccounts.length > 0) {
-            this.walletAddress = newAccounts[0].address;
+            const nextAddress = newAccounts[0].address;
+            this.walletAddress = nextAddress;
+            this.walletService.addresses$.next([nextAddress]);
+            this.walletService.address$.next(nextAddress);
           } else {
             // If empty array, try to reconnect (per docs suggestion)
             ph.requestAccounts().catch((e: any) => console.warn("Re-connect failed:", e));
@@ -229,18 +235,24 @@ async connectWallet() {
     }
 
     // --- Fallback: your existing custom wallet path ---
-    if (this.walletService.hasTradeLayerWallet()) {
+    const customWallet: any = (window as any).myWallet || (window as any).tradelayer;
+    if (customWallet && typeof customWallet.sendRequest === "function") {
       console.log("Fallback wallet detected.");
 
       if (this.isLitecoinNetwork && this.walletAddress && this.walletAddress.startsWith('bc1')) {
         this.walletAddress = null;
       }
 
-      await this.walletService.connectPreferred();
-      const nextAddress = this.walletService.address$.value;
+      const accounts = await customWallet.sendRequest("requestAccounts", {
+        network: this.rpcService.NETWORK,
+      });
+      const firstAccount = Array.isArray(accounts) ? accounts[0] : null;
+      const nextAddress = firstAccount?.address || firstAccount || null;
       if (nextAddress) {
         this.walletAddress = nextAddress;
         this.balanceVisible = true;
+        this.walletService.addresses$.next([nextAddress]);
+        this.walletService.address$.next(nextAddress);
         console.log("Connected Wallet Address:", this.walletAddress);
       }
 
