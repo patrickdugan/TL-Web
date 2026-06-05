@@ -200,7 +200,7 @@ async connectWallet() {
 //
     // --- Phantom Bitcoin provider (preferred) ---
     const ph: any = (window as any)?.phantom?.bitcoin;
-    if (!this.isLitecoinNetwork && ph?.isPhantom) {
+    if (!this.isLitecoinNetwork && typeof ph?.requestAccounts === 'function') {
       console.log("Phantom Bitcoin detected.");
 
       // Must be called from a user gesture (your button click) to show the approval modal.
