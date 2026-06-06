@@ -243,9 +243,21 @@ async connectWallet() {
         this.walletAddress = null;
       }
 
-      const accounts = await customWallet.sendRequest("requestAccounts", {
-        network: this.rpcService.NETWORK,
-      });
+      const network = this.rpcService.NETWORK;
+      let accounts: any = null;
+
+      if (typeof customWallet.connect === "function") {
+        try {
+          accounts = await customWallet.connect(network);
+        } catch (connectError) {
+          console.warn("[wallet] custom provider connect failed; falling back to requestAccounts", connectError);
+        }
+      }
+
+      if (!Array.isArray(accounts) || accounts.length === 0) {
+        accounts = await customWallet.sendRequest("requestAccounts", { network });
+      }
+
       const firstAccount = Array.isArray(accounts) ? accounts[0] : null;
       const nextAddress = firstAccount?.address || firstAccount || null;
       if (nextAddress) {

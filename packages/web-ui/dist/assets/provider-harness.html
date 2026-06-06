@@ -71,6 +71,7 @@
       </select>
       <button id="inspect">Inspect Providers</button>
       <button id="phantom">Phantom requestAccounts</button>
+      <button id="tl-connect">tradelayer.connect</button>
       <button id="tl-request">tradelayer.request</button>
       <button id="tl-network">tradelayer.requestAccountsForNetwork</button>
       <button id="tl-send">tradelayer.sendRequest</button>
@@ -156,6 +157,9 @@
     const handlers = {
       inspect: inspectProviders,
       phantom: () => runCase('phantom.requestAccounts', () => window.phantom.bitcoin.requestAccounts()),
+      'tl-connect': () => runCase('tradelayer.connect', () =>
+        window.tradelayer.connect(network())
+      ),
       'tl-request': () => runCase('tradelayer.request(requestAccounts)', () =>
         window.tradelayer.request({ method: 'requestAccounts', params: { network: network() } })
       ),
@@ -175,7 +179,7 @@
     };
 
     document.getElementById('run-all').addEventListener('click', async () => {
-      for (const id of ['phantom', 'tl-request', 'tl-network', 'tl-send', 'mw-send', 'mw-accounts']) {
+      for (const id of ['phantom', 'tl-connect', 'tl-request', 'tl-network', 'tl-send', 'mw-send', 'mw-accounts']) {
         try {
           await handlers[id]();
         } catch (_error) {
