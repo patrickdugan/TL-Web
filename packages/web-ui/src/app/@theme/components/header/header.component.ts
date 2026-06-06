@@ -234,8 +234,15 @@ async connectWallet() {
     return; // Done with Phantom path
     }
 
-    // --- Fallback: your existing custom wallet path ---
-    const customWallet: any = (window as any).myWallet || (window as any).tradelayer;
+    // --- Fallback: TradeLayer custom wallet ---
+    const legacyWallet: any = (window as any).myWallet;
+    const tradeLayerWallet: any = (window as any).tradelayer;
+    const legacyShimAvailable =
+      legacyWallet &&
+      typeof legacyWallet.sendRequest === "function" &&
+      legacyWallet !== tradeLayerWallet;
+    const customWallet: any = legacyShimAvailable ? legacyWallet : tradeLayerWallet;
+
     if (customWallet && typeof customWallet.sendRequest === "function") {
       console.log("Fallback wallet detected.");
 
@@ -246,7 +253,9 @@ async connectWallet() {
       const network = this.rpcService.NETWORK;
       let accounts: any = null;
 
-      if (typeof customWallet.connect === "function") {
+      if (legacyShimAvailable) {
+        accounts = await legacyWallet.sendRequest("requestAccounts", {});
+      } else if (typeof customWallet.connect === "function") {
         try {
           accounts = await customWallet.connect(network);
         } catch (connectError) {
