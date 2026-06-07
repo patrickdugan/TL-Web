@@ -67,12 +67,10 @@ class MyWalletProvider extends EventEmitter {
       if (event.source !== window) return;
 
       const { type, data } = event.data;
-      console.log('in listener in window.js '+type+' '+JSON.stringify(data))
-      console.log('data result '+JSON.stringify(data.result))
       if (type === 'response') {
         const response = data && (data.payload || data);
         const { id, result, error, success } = response || {};
-        console.log('window handle response '+JSON.stringify(result)+' '+id+' err? '+error)
+        console.log('window.js response', { id, result, error, success });
         const { resolve, reject } = this.pendingRequests.get(id) || {};
         if (resolve) {
           this.pendingRequests.delete(id);
@@ -80,6 +78,8 @@ class MyWalletProvider extends EventEmitter {
         }
       } else if (type === 'accountsChanged' || type === 'networkChanged'|| type==='signResult') {
         this.emit(type, data);
+      } else {
+        console.log('window.js request', { type, data });
       }
     });
 
@@ -97,7 +97,7 @@ class MyWalletProvider extends EventEmitter {
   sendRequest(method, params) {
     return new Promise((resolve, reject) => {
       const id = ++this.requestId;
-      console.log('id '+id)
+      console.log('window.js request id', id);
       this.pendingRequests.set(id, { resolve, reject });
       window.postMessage({ type: 'request', data: { id, method, params } }, '*');
     });
