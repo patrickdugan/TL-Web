@@ -35,6 +35,37 @@
                 padding: 0 0.5rem;
             }
         }
+        .selected-utxo-card {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .selected-utxo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+        }
+        .selected-utxo-address {
+            color: #9fd7ff;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .selected-utxo-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            color: #d9e8ff;
+            margin-bottom: 0.75rem;
+            .summary-divider {
+                opacity: 0.65;
+            }
+        }
         mat-card-content {
             color: whitesmoke;
             overflow: auto;
@@ -42,10 +73,15 @@
                 text-align: center;
             }
         }
+        .balance-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
         .new-address-buttton {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
+            white-space: nowrap;
         }
     }
 }
@@ -75,7 +111,8 @@
 }
 
   .mat-column-address {
-    min-width: 12rem;
+    min-width: 10rem;
+    max-width: 12rem;
   }
 
   .mat-column-propertyid,
@@ -87,13 +124,39 @@
     min-width: 6rem;
   }
 
+  .mat-column-tokens {
+    min-width: 10rem;
+    max-width: 14rem;
+  }
+
   .mat-column-attestation {
-    max-width: 3rem;
+    min-width: 6rem;
+    max-width: 7rem;
     mat-icon {
         cursor: pointer;
-        margin-left: 1rem;
+        margin-left: 0;
     }
   }
   .mat-column-actions {
-    min-width: 16rem;
+    min-width: 10rem;
+  }
+
+  .mat-column-txid {
+    min-width: 14rem;
+    max-width: 18rem;
+  }
+
+  .mat-column-vout,
+  .mat-column-confirmations,
+  .mat-column-amount {
+    min-width: 5rem;
+    max-width: 7rem;
+  }
+
+  .mat-column-txid,
+  .mat-column-address,
+  .mat-column-tokens {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }

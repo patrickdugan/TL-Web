@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { HttpClient } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
@@ -13,6 +13,8 @@ import { ENCODER } from 'src/app/utils/payloads/encoder';
 import { WalletService } from 'src/app/@core/services/wallet.service'
 import { ProceduralRuntimeConfig, ProceduralRuntimeService } from 'src/app/@core/services/procedural-runtime.service';
 import { environment } from 'src/environments/environment';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'tl-portoflio-page',
@@ -23,9 +25,11 @@ export class PortfolioPageComponent implements OnInit {
   cryptoBalanceColumns: string[] = ['attestation', 'address', 'confirmed', 'unconfirmed', 'actions'];
   tokensBalanceColums: string[] = ['propertyid', 'name', 'available', 'reserved', 'margin', 'channel', 'actions'];
   selectedAddress: string = '';
+  hideZeroBalances = false;
   private url = "https://ws.layerwallet.com/relayer";
   receiptPropertyId: number | null = null;
   proceduralConfig: ProceduralRuntimeConfig | null = null;
+  private destroy$ = new Subject<void>();
 
   constructor(
     private balanceService: BalanceService,
@@ -47,11 +51,33 @@ export class PortfolioPageComponent implements OnInit {
     return Object.keys(this.balanceService.allBalances).map((address) => ({
       address,
       ...(this.balanceService.allBalances?.[address]?.coinBalance || {}),
-    }));
+    })).filter((row) => {
+      if (!this.hideZeroBalances) {
+        return true;
+      }
+
+      const confirmed = Number(row?.confirmed || 0);
+      const unconfirmed = Number(row?.unconfirmed || 0);
+      return confirmed !== 0 || unconfirmed !== 0;
+    });
   }
 
   get tokensBalances() {
     return this.balanceService.getTokensBalancesByAddress(this.selectedAddress);
+  }
+
+  get selectedCoinBalance() {
+    return this.selectedAddress
+      ? this.balanceService.getCoinBalancesByAddress(this.selectedAddress)
+      : { confirmed: 0, unconfirmed: 0, utxos: [] as any[] };
+  }
+
+  get selectedUtxos() {
+    return this.selectedCoinBalance.utxos || [];
+  }
+
+  formatBalance(value: any): string {
+    return Number(value || 0).toFixed(6);
   }
 
   get isAbleToRpc() {
@@ -86,6 +112,28 @@ export class PortfolioPageComponent implements OnInit {
   ngOnInit(): void {
     this.authService.listOfallAddresses; // Placeholder for actual logic
     this.loadProceduralRuntime();
+
+    this.walletService.address$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((address) => {
+        if (!address) {
+          return;
+        }
+
+        if (this.selectedAddress !== address) {
+          this.selectedAddress = address;
+        }
+      });
+
+    const currentAddress = this.walletService.address$.value;
+    if (currentAddress && !this.selectedAddress) {
+      this.selectedAddress = currentAddress;
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   shouldShowVesting(propertyId: number): boolean {
@@ -94,9 +142,9 @@ export class PortfolioPageComponent implements OnInit {
 
   getReservedOrVestingValue(element: any): string {
     if (element.propertyid === 2 || element.propertyid === 3) {
-      return element.vesting !== undefined ? element.vesting.toFixed(6) : 'N/A';
+      return Number(element?.vesting || 0).toFixed(6);
     } else {
-      return element.reserved !== undefined ? element.reserved.toFixed(6) : 'N/A';
+      return Number(element?.reserved || 0).toFixed(6);
     }
   }
 
