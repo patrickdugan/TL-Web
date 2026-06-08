@@ -3,6 +3,9 @@
         <h3 class="warning" *ngIf="!isSynced">
           The Node is not synced and the balance may be incorrect.
         </h3>
+        <div class="wallet-bootstrap-status" *ngIf="walletBootstrapStatus">
+          {{ walletBootstrapStatus }}
+        </div>
         <mat-card-header>Balance</mat-card-header>
         <div class="portfolio-toolbar">
           <mat-checkbox [(ngModel)]="hideZeroBalances">Hide 0 balances</mat-checkbox>
@@ -58,6 +61,13 @@
                 <ng-container matColumnDef="unconfirmed">
                     <mat-header-cell *matHeaderCellDef>Unconfirmed</mat-header-cell>
                     <mat-cell *matCellDef="let element"> {{ formatBalance(element?.unconfirmed) }} </mat-cell>
+                </ng-container>
+
+                <ng-container matColumnDef="tokens">
+                    <mat-header-cell *matHeaderCellDef>Tokens</mat-header-cell>
+                    <mat-cell *matCellDef="let element" [title]="element.tokenSummary">
+                        {{ element.tokenSummary }}
+                    </mat-cell>
                 </ng-container>
 
                 <ng-container matColumnDef="actions">

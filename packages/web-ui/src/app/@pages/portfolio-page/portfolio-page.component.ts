@@ -22,7 +22,7 @@ import { takeUntil } from 'rxjs/operators';
   styleUrls: ['./portfolio-page.component.scss'],
 })
 export class PortfolioPageComponent implements OnInit {
-  cryptoBalanceColumns: string[] = ['attestation', 'address', 'confirmed', 'unconfirmed', 'actions'];
+  cryptoBalanceColumns: string[] = ['attestation', 'address', 'confirmed', 'unconfirmed', 'tokens', 'actions'];
   tokensBalanceColums: string[] = ['propertyid', 'name', 'available', 'reserved', 'margin', 'channel', 'actions'];
   selectedAddress: string = '';
   hideZeroBalances = false;
@@ -48,18 +48,43 @@ export class PortfolioPageComponent implements OnInit {
   ) {}
 
   get coinBalance() {
-    return Object.keys(this.balanceService.allBalances).map((address) => ({
-      address,
-      ...(this.balanceService.allBalances?.[address]?.coinBalance || {}),
-    })).filter((row) => {
-      if (!this.hideZeroBalances) {
-        return true;
-      }
+    const addresses = Object.keys(this.balanceService.allBalances || {});
+    const nextRows = addresses
+      .map((address, index) => {
+        const coinBalance = this.balanceService.getCoinBalancesByAddress(address) || {};
+        const hasNativeBalance = this.hasNativeBalance(coinBalance);
+        const hasTokenBalance = this.hasTokenBalance(address);
+        return {
+          address,
+          index,
+          hasAnyBalance: hasNativeBalance || hasTokenBalance,
+          tokenSummary: this.getTokenSummaryForAddress(address),
+          ...coinBalance,
+        };
+      })
+      .filter((row) => !this.hideZeroBalances || row.hasAnyBalance)
+      .sort((a, b) => {
+        if (a.hasAnyBalance !== b.hasAnyBalance) {
+          return a.hasAnyBalance ? -1 : 1;
+        }
 
-      const confirmed = Number(row?.confirmed || 0);
-      const unconfirmed = Number(row?.unconfirmed || 0);
-      return confirmed !== 0 || unconfirmed !== 0;
-    });
+        const aConfirmed = Number(a.confirmed || 0);
+        const bConfirmed = Number(b.confirmed || 0);
+        if (aConfirmed !== bConfirmed) {
+          return bConfirmed - aConfirmed;
+        }
+
+        const aUnconfirmed = Number(a.unconfirmed || 0);
+        const bUnconfirmed = Number(b.unconfirmed || 0);
+        if (aUnconfirmed !== bUnconfirmed) {
+          return bUnconfirmed - aUnconfirmed;
+        }
+
+        return a.index - b.index;
+      })
+      .map(({ index, hasAnyBalance, ...balanceRow }) => balanceRow);
+
+    return nextRows;
   }
 
   get tokensBalances() {
@@ -80,8 +105,49 @@ export class PortfolioPageComponent implements OnInit {
     return Number(value || 0).toFixed(6);
   }
 
+  private hasNativeBalance(balance: any): boolean {
+    const confirmed = Number(balance?.confirmed || 0);
+    const unconfirmed = Number(balance?.unconfirmed || 0);
+    return confirmed > 0 || unconfirmed > 0;
+  }
+
+  private hasTokenBalance(address: string): boolean {
+    const balances = this.balanceService.getTokensBalancesByAddress(address) || [];
+    return balances.some((row: any) => {
+      return ['amount', 'available', 'reserved', 'margin', 'vesting', 'channel']
+        .some((field) => Math.abs(Number(row?.[field] || 0)) > 0);
+    });
+  }
+
+  getTokenSummaryForAddress(address: string): string {
+    const balances = this.balanceService.getTokensBalancesByAddress(address) || [];
+    const nonZeroBalances = balances
+      .map((row: any) => {
+        const total = ['available', 'reserved', 'margin', 'vesting', 'channel']
+          .reduce((sum, field) => sum + Number(row?.[field] || 0), 0);
+        return {
+          label: row?.name || row?.ticker || row?.rawPropertyId || row?.propertyid || 'Token',
+          total,
+        };
+      })
+      .filter((row) => Math.abs(row.total) > 0);
+
+    if (!nonZeroBalances.length) return '-';
+
+    return nonZeroBalances
+      .slice(0, 3)
+      .map((row) => `${row.label}: ${Number(row.total.toFixed(6))}`)
+      .join(', ');
+  }
+
   get isAbleToRpc() {
     return this.rpcService.isAbleToRpc;
+  }
+
+  get walletBootstrapStatus(): string {
+    if (!this.walletService.isWalletAvailable()) return 'Waiting for wallet extension...';
+    if (!this.walletService.address$.value) return 'Wallet loaded, waiting for connection...';
+    return '';
   }
 
   get isSynced() {
