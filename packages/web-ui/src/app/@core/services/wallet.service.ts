@@ -513,12 +513,21 @@ export class WalletService {
 
   async checkIP(): Promise<{ ip: string; isVpn: boolean; countryCode: string }> {
     this.relayerWsService.setBaseUrl(this.baseUrl);
-    const res = await this.relayerWsService.request<{ ip: string; isVpn: boolean; countryCode: string }>(
+    const res = await this.relayerWsService.request<any>(
       `/attestation/ip`,
       { method: "GET" }
     );
 
-    return res;
+    return {
+      ip: res?.ip || res?.attestation?.ip,
+      isVpn: !!(res?.isVpn || res?.attestation?.isVpn),
+      countryCode: String(
+        res?.countryCode ||
+        res?.attestation?.countryCode ||
+        res?.attestation?.country ||
+        'UNKNOWN'
+      ).toUpperCase(),
+    };
   }
 
   private msigKey(m: number, pubKeys: string[]): string {
